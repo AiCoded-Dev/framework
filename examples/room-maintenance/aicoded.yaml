@@ -1,0 +1,19 @@
+app: room-maintenance
+data:
+  - source: sqldb
+    classes: [internal]
+# access is written by aicoded generate from <ssr:access>; do not edit it
+access:
+  "/tickets":
+    require: ["staff"]
+  "/tickets/report":
+    require: ["staff"]
+  "/tickets/{id}":
+    require: ["staff"]
+    guard: true
+  "/tickets/{id}/edit":
+    require: ["staff"]
+    guard: true
+  "/tickets/{id}/status":
+    require: ["staff", "hotel-ops"]
+    guard: true

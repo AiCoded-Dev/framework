@@ -1,0 +1,8 @@
+<ssr:var name="q" type="string"/>
+<ssr:var name="link" type="string"/>
+<ssr:var name="page" type="map[string]string"/>
+<h1>Home</h1>
+<p id="echo">{{ q }}</p>
+<a id="link" href="{{ link }}">link</a>
+<a id="search" href="/home?q={{ q }}">again</a>
+<ssr:json name="page-data" value="page"/>

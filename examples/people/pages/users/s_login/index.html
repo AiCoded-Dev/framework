@@ -1,0 +1,20 @@
+<ssr:var name="user" type="User"/>
+<ssr:var name="initials" type="string"/>
+<ssr:var name="photos" type="[]PhotoFile"/>
+<ssr:var name="tabClass" type="func(string) string"/>
+<article class="card profile">
+  <div id="avatar" class="avatar">{{ initials }}</div>
+  <div>
+    <h1 id="user-name">{{ user.Name }}</h1>
+    <ul>
+      <li>Login: <strong id="user-login">{{ user.Login }}</strong></li>
+      <li>Age: <strong id="user-age">{{ user.Age }}</strong></li>
+      <li ssr:for="photo in photos" class="photo">Photo: {{ photo.Name }}, {{ photo.Size }} bytes</li>
+    </ul>
+    <nav class="tabs">
+      <a id="tab-info" class="{{ tabClass('info') }}" href="/users/{{ user.Login }}/info">Info</a>
+      <a id="tab-contacts" class="{{ tabClass('contacts') }}" href="/users/{{ user.Login }}/contacts">Contacts</a>
+    </nav>
+  </div>
+</article>
+<ssr:content default="info"/>

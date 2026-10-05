@@ -1,0 +1,4 @@
+<ssr:var name="apps" type="[]string"/>
+<h1>Mail</h1>
+<p>aicoded dev keeps the mail each app sends, and sends none of it.</p>
+<ul id="apps"><li ssr:for="a in apps"><a href="/mail/{{ a }}">{{ a }}</a></li></ul>

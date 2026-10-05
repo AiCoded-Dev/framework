@@ -1,0 +1,15 @@
+app: site
+# access is written by aicoded generate from <ssr:access>; do not edit it
+access:
+  "/admin/live":
+    require: ["admin"]
+  "/admin/settings":
+    require: ["admin"]
+  "/home":
+    require: ["*"]
+  "/notes":
+    require: ["editor"]
+  "/notes/{id}":
+    require: ["editor"]
+    guard: true
+    calls: ["star"]

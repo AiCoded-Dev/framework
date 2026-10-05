@@ -1,0 +1,21 @@
+app: billing
+# access is written by aicoded generate from <ssr:access>; do not edit it
+access: {}
+# services is written by aicoded generate from rpc/ and the clients in services/; do not edit it
+services:
+  serves:
+    "Fail":
+      callers: ["shop"]
+      require: ["*"]
+    "GetInvoice":
+      callers: ["shop"]
+      require: ["editor"]
+    "Missing":
+      callers: ["shop"]
+      require: ["*"]
+    "Ping":
+      callers: ["shop"]
+      apps: true
+    "Secret":
+      callers: ["shop"]
+      require: ["admin"]

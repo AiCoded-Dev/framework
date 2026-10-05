@@ -1,0 +1,44 @@
+#filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em 1em;
+  align-items: end;
+  margin-bottom: 1em;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  text-align: start;
+  vertical-align: top;
+  padding: 0.2em 0.5em;
+  border-bottom: 1px solid #8884;
+}
+
+.message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.attrs {
+  display: block;
+  opacity: 0.7;
+  font-family: ui-monospace, monospace;
+}
+
+.level-WARN td {
+  background: #fc03;
+}
+
+.level-ERROR td {
+  background: #f003;
+}
+
+.error {
+  color: #d00;
+  white-space: pre-wrap;
+}

@@ -1,0 +1,9 @@
+<ssr:access role="*"/>
+<ssr:var name="invoice" type="Invoice"/>
+<ssr:var name="due" type="string"/>
+<ssr:var name="paid" type="string"/>
+<h1 id="customer">{{ invoice.Customer }}</h1>
+<p id="viewer">{{ invoice.Viewer }}</p>
+<ul id="lines"><li ssr:for="l in invoice.Lines">{{ l.Item }}: {{ l.Amount }}</li></ul>
+<p id="due">{{ due }}</p>
+<p id="paid">{{ paid }}</p>

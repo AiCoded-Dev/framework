@@ -1,0 +1,9 @@
+<ssr:access role="editor" guard="true"/>
+<ssr:var name="note" type="Note"/>
+<h1>{{ note.Title }}</h1>
+<a href="/notes/{{ note.ID }}/print">Print</a>
+<a href="/{{ note.Slug }}">Short link</a>
+<ssr:form name="rename">
+    <ssr:input name="title" type="text" required/>
+    <button type="submit">Save</button>
+</ssr:form>

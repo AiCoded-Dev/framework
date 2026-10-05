@@ -1,0 +1,13 @@
+<ssr:var name="root" type="string"/>
+<ssr:var name="claude" type="string"/>
+<ssr:var name="codex" type="string"/>
+<ssr:var name="cursor" type="string"/>
+<h1>MCP setup</h1>
+<p>Your AI assistant builds and checks the apps of <code>{{ root }}</code> through <code>aicoded mcp</code>. Set it up once in the assistant you use.</p>
+<h2>Claude Code</h2>
+<pre id="claude">{{ claude }}</pre>
+<h2>Codex</h2>
+<pre id="codex">{{ codex }}</pre>
+<h2>Cursor</h2>
+<p>Put this in <code>.cursor/mcp.json</code> in that folder:</p>
+<pre id="cursor">{{ cursor }}</pre>

@@ -1,0 +1,19 @@
+<ssr:var name="everyone" type="bool"/>
+<ssr:var name="tickets" type="[]Ticket" reactive="true"/>
+<h1>{{ everyone ? 'All tickets' : 'Your tickets' }}</h1>
+<p id="no-tickets" ssr:if="len(tickets) == 0">No tickets yet.</p>
+<table id="tickets" ssr:else>
+  <thead>
+    <tr><th>Ticket</th><th>Room</th><th>Problem</th><th ssr:if="everyone">Reported by</th><th>Status</th><th>Updated</th></tr>
+  </thead>
+  <tbody>
+    <tr ssr:for="t in tickets" id="ticket-{{ t.ID }}">
+      <td>#{{ t.ID }}</td>
+      <td>{{ t.Room }}</td>
+      <td><a href="/tickets/{{ t.ID }}">{{ t.Title }}</a></td>
+      <td ssr:if="everyone">{{ t.Author }}</td>
+      <td class="status {{ t.Status }}">{{ t.Status.Label() }}</td>
+      <td>{{ t.Updated.Format('2006-01-02 15:04 UTC') }}</td>
+    </tr>
+  </tbody>
+</table>

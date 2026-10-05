@@ -1,0 +1,28 @@
+<ssr:var name="m" type="Message"/>
+<p><a href="/mail/{{ m.App }}">All mail of {{ m.App }}</a></p>
+<h1>{{ m.Subject != '' ? m.Subject : '(no subject)' }}</h1>
+<table id="headers">
+<tr><th>Folder</th><td>{{ m.Folder }}</td></tr>
+<tr><th>Time</th><td><time datetime="{{ m.Stamp }}">{{ m.Time }}</time></td></tr>
+<tr><th>From</th><td>{{ m.From }}</td></tr>
+<tr><th>To</th><td>{{ m.To }}</td></tr>
+<tr ssr:if="m.Cc != ''"><th>Cc</th><td>{{ m.Cc }}</td></tr>
+<tr ssr:if="m.Bcc != ''"><th>Bcc</th><td>{{ m.Bcc }}</td></tr>
+<tr ssr:if="m.ReplyTo != ''"><th>Reply-To</th><td>{{ m.ReplyTo }}</td></tr>
+</table>
+<h2>Text</h2>
+<pre id="text" ssr:if="m.Text != ''">{{ m.Text }}</pre>
+<p ssr:else>The message has no text part.</p>
+<section ssr:if="m.HTML">
+<h2>HTML</h2>
+<iframe sandbox src="/_aicoded/mail/{{ m.App }}/{{ m.ID }}" title="The HTML part of the message"></iframe>
+</section>
+<section ssr:if="len(m.Attachments) > 0">
+<h2>Attachments</h2>
+<table id="attachments">
+<thead><tr><th>Name</th><th>Type</th><th>Size</th></tr></thead>
+<tbody>
+<tr ssr:for="a in m.Attachments"><td>{{ a.Name }}</td><td>{{ a.Type }}</td><td>{{ a.Size }} bytes</td></tr>
+</tbody>
+</table>
+</section>

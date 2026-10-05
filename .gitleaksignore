@@ -1,0 +1,10 @@
+# Findings of make secrets that stay in old commits after being fixed at their source, listed by
+# commit fingerprint, <commit>:<file>:<rule>:<line>. None of them is a secret.
+
+# The generator's log line for a live block, "key", "<block key>", in a generated dev UI page.
+7063a6a682560637b49595a76b93f7afb4235e71:cmd/aicoded/internal/devui/pages/logs/route_gen.go:generic-api-key:442
+3ce2a50358a2142a759c0f2de50626585d43fdfc:cmd/aicoded/internal/devui/pages/apps/route_gen.go:generic-api-key:212
+# The same log line in the generator's golden file.
+7c42846fdabfa718285be53c9f43d2978fe752ba:cmd/aicoded/internal/generate/testdata/golden/live_route_gen.go.golden:generic-api-key:216
+# The made-up access token of the dev UI tests.
+a3908ba762d87e65f935173c08cf3974cd6c9807:cmd/aicoded/internal/devui/devui_test.go:generic-api-key:25

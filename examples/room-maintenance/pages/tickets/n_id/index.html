@@ -1,0 +1,24 @@
+<ssr:access role="staff" guard="true"/>
+<ssr:var name="ticket" type="Ticket"/>
+<ssr:var name="canEdit" type="bool"/>
+<ssr:var name="canSetStatus" type="bool"/>
+<article class="card">
+  <h1 id="ticket-title">{{ ticket.Title }}</h1>
+  <dl>
+    <dt>Room</dt>
+    <dd id="ticket-room">{{ ticket.Room }}</dd>
+    <dt>Status</dt>
+    <dd id="ticket-status" class="status {{ ticket.Status }}">{{ ticket.Status.Label() }}</dd>
+    <dt>Reported by</dt>
+    <dd id="ticket-author">{{ ticket.Author }}</dd>
+    <dt>Reported</dt>
+    <dd>{{ ticket.Created.Format('2006-01-02 15:04 UTC') }}</dd>
+    <dt>Updated</dt>
+    <dd>{{ ticket.Updated.Format('2006-01-02 15:04 UTC') }}</dd>
+  </dl>
+  <p id="ticket-details" class="details">{{ ticket.Details }}</p>
+  <p class="actions">
+    <a id="edit" ssr:if="canEdit" href="/tickets/{{ ticket.ID }}/edit">Edit</a>
+    <a id="set-status" ssr:if="canSetStatus" href="/tickets/{{ ticket.ID }}/status">Change the status</a>
+  </p>
+</article>

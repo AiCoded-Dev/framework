@@ -1,0 +1,43 @@
+<ssr:access role="developer" guard="true"/>
+<ssr:var name="name" type="string"/>
+<ssr:var name="app" type="App" reactive="true"/>
+<h1>{{ name }}</h1>
+<dl>
+<dt>State</dt>
+<dd id="state">{{ app.State }}</dd>
+<dt>Since</dt>
+<dd id="since"><time datetime="{{ app.Stamp }}">{{ app.Since }}</time></dd>
+<dt>Address</dt>
+<dd id="address"><a ssr:if="app.URL != ''" href="{{ app.URL }}">{{ app.URL }}</a><span ssr:else>The app has no pages.</span></dd>
+</dl>
+<div class="actions">
+<ssr:form name="start"><button type="submit">Start</button></ssr:form>
+<ssr:form name="restart"><button type="submit">Restart</button></ssr:form>
+<ssr:form name="stop"><button type="submit">Stop</button></ssr:form>
+</div>
+<div class="actions">
+<ssr:form name="manual"><button type="submit">Run it yourself</button></ssr:form>
+<ssr:form name="auto"><button type="submit">Let aicoded dev run it</button></ssr:form>
+</div>
+<section id="manual">
+<div ssr:if="app.Command != ''">
+<h2>Run it yourself</h2>
+<p>aicoded dev keeps the app's runner up, and never builds or starts the app. Start it with:</p>
+<pre>{{ app.Command }}</pre>
+<p>To start it from a debugger, run it in its folder with the environment variable <code>AICODED_RUNNER_DIR</code> set to:</p>
+<pre>{{ app.RunnerDir }}</pre>
+</div>
+</section>
+<section id="problems">
+<div ssr:if="len(app.Problems) > 0">
+<h2>Problems</h2>
+<ul>
+<li ssr:for="p in app.Problems">
+<p><strong ssr:if="p.Code != ''">{{ p.Code }}</strong> <code ssr:if="p.Pos != ''">{{ p.Pos }}</code></p>
+<pre>{{ p.Message }}</pre>
+<p ssr:if="p.Fix != ''">Fix: {{ p.Fix }}</p>
+<p ssr:if="p.Docs != ''"><a href="{{ p.Docs }}">{{ p.Docs }}</a></p>
+</li>
+</ul>
+</div>
+</section>

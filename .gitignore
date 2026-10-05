@@ -1,0 +1,19 @@
+# Build output
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+
+# Coverage
+coverage.*
+*.coverprofile
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Working notes
+.superpowers/

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<ssr:access role="*"/>
+<title>People</title>
+<ssr:assets/>
+</head>
+<body>
+<ssr:var name="section" type="string"/>
+<ssr:var name="viewer" type="string"/>
+<ssr:var name="staff" type="bool"/>
+<nav>
+<a class="brand" href="/home">People</a>
+<a class="{{ section == 'home' ? 'active' : '' }}" href="/home">Home</a>
+<a id="nav-users" class="{{ section == 'users' ? 'active' : '' }}" href="/users" ssr:if="staff">Users</a>
+<a class="{{ section == 'contact' ? 'active' : '' }}" href="/contact">Contact</a>
+<span id="viewer" class="viewer">{{ viewer }}</span>
+</nav>
+<main>
+<ssr:content default="home"/>
+</main>
+</body>
+</html>

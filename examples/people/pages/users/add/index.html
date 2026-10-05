@@ -1,0 +1,63 @@
+<ssr:access role="hr"/>
+<h1>Add a user</h1>
+<ssr:form name="add" enctype="multipart/form-data">
+  <div class="field">
+    <label for="login">Login</label>
+    <ssr:input name="login" type="text" required maxlength="32" id="login"
+               class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="login-error" class="error" ssr:if="form.Login.HasError()">{{ form.Login.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="name">Name</label>
+    <ssr:input name="name" type="text" required maxlength="100" id="name"
+               class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="name-error" class="error" ssr:if="form.Name.HasError()">{{ form.Name.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="age">Age</label>
+    <ssr:input name="age" type="number" gotype="uint8" required min="18" max="120" step="1" id="age"
+               class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="age-error" class="error" ssr:if="form.Age.HasError()">{{ form.Age.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="team">Team</label>
+    <ssr:select name="team" required id="team"
+                class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="team-error" class="error" ssr:if="form.Team.HasError()">{{ form.Team.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="languages">Languages</label>
+    <ssr:select name="languages" multiple id="languages"
+                class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="languages-error" class="error" ssr:if="form.Languages.HasError()">{{ form.Languages.GetError() }}</p>
+  </div>
+  <div class="field">
+    <span>Works</span>
+    <label><ssr:input name="remote" type="checkbox" gotype="bool" value="false" id="on-site"/> on site</label>
+    <label><ssr:input name="remote" type="checkbox" gotype="bool" value="true" id="remote"/> remotely</label>
+    <p id="remote-error" class="error" ssr:if="form.Remote.HasError()">{{ form.Remote.GetError() }}</p>
+  </div>
+  <div class="field">
+    <span>Shift</span>
+    <label><ssr:input name="shift" type="radio" gotype="uint8" value="1" required id="day"/> day</label>
+    <label><ssr:input name="shift" type="radio" gotype="uint8" value="2" required id="night"/> night</label>
+    <p id="shift-error" class="error" ssr:if="form.Shift.HasError()">{{ form.Shift.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="bio">About them</label>
+    <ssr:textarea name="bio" required maxlength="2000" rows="5" id="bio"
+                  class="{{ form.IsValidated() ? textarea.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="bio-error" class="error" ssr:if="form.Bio.HasError()">{{ form.Bio.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="photo">Photo</label>
+    <ssr:input name="photo" type="file" required accept="image/*" id="photo"/>
+    <p id="photo-error" class="error" ssr:if="form.Photo.HasError()">{{ form.Photo.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="photos">More photos, up to 4</label>
+    <ssr:input name="photos" type="file" multiple accept="image/*" id="photos"/>
+    <p id="photos-error" class="error" ssr:if="form.Photos.HasError()">{{ form.Photos.GetError() }}</p>
+  </div>
+  <button type="submit">Add</button>
+</ssr:form>

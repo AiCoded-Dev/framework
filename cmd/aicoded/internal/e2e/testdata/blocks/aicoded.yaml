@@ -1,0 +1,17 @@
+app: blocks
+data:
+  - source: sqldb
+    classes: [internal]
+  - source: filestore:docs
+    classes: [internal]
+email:
+  from: app@blocks.test
+  to_domains: [blocks.test]
+# access is written by aicoded generate from <ssr:access>; do not edit it
+access:
+  "/inbox":
+    require: ["editor"]
+  "/items":
+    require: ["editor"]
+  "/items/{id}":
+    require: ["editor"]

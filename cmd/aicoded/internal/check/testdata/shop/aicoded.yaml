@@ -1,0 +1,5 @@
+app: shop
+# access is written by aicoded generate from <ssr:access>; do not edit it
+access:
+  "/":
+    require: ["*"]

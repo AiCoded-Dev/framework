@@ -1,0 +1,5 @@
+* text=auto eol=lf
+
+*_gen.go linguist-generated=true
+*.pb.go linguist-generated=true
+*.connect.go linguist-generated=true

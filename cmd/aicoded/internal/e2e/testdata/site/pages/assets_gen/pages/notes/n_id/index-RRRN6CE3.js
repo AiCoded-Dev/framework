@@ -1,0 +1,1 @@
+(()=>{var n=globalThis.aicodedReactive.route("d959c49d");var e=document.getElementById("star-result");document.getElementById("star")?.addEventListener("click",()=>{n.call("star",{starred:!0}).then(t=>{e&&(e.textContent=`starred ${t.title}`)}).catch(t=>{e&&(e.textContent=`failed ${t.status}`)})});})();

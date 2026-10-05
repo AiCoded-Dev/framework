@@ -1,0 +1,15 @@
+<ssr:var name="personas" type="[]Persona"/>
+<ssr:var name="switchers" type="[]Switcher"/>
+<h1>Personas</h1>
+<p>Each app sees you as one of these personas. They come from the personas of dev.yaml, or are the default ones when it names none.</p>
+<table id="personas">
+<thead><tr><th>Persona</th><th>Roles</th><th>Groups</th></tr></thead>
+<tbody>
+<tr ssr:for="p in personas"><td>{{ p.Name }}</td><td>{{ p.Roles }}</td><td>{{ p.Groups }}</td></tr>
+</tbody>
+</table>
+<h2>Choose a persona</h2>
+<p>Choose the persona of an app on its own page:</p>
+<ul id="switchers">
+<li ssr:for="sw in switchers"><a href="{{ sw.URL }}">{{ sw.App }}</a></li>
+</ul>

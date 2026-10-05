@@ -1,0 +1,7 @@
+<ssr:access role="staff" guard="true"/>
+<ssr:var name="phones" type="[]string"/>
+<ssr:var name="emails" type="[]string"/>
+<h2>Phones</h2>
+<ul id="phones"><li ssr:for="phone in phones">{{ phone }}</li></ul>
+<h2>Emails</h2>
+<ul id="emails"><li ssr:for="email in emails">{{ email }}</li></ul>

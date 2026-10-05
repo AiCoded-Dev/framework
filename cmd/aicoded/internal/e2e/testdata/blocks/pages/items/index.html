@@ -1,0 +1,7 @@
+<ssr:access role="editor"/>
+<ssr:var name="items" type="[]Item"/>
+<ul id="items"><li ssr:for="it in items"><a href="/items/{{ it.ID }}">{{ it.Title }}</a></li></ul>
+<ssr:form name="add">
+    <ssr:input name="title" type="text" required/>
+    <button type="submit">Add</button>
+</ssr:form>

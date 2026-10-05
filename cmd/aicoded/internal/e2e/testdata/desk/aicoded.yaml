@@ -1,0 +1,7 @@
+app: desk
+email:
+  from: app@desk.test
+  to_domains: [desk.test]
+secrets: [token]
+# access is written by aicoded generate from <ssr:access>; do not edit it
+access: {}

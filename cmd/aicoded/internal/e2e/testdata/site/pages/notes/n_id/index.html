@@ -1,0 +1,14 @@
+<ssr:access role="*" guard="true"/>
+<ssr:var name="note" type="Note"/>
+<ssr:call name="star" in="StarIn" out="StarOut"/>
+<h1 id="title">{{ note.Title }}</h1>
+<button id="star" type="button">Star</button>
+<p id="star-result"></p>
+<ssr:form name="rename">
+    <ssr:input name="title" type="text" required/>
+    <button type="submit">Save</button>
+</ssr:form>
+<ssr:form name="give">
+    <ssr:input name="to" type="text" required/>
+    <button type="submit">Give</button>
+</ssr:form>

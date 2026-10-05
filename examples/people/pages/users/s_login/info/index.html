@@ -1,0 +1,25 @@
+<ssr:var name="user" type="User"/>
+<ssr:var name="lastSeen" type="string" reactive="true"/>
+<h2>Age group:
+  <span id="age-group" ssr:if="user.Age <= 18">0-18</span>
+  <span id="age-group" ssr:else-if="user.Age <= 30">19-30</span>
+  <!-- the older groups -->
+  <span id="age-group" ssr:else-if="user.Age <= 60">31-60</span>
+  <span id="age-group" ssr:else>60+</span>
+</h2>
+<dl>
+  <dt>Team</dt>
+  <dd id="team">{{ user.Team }}</dd>
+  <dt>Languages</dt>
+  <dd id="languages">{{ user.Languages == '' ? 'none given' : user.Languages }}</dd>
+  <dt>Works</dt>
+  <dd id="works">
+    <span ssr:if="user.OnSite && user.Remote">on site and remotely</span>
+    <span ssr:else-if="user.Remote">remotely</span>
+    <span ssr:else>on site</span>
+  </dd>
+  <dt>Shift</dt>
+  <dd id="shift">{{ user.Shift == 2 ? 'night' : 'day' }}</dd>
+</dl>
+<p id="bio">{{ user.Bio }}</p>
+<p class="muted">Last opened a page: <span id="last-seen">{{ lastSeen }}</span></p>

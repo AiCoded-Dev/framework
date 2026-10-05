@@ -1,0 +1,25 @@
+#filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em 1em;
+  align-items: end;
+  margin-bottom: 1em;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  text-align: start;
+  vertical-align: top;
+  padding: 0.2em 0.5em;
+  border-bottom: 1px solid #8884;
+}
+
+.error {
+  color: #d00;
+  white-space: pre-wrap;
+}

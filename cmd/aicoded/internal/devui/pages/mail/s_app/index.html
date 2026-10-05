@@ -1,0 +1,22 @@
+<ssr:access role="developer" guard="true"/>
+<ssr:var name="app" type="string"/>
+<ssr:var name="mail" type="[]Message" reactive="true"/>
+<h1>Mail of {{ app }}</h1>
+<div id="messages">
+<table ssr:if="len(mail) > 0">
+<thead><tr><th>Folder</th><th>Time</th><th>From</th><th>To</th><th>Subject</th></tr></thead>
+<tbody>
+<tr ssr:for="m in mail"><td>{{ m.Folder }}</td><td><time datetime="{{ m.Stamp }}">{{ m.Time }}</time></td><td>{{ m.From }}</td><td>{{ m.To }}</td><td><a href="/mail/{{ app }}/{{ m.ID }}">{{ m.Subject != '' ? m.Subject : '(no subject)' }}</a></td></tr>
+</tbody>
+</table>
+<p ssr:else>No mail yet.</p>
+</div>
+<h2>Simulate inbound mail</h2>
+<ssr:form name="receive">
+<label>From <ssr:input name="from" type="email" required/></label>
+<label>Subject <ssr:input name="subject" type="text"/></label>
+<label>Text <ssr:textarea name="text" rows="6"/></label>
+<p class="error" id="receive-error" ssr:if="form.GetError() != ''">{{ form.GetError() }}</p>
+<p class="error" ssr:else-if="form.HasError()">Give the address the mail comes from.</p>
+<button type="submit">Put it in the inbox</button>
+</ssr:form>

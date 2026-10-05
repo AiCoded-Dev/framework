@@ -1,0 +1,12 @@
+<ssr:access role="editor"/>
+<ssr:var name="notes" type="[]Note"/>
+<img src="logo.png" alt="logo">
+<span data-label="x"></span>
+<ul><li ssr:for="n in notes"><a href="/notes/{{ n.ID }}">{{ n.Title }}</a></li></ul>
+<ssr:form name="add">
+    <ssr:input name="title" type="text" required class="{{ input.HasError() ? 'bad' : '' }}"/>
+    <ssr:select name="priority" gotype="int"/>
+    <p ssr:if="form.HasError()">Check the form.</p>
+    <button type="submit">Add</button>
+</ssr:form>
+<ssr:content/>

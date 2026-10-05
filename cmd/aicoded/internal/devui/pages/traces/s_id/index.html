@@ -1,0 +1,9 @@
+<ssr:var name="trace" type="Trace"/>
+<h1>Trace {{ trace.ID }}</h1>
+<p>{{ trace.Duration }} in {{ trace.Apps }}. <a href="/logs?trace={{ trace.ID }}">Its log lines</a></p>
+<table id="spans">
+<thead><tr><th>Span</th><th>App</th><th>Start</th><th>Duration</th><th>Of the trace</th><th>Error</th></tr></thead>
+<tbody>
+<tr ssr:for="sp in trace.Spans"><td class="depth-{{ sp.Depth }}">{{ sp.Name }}<ul class="attrs" ssr:if="len(sp.Attrs) > 0"><li ssr:for="a in sp.Attrs">{{ a.Key }}={{ a.Value }}</li></ul></td><td>{{ sp.App }}</td><td>+{{ sp.Offset }}</td><td>{{ sp.Duration }}</td><td><meter min="0" max="{{ trace.Total }}" value="{{ sp.Length }}"></meter></td><td class="error">{{ sp.Error }}</td></tr>
+</tbody>
+</table>

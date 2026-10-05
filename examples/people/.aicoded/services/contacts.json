@@ -1,0 +1,31 @@
+{
+  "app": "contacts",
+  "methods": {
+    "Contacts": {
+      "in": "ContactsIn",
+      "out": "ContactsOut"
+    }
+  },
+  "types": {
+    "ContactsIn": {
+      "fields": {
+        "Login": {
+          "number": 1,
+          "type": "string"
+        }
+      }
+    },
+    "ContactsOut": {
+      "fields": {
+        "Emails": {
+          "number": 1,
+          "type": "[]string"
+        },
+        "Phones": {
+          "number": 2,
+          "type": "[]string"
+        }
+      }
+    }
+  }
+}

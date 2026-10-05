@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package aicoded.runner.v1;
+
+option go_package = "aicoded.dev/framework/runnerproto/runnerv1;runnerv1";
+
+// RpcService carries a call from this app to a function of another app. The runner serves it
+// on runner.sock and the app calls it. The runner checks the call against the permission lists
+// of both apps, then forwards it to the callee's AppService with a fresh call token.
+//
+// The runner refuses a call with PERMISSION_DENIED, UNAUTHENTICATED (a viewer token it will not
+// forward) or UNAVAILABLE (the callee is not running), with a coded message, or with
+// PERMISSION_DENIED and a plain message when the viewer lacks a role. Every refusal of its own
+// carries the error metadata Aicoded-Origin: runner. From the callee it passes on only the code
+// and message of INVALID_ARGUMENT, NOT_FOUND, ALREADY_EXISTS, PERMISSION_DENIED,
+// FAILED_PRECONDITION and UNAVAILABLE, with the message cut at 1 KiB, and never that mark. A
+// call cut short, by the runner's 30 s cap or because the caller's or the callee's context
+// ended, fails with CANCELED or DEADLINE_EXCEEDED and the message "the call was canceled" or
+// "the call ran out of time". Any other code of the callee becomes INTERNAL with the message
+// "internal error".
+service RpcService {
+  rpc Call(CallRequest) returns (CallResponse);
+}
+
+message CallRequest {
+  // The callee app.
+  string app = 1;
+  // The callee's function.
+  string method = 2;
+  // The function's input, encoded as the callee's schema snapshot says.
+  bytes payload = 3;
+  // The viewer token of the request the call is made for; empty for a call the app makes as
+  // itself.
+  string viewer = 4;
+}
+
+message CallResponse {
+  bytes payload = 1;
+}
+
+// AppService runs a function of this app for another app. The app serves it on app.sock and
+// only the runner calls it. The Aicoded-Viewer header carries the call token: it names the
+// calling app and the viewer, or only the calling app for a call the app makes as itself. The
+// app answers with the codes RpcService passes on, INTERNAL with "internal error" for anything
+// else, and CANCELED or DEADLINE_EXCEEDED when the call's context ends.
+service AppService {
+  rpc Serve(ServeRequest) returns (ServeResponse);
+}
+
+message ServeRequest {
+  string method = 1;
+  bytes payload = 2;
+}
+
+message ServeResponse {
+  bytes payload = 1;
+}

@@ -1,0 +1,24 @@
+<ssr:var name="names" type="[]string"/>
+<ssr:var name="query" type="Query"/>
+<ssr:var name="logs" type="Logs" reactive="true"/>
+<h1>Logs</h1>
+<form method="get" action="/logs" id="filter">
+<label>App <input name="app" list="app-names" value="{{ query.App }}"></label>
+<datalist id="app-names"><option ssr:for="n in names" value="{{ n }}"></option></datalist>
+<label>Lowest level <input name="level" list="levels" value="{{ query.Level }}"></label>
+<datalist id="levels"><option value="DEBUG"></option><option value="INFO"></option><option value="WARN"></option><option value="ERROR"></option></datalist>
+<label>Text <input type="search" name="q" value="{{ query.Contains }}"></label>
+<label>Trace <input name="trace" value="{{ query.TraceID }}"></label>
+<button type="submit">Show</button>
+</form>
+<div id="manual"><p class="note" ssr:for="a in logs.Manual">{{ a }} runs by hand: its log lines go to the terminal it runs in, not here.</p></div>
+<div id="problem"><pre class="error" ssr:if="logs.Problem != ''">{{ logs.Problem }}</pre></div>
+<div id="entries">
+<table ssr:if="len(logs.Entries) > 0">
+<thead><tr><th>Time</th><th>App</th><th>Source</th><th>Level</th><th>Message</th><th>Trace</th></tr></thead>
+<tbody>
+<tr ssr:for="e in logs.Entries" class="{{ e.Class }}"><td><time datetime="{{ e.Stamp }}">{{ e.Time }}</time></td><td>{{ e.App }}</td><td>{{ e.Source }}</td><td>{{ e.Level }}</td><td class="message">{{ e.Message }}<span class="attrs" ssr:if="e.Attrs != ''">{{ e.Attrs }}</span></td><td><a ssr:if="e.Trace != ''" href="/traces/{{ e.Trace }}">trace</a></td></tr>
+</tbody>
+</table>
+<p ssr:else>No log lines match.</p>
+</div>

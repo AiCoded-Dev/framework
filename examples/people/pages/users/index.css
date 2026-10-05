@@ -1,0 +1,25 @@
+.users {
+  display: grid;
+  grid-template-columns: 16rem 1fr;
+  gap: 1.5rem;
+
+  aside ul {
+    list-style: none;
+    padding: 0;
+  }
+  aside a {
+    display: block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  aside a.active {
+    color: white;
+    background: var(--accent);
+  }
+}
+
+.muted {
+  color: var(--muted);
+}

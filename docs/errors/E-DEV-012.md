@@ -1,0 +1,5 @@
+# E-DEV-012: aicoded dev already runs for this workspace
+
+Only one `aicoded dev` may run for a workspace: two would build the same apps and fight over their port, sockets, files and database users. One already runs for this folder, for a folder above it or for a folder inside it, started in a terminal or by `aicoded mcp` for your AI assistant, and the message names the folder it runs for and its address. `aicoded dev` then also prints the login link of the running one's dev UI. `aicoded mcp` uses a running `aicoded dev` itself, so there is no need to stop it for that. When the message says that the control socket did not answer, a process still listens on it but did not reply within 2 seconds, such as an `aicoded dev` that is still starting its apps.
+
+**Fix:** use the running one at the address the message names, or stop it first (Ctrl+C in its terminal, or end the AI assistant's session that runs `aicoded mcp`). When no `aicoded dev` runs and the socket did not answer, remove the socket file the message names.

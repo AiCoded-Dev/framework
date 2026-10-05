@@ -1,0 +1,38 @@
+#spans {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+#spans th,
+#spans td {
+  text-align: start;
+  vertical-align: top;
+  padding: 0.2em 0.5em;
+  border-bottom: 1px solid #8884;
+}
+
+#spans meter {
+  width: 12em;
+}
+
+.attrs {
+  margin: 0.2em 0 0;
+  padding: 0;
+  list-style: none;
+  opacity: 0.7;
+  font-family: ui-monospace, monospace;
+}
+
+.error {
+  color: #d00;
+  white-space: pre-wrap;
+}
+
+#spans .depth-1 { padding-inline-start: 1.5em; }
+#spans .depth-2 { padding-inline-start: 3em; }
+#spans .depth-3 { padding-inline-start: 4.5em; }
+#spans .depth-4 { padding-inline-start: 6em; }
+#spans .depth-5 { padding-inline-start: 7.5em; }
+#spans .depth-6 { padding-inline-start: 9em; }
+#spans .depth-7 { padding-inline-start: 10.5em; }
+#spans .depth-8 { padding-inline-start: 12em; }

@@ -1,0 +1,27 @@
+app: people
+data:
+  - source: sqldb
+    classes: [internal]
+  - source: filestore:photos
+    classes: [internal]
+email:
+  from: people@acme.example
+  to_domains: [acme.example]
+settings: [team_address]
+# access is written by aicoded generate from <ssr:access>; do not edit it
+access:
+  "/contact":
+    require: ["*"]
+  "/home":
+    require: ["*"]
+  "/users/add":
+    require: ["staff", "hr"]
+  "/users/{login}/contacts":
+    require: ["staff"]
+    guard: true
+  "/users/{login}/info":
+    require: ["staff"]
+# services is written by aicoded generate from rpc/ and the clients in services/; do not edit it
+services:
+  calls:
+    "contacts": ["Contacts"]

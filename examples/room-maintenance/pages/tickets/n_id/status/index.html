@@ -1,0 +1,13 @@
+<ssr:access role="hotel-ops"/>
+<ssr:var name="ticket" type="Ticket"/>
+<h1>Change the status</h1>
+<p>#{{ ticket.ID }}, room {{ ticket.Room }}: {{ ticket.Title }}</p>
+<ssr:form name="status">
+  <div class="field">
+    <label for="status">Status</label>
+    <ssr:select name="status" required id="status"
+                class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="status-error" class="error" ssr:if="form.Status.HasError()">{{ form.Status.GetError() }}</p>
+  </div>
+  <button type="submit">Save</button>
+</ssr:form>

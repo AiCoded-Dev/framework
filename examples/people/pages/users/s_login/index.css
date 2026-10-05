@@ -1,0 +1,32 @@
+.profile {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+
+  .avatar {
+    display: grid;
+    place-items: center;
+    width: 4rem;
+    height: 4rem;
+    border-radius: 50%;
+    font-size: 1.5rem;
+    color: white;
+    background: var(--accent);
+  }
+  h1 {
+    margin-top: 0;
+  }
+  .tabs {
+    display: flex;
+    gap: 1rem;
+
+    a {
+      color: var(--muted);
+      text-decoration: none;
+    }
+    a.active {
+      color: var(--ink);
+      border-bottom: 2px solid var(--accent);
+    }
+  }
+}

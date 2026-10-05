@@ -1,0 +1,9 @@
+<ssr:access role="editor"/>
+<ssr:var name="notes" type="[]Note"/>
+<ul id="notes"><li ssr:for="n in notes"><a href="/notes/{{ n.ID }}">{{ n.Title }}</a></li></ul>
+<ssr:form name="add">
+    <ssr:input name="title" type="text" required/>
+    <ssr:select name="priority" gotype="int" required/>
+    <p id="form-error" ssr:if="form.HasError()">Check the form.</p>
+    <button type="submit">Add</button>
+</ssr:form>

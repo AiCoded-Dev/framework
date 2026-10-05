@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package aicoded.runner.v1;
+
+option go_package = "aicoded.dev/framework/runnerproto/runnerv1;runnerv1";
+
+// FilesService serves the file stores the app declares in aicoded.yaml as filestore:<name>.
+// Names are slash-separated paths inside a store, as io/fs.ValidPath accepts them.
+// A store the app did not declare is PERMISSION_DENIED; a missing file NOT_FOUND; a file
+// where Mkdir would create a folder, at the name or at a parent, ALREADY_EXISTS; a bad name
+// INVALID_ARGUMENT; a folder that is not empty, or a folder where a file is expected,
+// FAILED_PRECONDITION; a file over the size limit RESOURCE_EXHAUSTED.
+service FilesService {
+  rpc Stat(StatRequest) returns (StatResponse);
+  // ReadDir lists a folder. On a file it is FAILED_PRECONDITION.
+  rpc ReadDir(ReadDirRequest) returns (ReadDirResponse);
+  // Read streams the content of a file. On a folder it is FAILED_PRECONDITION.
+  rpc Read(ReadRequest) returns (stream ReadResponse);
+  // Write takes the header first and then the content. It creates the file, or replaces an
+  // existing file of that name, only when the stream ends without error; until then, and after
+  // an error, the store is unchanged.
+  rpc Write(stream WriteRequest) returns (WriteResponse);
+  // Mkdir creates a folder and any missing parents. A folder that exists already is not an error.
+  rpc Mkdir(MkdirRequest) returns (MkdirResponse);
+  // Remove removes a file or an empty folder.
+  rpc Remove(RemoveRequest) returns (RemoveResponse);
+  // Rename moves a file or folder to new_name. An existing file at new_name is replaced; a folder
+  // at new_name is never replaced, even an empty one.
+  rpc Rename(RenameRequest) returns (RenameResponse);
+}
+
+message FileInfo {
+  string name = 1;
+  int64 size = 2;
+  bool dir = 3;
+  int64 mod_time_unix_nano = 4;
+}
+
+message StatRequest {
+  string store = 1;
+  string name = 2;
+}
+
+message StatResponse {
+  FileInfo info = 1;
+}
+
+message ReadDirRequest {
+  string store = 1;
+  string name = 2;
+}
+
+message ReadDirResponse {
+  repeated FileInfo entries = 1;
+}
+
+message ReadRequest {
+  string store = 1;
+  string name = 2;
+}
+
+message ReadResponse {
+  bytes data = 1;
+}
+
+message WriteHeader {
+  string store = 1;
+  string name = 2;
+}
+
+message WriteRequest {
+  oneof part {
+    WriteHeader header = 1;
+    bytes data = 2;
+  }
+}
+
+message WriteResponse {
+  FileInfo info = 1;
+}
+
+message MkdirRequest {
+  string store = 1;
+  string name = 2;
+}
+
+message MkdirResponse {}
+
+message RemoveRequest {
+  string store = 1;
+  string name = 2;
+}
+
+message RemoveResponse {}
+
+message RenameRequest {
+  string store = 1;
+  string old_name = 2;
+  string new_name = 3;
+}
+
+message RenameResponse {}

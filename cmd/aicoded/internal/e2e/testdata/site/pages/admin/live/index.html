@@ -1,0 +1,7 @@
+<ssr:var name="message" type="string" reactive="true" client-writable="true"/>
+<ssr:var name="ticks" type="int" reactive="true"/>
+<input id="message-input" ssr:bind="message">
+<p id="message">{{ message }}</p>
+<p id="ticks">{{ ticks }}</p>
+<ul id="echo-list" ssr:if="ticks > 0"><li>{{ message }}</li></ul>
+<p id="error"></p>

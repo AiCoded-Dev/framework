@@ -1,0 +1,13 @@
+app: shop
+# access is written by aicoded generate from <ssr:access>; do not edit it
+access:
+  "/checks":
+    require: ["*"]
+  "/invoices/{id}":
+    require: ["*"]
+  "/status":
+    require: ["*"]
+# services is written by aicoded generate from rpc/ and the clients in services/; do not edit it
+services:
+  calls:
+    "billing": ["Fail", "GetInvoice", "Missing", "Ping", "Secret"]

@@ -1,0 +1,1 @@
+.users{display:grid;grid-template-columns:16rem 1fr;gap:1.5rem}.users aside ul{list-style:none;padding:0}.users aside a{display:block;padding:.25rem .5rem;border-radius:.25rem;color:var(--ink);text-decoration:none}.users aside a.active{color:#fff;background:var(--accent)}.muted{color:var(--muted)}

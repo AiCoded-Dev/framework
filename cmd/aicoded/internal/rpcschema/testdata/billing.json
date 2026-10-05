@@ -1,0 +1,51 @@
+{
+  "app": "billing",
+  "methods": {
+    "GetInvoice": {
+      "in": "GetInvoiceIn",
+      "out": "Invoice"
+    }
+  },
+  "types": {
+    "GetInvoiceIn": {
+      "fields": {
+        "ID": {
+          "number": 1,
+          "type": "int64"
+        }
+      }
+    },
+    "Invoice": {
+      "fields": {
+        "ID": {
+          "number": 1,
+          "type": "int64"
+        },
+        "Lines": {
+          "number": 3,
+          "type": "[]Line"
+        },
+        "Paid": {
+          "number": 4,
+          "type": "*time"
+        }
+      },
+      "retired": [
+        2,
+        5
+      ]
+    },
+    "Line": {
+      "fields": {
+        "Amount": {
+          "number": 1,
+          "type": "int64"
+        },
+        "Note": {
+          "number": 2,
+          "type": "string"
+        }
+      }
+    }
+  }
+}

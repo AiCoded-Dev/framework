@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<ssr:access role="staff"/>
+<title>Room maintenance</title>
+<ssr:assets/>
+</head>
+<body>
+<ssr:var name="viewer" type="string"/>
+<nav>
+<a class="brand" href="/tickets">Room maintenance</a>
+<a href="/tickets">Tickets</a>
+<a href="/tickets/report">Report a problem</a>
+<span id="viewer" class="viewer">{{ viewer }}</span>
+</nav>
+<main>
+<ssr:content default="tickets"/>
+</main>
+</body>
+</html>

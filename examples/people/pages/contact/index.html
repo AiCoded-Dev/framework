@@ -1,0 +1,32 @@
+<ssr:var name="sent" type="bool"/>
+<h1>Contact us</h1>
+<p>Your message goes to the team by mail.</p>
+<p id="sent" class="alert success" ssr:if="sent">Your message was sent.</p>
+
+<ssr:form name="contact">
+  <div class="field">
+    <label for="contact-name">Your name</label>
+    <ssr:input name="name" type="text" required maxlength="100" id="contact-name"
+               class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="contact-name-error" class="error" ssr:if="form.Name.HasError()">{{ form.Name.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="contact-email">Your email address</label>
+    <ssr:input name="email" type="email" required maxlength="254" id="contact-email"
+               class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="contact-email-error" class="error" ssr:if="form.Email.HasError()">{{ form.Email.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="contact-topic">Topic</label>
+    <ssr:select name="topic" required id="contact-topic"
+                class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="contact-topic-error" class="error" ssr:if="form.Topic.HasError()">{{ form.Topic.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="contact-message">Message</label>
+    <ssr:textarea name="message" required maxlength="2000" rows="6" id="contact-message"
+                  class="{{ form.IsValidated() ? textarea.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="contact-message-error" class="error" ssr:if="form.Message.HasError()">{{ form.Message.GetError() }}</p>
+  </div>
+  <button type="submit">Send message</button>
+</ssr:form>

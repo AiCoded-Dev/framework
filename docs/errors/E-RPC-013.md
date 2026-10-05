@@ -1,0 +1,8 @@
+# E-RPC-013: held snapshot broken by the called app
+
+A calling app holds a snapshot of another app's functions in `.aicoded/services/<app>.json`, made by `aicoded rpc add`, and its generated client encodes calls by it. A change to the called app's functions breaks that snapshot: a function is gone, a field is gone or renamed, a field's type changed, or a field's number no longer matches. Calls built from the old snapshot would fail or read the wrong data. The position is the broken function in the held snapshot. The error comes at two moments:
+
+- **Before the called app is generated.** `aicoded generate` numbers the called app's new functions in memory and checks them against every snapshot of them that another app of the workspace holds, before it writes anything. For `aicoded generate` on its own, the workspace is the apps in the folders next to the app's folder. The called app's `.aicoded/rpc.json` is left as it was, so undoing the change in `rpc/` is enough. `aicoded rpc add` does not count the snapshot of the app it runs in, since it replaces that one.
+- **On the snapshots as they are.** `aicoded dev` also compares each held snapshot with the called app's `.aicoded/rpc.json`. When that file already records the change, for example because the called app was generated outside the workspace, undoing the change in `rpc/` alone gives a removed field a new number, which still breaks the held snapshot.
+
+**Fix:** undo the change to the `rpc/` folder of the called app, and restore its `.aicoded/rpc.json` from the version history too when the fix line says so; or run `aicoded rpc add <app>` in the calling app and update its code to the new functions.

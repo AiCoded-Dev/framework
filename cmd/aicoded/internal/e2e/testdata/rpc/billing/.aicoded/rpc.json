@@ -1,0 +1,90 @@
+{
+  "app": "billing",
+  "methods": {
+    "Fail": {
+      "in": "InvoiceID",
+      "out": "Invoice"
+    },
+    "GetInvoice": {
+      "in": "InvoiceID",
+      "out": "Invoice"
+    },
+    "Missing": {
+      "in": "InvoiceID",
+      "out": "Invoice"
+    },
+    "Ping": {
+      "in": "PingIn",
+      "out": "PingOut"
+    },
+    "Secret": {
+      "in": "PingIn",
+      "out": "PingOut"
+    }
+  },
+  "types": {
+    "Invoice": {
+      "fields": {
+        "Customer": {
+          "number": 1,
+          "type": "string"
+        },
+        "Due": {
+          "number": 2,
+          "type": "time"
+        },
+        "ID": {
+          "number": 3,
+          "type": "int64"
+        },
+        "Lines": {
+          "number": 4,
+          "type": "[]Line"
+        },
+        "Paid": {
+          "number": 5,
+          "type": "*bool"
+        },
+        "Viewer": {
+          "number": 6,
+          "type": "string"
+        }
+      }
+    },
+    "InvoiceID": {
+      "fields": {
+        "ID": {
+          "number": 1,
+          "type": "int64"
+        }
+      }
+    },
+    "Line": {
+      "fields": {
+        "Amount": {
+          "number": 1,
+          "type": "int64"
+        },
+        "Item": {
+          "number": 2,
+          "type": "string"
+        }
+      }
+    },
+    "PingIn": {
+      "fields": {}
+    },
+    "PingOut": {
+      "fields": {
+        "Caller": {
+          "number": 1,
+          "type": "string"
+        },
+        "Viewer": {
+          "number": 2,
+          "type": "string"
+        }
+      }
+    }
+  }
+}

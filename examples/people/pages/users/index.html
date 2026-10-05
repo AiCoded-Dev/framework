@@ -1,0 +1,18 @@
+<ssr:access role="staff"/>
+<ssr:var name="users" type="[]User"/>
+<ssr:var name="current" type="string"/>
+<ssr:var name="canAdd" type="bool"/>
+<ssr:var name="userCount" type="int" reactive="true"/>
+<div class="users">
+  <aside>
+    <h2>Users</h2>
+    <p class="muted"><span id="user-count">{{ userCount }}</span> people</p>
+    <a id="add-user" ssr:if="canAdd" href="/users/add">Add a user</a>
+    <ul id="user-list">
+      <li ssr:for="u in users"><a class="{{ u.Login == current ? 'active' : '' }}" href="/users/{{ u.Login }}">{{ u.Name }}</a></li>
+    </ul>
+  </aside>
+  <section>
+    <ssr:content/>
+  </section>
+</div>

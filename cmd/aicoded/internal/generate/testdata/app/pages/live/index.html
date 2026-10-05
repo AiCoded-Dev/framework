@@ -1,0 +1,8 @@
+<ssr:access role="*"/>
+<ssr:var name="count" type="int" reactive="true" client-writable="true"/>
+<ssr:var name="items" type="[]string" reactive="true"/>
+<input ssr:bind="count" type="number">
+<p>{{ count }}</p>
+<table><tr ssr:for="it in items"><td>{{ it }}</td></tr></table>
+<p class="n{{ count }}">x</p>
+<p ssr:if="count > 3">many</p>

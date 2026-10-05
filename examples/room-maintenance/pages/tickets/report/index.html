@@ -1,0 +1,22 @@
+<h1>Report a problem</h1>
+<ssr:form name="report">
+  <div class="field">
+    <label for="room">Room</label>
+    <ssr:select name="room" gotype="int" required id="room"
+                class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="room-error" class="error" ssr:if="form.Room.HasError()">{{ form.Room.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="title">What is wrong</label>
+    <ssr:input name="title" type="text" required maxlength="100" id="title"
+               class="{{ form.IsValidated() ? input.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="title-error" class="error" ssr:if="form.Title.HasError()">{{ form.Title.GetError() }}</p>
+  </div>
+  <div class="field">
+    <label for="details">Details</label>
+    <ssr:textarea name="details" required maxlength="2000" rows="5" id="details"
+                  class="{{ form.IsValidated() ? textarea.HasError() ? 'invalid' : 'valid' : '' }}"/>
+    <p id="details-error" class="error" ssr:if="form.Details.HasError()">{{ form.Details.GetError() }}</p>
+  </div>
+  <button type="submit">Report</button>
+</ssr:form>

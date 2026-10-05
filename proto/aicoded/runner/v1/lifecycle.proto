@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package aicoded.runner.v1;
+
+option go_package = "aicoded.dev/framework/runnerproto/runnerv1;runnerv1";
+
+// LifecycleService is the handshake between an app process and its runner.
+service LifecycleService {
+  // Hello is the app's first call. The runner answers with everything the app needs to serve.
+  rpc Hello(HelloRequest) returns (HelloResponse);
+  // Ready tells the runner that the app accepts requests on app.sock.
+  rpc Ready(ReadyRequest) returns (ReadyResponse);
+}
+
+message HelloRequest {
+  uint32 protocol_version = 1;
+  string framework_version = 2;
+}
+
+message HelloResponse {
+  string app = 1;
+  string env = 2;
+  string version = 3;
+  // Key for signing CSRF tokens; at least 32 bytes.
+  bytes csrf_key = 4;
+  // Ed25519 public keys that verify viewer tokens.
+  repeated bytes viewer_keys = 5;
+  // Values of the settings declared in aicoded.yaml.
+  map<string, string> settings = 6;
+}
+
+message ReadyRequest {}
+
+message ReadyResponse {}

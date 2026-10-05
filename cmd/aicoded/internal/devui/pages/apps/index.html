@@ -1,0 +1,17 @@
+<ssr:var name="apps" type="[]App" reactive="true"/>
+<h1>Apps</h1>
+<div id="apps">
+<table ssr:if="len(apps) > 0">
+<thead><tr><th>App</th><th>State</th><th>Since</th><th>Address</th><th>Problem</th></tr></thead>
+<tbody>
+<tr ssr:for="a in apps">
+<td><a href="/apps/{{ a.Name }}">{{ a.Name }}</a></td>
+<td>{{ a.State }}</td>
+<td><time datetime="{{ a.Stamp }}">{{ a.Since }}</time></td>
+<td><a ssr:if="a.URL != ''" href="{{ a.URL }}">{{ a.URL }}</a></td>
+<td>{{ a.Problem }}</td>
+</tr>
+</tbody>
+</table>
+<p ssr:else>The workspace has no apps.</p>
+</div>

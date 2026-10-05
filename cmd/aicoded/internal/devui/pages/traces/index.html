@@ -1,0 +1,21 @@
+<ssr:var name="names" type="[]string"/>
+<ssr:var name="query" type="Query"/>
+<ssr:var name="traces" type="Traces" reactive="true"/>
+<h1>Traces</h1>
+<form method="get" action="/traces" id="filter">
+<label>App <input name="app" list="app-names" value="{{ query.App }}"></label>
+<datalist id="app-names"><option ssr:for="n in names" value="{{ n }}"></option></datalist>
+<label ssr:if="query.ErrorsOnly"><input type="checkbox" name="errors" value="1" checked> Only with an error</label>
+<label ssr:else><input type="checkbox" name="errors" value="1"> Only with an error</label>
+<button type="submit">Show</button>
+</form>
+<div id="problem"><pre class="error" ssr:if="traces.Problem != ''">{{ traces.Problem }}</pre></div>
+<div id="traces">
+<table ssr:if="len(traces.Traces) > 0">
+<thead><tr><th>Start</th><th>Root span</th><th>Apps</th><th>Spans</th><th>Duration</th><th>Error</th></tr></thead>
+<tbody>
+<tr ssr:for="t in traces.Traces"><td><time datetime="{{ t.Stamp }}">{{ t.Start }}</time></td><td><a href="/traces/{{ t.ID }}">{{ t.Root }}</a></td><td>{{ t.Apps }}</td><td>{{ t.Spans }}</td><td>{{ t.Duration }}</td><td><span class="error" ssr:if="t.Error">error</span></td></tr>
+</tbody>
+</table>
+<p ssr:else>No traces match.</p>
+</div>

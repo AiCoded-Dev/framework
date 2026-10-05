@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<ssr:access role="*"/>
+<title>Site</title>
+<ssr:assets/>
+</head>
+<body>
+<ssr:var name="viewer" type="string"/>
+<p id="viewer">{{ viewer }}</p>
+<ssr:content default="/home"/>
+</body>
+</html>
