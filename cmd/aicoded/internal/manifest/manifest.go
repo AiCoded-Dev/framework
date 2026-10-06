@@ -219,7 +219,7 @@ func checkData(ds []Data, at func(string, int) string) error {
 		valid := d.Source == "sqldb" || named && (kind == "filestore" || kind == "connector") && sourceName.MatchString(name)
 		if !valid {
 			return errs.At(at("data", i), "E-MAN-007", fmt.Sprintf("data source %q is not valid", d.Source),
-				"use sqldb, filestore:<name> or connector:<name> with a lower-case name")
+				"use `sqldb`, `filestore:<name>` or `connector:<name>` with a lower-case name")
 		}
 		if seen[d.Source] {
 			return errs.At(at("data", i), "E-MAN-007", fmt.Sprintf("data source %q is listed twice", d.Source), "remove the duplicate")

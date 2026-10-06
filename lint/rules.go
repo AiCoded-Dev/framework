@@ -80,7 +80,7 @@ var rules = []Rule{
 		Title: "file the checks cannot read",
 		Dont:  "Add assembly, C or object files, cgo, Go files that a //go:build line or a name such as x_windows.go leaves out of the build, or Go files in a folder that go.mod ignores.",
 		Do:    "Write the app in plain Go files that are built on every machine.",
-		Fix:   "delete the file, or make it a plain Go file with no //go:build line or _<os> or _<arch> name suffix that leaves it out of this build and no import \"C\", in a folder that go.mod does not ignore",
+		Fix:   "delete the file, or make it a plain Go file with no `//go:build` line or `_<os>` or `_<arch>` name suffix that leaves it out of this build and no `import \"C\"`, in a folder that `go.mod` does not ignore",
 	},
 	{
 		Code:  "E-LINT-011",

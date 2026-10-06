@@ -4,6 +4,7 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- The fixes of E-LINT-010 and E-MAN-007 put code in code spans, such as `filestore:<name>`.
 - The framework's module path is now `aicoded.dev/framework` (it was
   `gopkg.aicoded.cloud/framework`). Imports, the `require` and `replace` lines of an app's
   `go.mod` and `go doc` use the new path, such as `aicoded.dev/framework/web/form`, and the CLI's
