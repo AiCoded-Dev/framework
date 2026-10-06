@@ -33,9 +33,12 @@ commands:
   explain [topic] print a page of the docs, such as guides/overview, changelog or E-DEV-001, or list them all
   generate [dir]  generate the code of the app in dir from pages/, rpc/ and .aicoded/services/
   init <name>     create the app <name> in a new folder of that name in the current directory
+  login           sign in to the platform, in the browser or with a code (--org <organisation>, --device)
+  logout          revoke the sign-in to the platform and forget it
   mcp [dir]       serve the AI assistant's tools for the apps in dir over MCP on stdin and stdout
   rpc add <app>   let the app in the current directory call the functions of the app named <app>
   version         print the aicoded version
+  whoami          print the organisation, email and scopes of the sign-in to the platform (--json)
 `
 
 // Exit codes: success, a failure the command reports, and a command line that is not valid.
@@ -141,6 +144,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return fail(stderr, err)
 		}
 		return exitOK
+	case "login":
+		return runLogin(args, stdout, stderr)
+	case "logout":
+		return runLogout(args, stdout, stderr)
 	case "mcp":
 		return runMCP(args, stdout, stderr)
 	case "rpc":
@@ -162,6 +169,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintln(stdout, "aicoded", version)
 		return exitOK
+	case "whoami":
+		return runWhoami(args, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "aicoded: unknown command %q\n\n%s", cmd, usage)
 		return exitUsage
