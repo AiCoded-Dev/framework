@@ -317,6 +317,8 @@ func TestRawHTML(t *testing.T) {
 		"## Head `x\nline <os>`\n":   {dropped(6, "<os>")},
 		"A `span\n> quote <os>`\n":   {dropped(6, "<os>")},
 		"A ``span\n<div> here``\n":   {dropped(6, "<div>")},
+		"`x\n<= 3 `<a>`\n":           {dropped(6, "<a>")},
+		"#1 `x\n`<a>`\n":             {dropped(6, "<a>")},
 	} {
 		root := tree(t, map[string]string{"docs/a.md": "# Doc\n\nText.\n\n" + text})
 		problems, err := checkHTML(root, "docs/a.md")

@@ -40,6 +40,10 @@ var (
 	// tag matches the start of raw HTML: a tag, a comment, a declaration or a processing
 	// instruction.
 	tag = regexp.MustCompile(`<[a-zA-Z/!?][^<>\s]*>?`)
+	// tagStart matches a line that starts with raw HTML.
+	tagStart = regexp.MustCompile(`^<[a-zA-Z/!?]`)
+	// heading matches a line that is a heading.
+	heading = regexp.MustCompile(`^#{1,6}(\s|$)`)
 )
 
 // checkDocs runs every check of the docs on the repo at root and returns the problems found.
@@ -401,8 +405,8 @@ func checkLink(root, rel, target string) string {
 // checkHTML checks that the doc at rel holds no raw HTML, which GitHub and the docs site drop: a
 // < followed by a letter, /, ! or ?, outside code blocks and code spans. The markers that
 // checkCode reads are allowed on lines of their own. A code span may run over the lines of a
-// paragraph, which a blank line, a code block, a marker or a line that notProse matches ends; a
-// heading is a paragraph of its own.
+// paragraph, which a blank line, a code block, a marker or a line that notProse matches ends,
+// unless that line starts with a < that is not raw HTML; a heading is a paragraph of its own.
 func checkHTML(root, rel string) ([]string, error) {
 	data, err := os.ReadFile(filepath.Join(root, rel))
 	if err != nil {
@@ -429,10 +433,10 @@ func checkHTML(root, rel string) ([]string, error) {
 		case f != nil || l == "" || marker.MatchString(line) || line == rulesStart || line == rulesEnd:
 			flush(i)
 			first = i + 1
-		case strings.HasPrefix(l, "#"):
+		case heading.MatchString(l):
 			flush(i)
 			flush(i + 1)
-		case notProse.MatchString(l):
+		case notProse.MatchString(l) && (l[0] != '<' || tagStart.MatchString(l)):
 			flush(i)
 		}
 		if f != nil {
