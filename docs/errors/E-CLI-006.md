@@ -1,0 +1,5 @@
+# E-CLI-006: sign-in refused
+
+The platform refused to sign you in, and the message quotes its error code and its reason, such as `access_denied`. `access_denied` comes when your organisation's sign-in did not sign you in or did not confirm your email address, or when you may not build apps in the organisation: in an organisation that signs in with its own company login, you are not in its builder group, and in one that signs in by invitation, you are not invited. `temporarily_unavailable` and `server_error` come when the platform or your organisation's sign-in cannot be reached or failed, or when too many sign-ins were started in the last minute. `invalid_request` with "no organisation has that name" comes when `--org` names no organisation on the platform.
+
+**Fix:** when the reason says you are not in the builder group or not invited, ask your administrator to add you to the builder group; otherwise run `aicoded login` again, and check the organisation you give with `--org`.

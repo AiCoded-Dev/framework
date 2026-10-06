@@ -13,7 +13,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | DEV | `aicoded dev`, its control socket and its dev UI, and the apps of a workspace in `aicoded check`, `aicoded describe` and `aicoded mcp` |
 | CHK | `aicoded check` and the Go build it runs, also in `aicoded dev` |
 | LINT | the rules for app code that `aicoded check` applies after `go vet`, listed in [the rules guide](../guides/rules.md) |
-| CLI | `aicoded init`, `aicoded explain` and the `app_create` and `howto` tools of `aicoded mcp` |
+| CLI | `aicoded init`, `aicoded explain`, `aicoded login`, `logout` and `whoami`, and the `app_create` and `howto` tools of `aicoded mcp` |
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
 | MAIL | mail rules |
@@ -36,6 +36,14 @@ Workspaces use these codes:
   else is at its path or the path is too long.
 - E-DEV-018 and E-DEV-019: the dev UI's token file, and a request to the dev UI from a browser
   that did not log in.
+
+Signing in to the platform uses these codes:
+
+- E-CLI-004: no sign-in to the platform, or one that has ended.
+- E-CLI-005: an address in `AICODED_PLATFORM` that is not valid.
+- E-CLI-006: a sign-in that the platform refused.
+- E-CLI-007: a credentials file or folder that others can read.
+- E-CLI-008: a sign-in that was not finished in time.
 
 `aicoded explain <CODE>` prints the page.
 
