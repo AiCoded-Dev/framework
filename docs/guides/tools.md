@@ -1,7 +1,7 @@
 # Tools: the aicoded commands
 
 `aicoded` creates apps, generates their code, checks them, describes them, explains its errors
-and docs, and connects apps that call each other. Every problem it reports has a code, a
+and docs, connects apps that call each other, and signs you in to the platform. Every problem it reports has a code, a
 `file:line` where there is one, a one-line fix and a docs link.
 
 ## The commands
@@ -15,6 +15,9 @@ aicoded explain [topic]
 aicoded rpc add <app>
 aicoded dev [--manual <app>] [dir]
 aicoded mcp [dir]
+aicoded login [--org <organisation>] [--device]
+aicoded logout
+aicoded whoami [--json]
 aicoded version
 ```
 
@@ -127,6 +130,59 @@ and need no network. An unknown topic is E-CLI-001.
 `aicoded rpc add <app>`, in the folder of an app, lets it call the functions of the app named
 `<app>`: it copies that app's snapshot to `.aicoded/services/<app>.json` and generates the client
 `services/<app>/client_gen.go`. See [calls between apps](calls-between-apps.md).
+
+## aicoded login
+
+`aicoded login [--org <organisation>] [--device]` signs you in to the platform, as a builder of
+your organisation. The first login needs `--org`, the organisation's name on the platform, and
+later ones remember it.
+
+- It opens the sign-in in your browser and prints its address, in case no browser opens. You sign
+  in with your organisation's company login or, in an organisation that invites its builders, with
+  the account you were invited with. The browser then comes back to `aicoded`, which listens for it
+  on `127.0.0.1` only, and refuses an answer that does not belong to this sign-in. It waits 5
+  minutes (E-CLI-008).
+- With `--device`, or when no browser opens, it prints an address and a code instead: open the
+  address in a browser on any device, enter the code there, and confirm. The code expires after
+  10 minutes (E-CLI-008).
+- When the platform refuses you, the error quotes its reason (E-CLI-006). When you are not in
+  your organisation's builder group, or not invited, ask your administrator to add you to it.
+- It prints `Signed in to <organisation> as <email>.` A new sign-in replaces and revokes the one
+  before it.
+
+```text
+To sign in to acme, finish in your browser. If it does not open, open this address:
+
+    https://api.aicoded.cloud/oauth/authorize?client_id=aicoded&...
+
+Signed in to acme as ana@acme.example.
+```
+
+The sign-in lives in `credentials.json` in your user configuration folder, next to `dev.yaml`,
+with one entry per platform address. It works like a password: the file must have mode 600 and
+its folder mode 700, and `aicoded` refuses to use them while others can read them (E-CLI-007).
+`AICODED_PLATFORM` names the platform, `https://api.aicoded.cloud` by default; it must be an
+`https` address, or `http://127.0.0.1:<port>` for a platform on this computer (E-CLI-005).
+
+There is no MCP tool for signing in: it needs a person and a browser.
+
+## aicoded logout
+
+`aicoded logout` asks the platform to revoke your sign-in, then deletes it from this computer. It
+deletes it even when the platform cannot be reached, and then says that the sign-in stays valid
+on the platform until it expires, within 30 days.
+
+## aicoded whoami
+
+`aicoded whoami [--json]` prints the organisation, the email address and the scopes of your
+sign-in, as the platform sees them. It refreshes the sign-in first when it is about to expire.
+Without a sign-in, or with one the platform no longer accepts, it fails with E-CLI-004.
+
+```text
+org: acme
+email: ana@acme.example
+scopes: app:create
+```
 
 ## The control socket
 
