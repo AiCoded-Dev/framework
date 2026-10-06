@@ -373,7 +373,7 @@ func TestOpenBrowser(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\necho \"$@\" >>"+ran+"\n"), 0o700))
 	t.Setenv("PATH", dir)
 	for _, address := range []string{"file:///etc/passwd", "http://evil.example/", "https://ana@evil.example/", "-a", "javascript:alert(1)"} {
-		assert.Error(t, platform.OpenBrowser(t.Context(), address), address)
+		require.Error(t, platform.OpenBrowser(t.Context(), address), address)
 	}
 	require.NoError(t, platform.OpenBrowser(t.Context(), "https://api.aicoded.cloud/oauth/authorize?a=b&c=d"))
 	b, err := os.ReadFile(ran)
