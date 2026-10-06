@@ -43,8 +43,6 @@ type Whoami struct {
 type Client struct {
 	// HTTP makes the requests to the platform. It must not follow redirects.
 	HTTP *http.Client
-	// Open opens an address in the person's browser.
-	Open func(ctx context.Context, address string) error
 	// Timeout is how long a sign-in in the browser may take.
 	Timeout time.Duration
 
@@ -52,23 +50,21 @@ type Client struct {
 	out     io.Writer
 }
 
-// New returns a client of the platform at address, which Address returned, that opens the
-// browser with OpenBrowser and gives a sign-in in the browser 5 minutes. It tells the person what
-// to do to sign in on out.
+// New returns a client of the platform at address, which Address returned, that gives a sign-in
+// in the browser 5 minutes. It tells the person what to do to sign in on out.
 func New(address string, out io.Writer) *Client {
 	return &Client{
 		HTTP: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		}},
-		Open:    OpenBrowser,
 		Timeout: 5 * time.Minute,
 		address: address,
 		out:     out,
 	}
 }
 
-// Login signs in to the organisation org: in the browser, or, with device or when no browser
-// opens, with a code entered in a browser on any device. An empty org is the organisation of the
+// Login signs in to the organisation org: in a browser on this computer, or, with device, with a
+// code entered in a browser on any device. An empty org is the organisation of the
 // last sign-in; without one, Login returns ErrNoOrg. It keeps the new sign-in, revokes the one it
 // replaces, and returns who it is for.
 func (c *Client) Login(ctx context.Context, org string, device bool) (Whoami, error) {

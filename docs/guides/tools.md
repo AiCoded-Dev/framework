@@ -137,21 +137,21 @@ and need no network. An unknown topic is E-CLI-001.
 your organisation. The first login needs `--org`, the organisation's name on the platform, and
 later ones remember it.
 
-- It opens the sign-in in your browser and prints its address, in case no browser opens. You sign
-  in with your organisation's company login or, in an organisation that invites its builders, with
-  the account you were invited with. The browser then comes back to `aicoded`, which listens for it
+- It prints the address of the sign-in: open it in a browser on this computer. You sign in with
+  your organisation's company login or, in an organisation that invites its builders, with the
+  account you were invited with. The browser then comes back to `aicoded`, which listens for it
   on `127.0.0.1` only, and refuses an answer that does not belong to this sign-in. It waits 5
-  minutes (E-CLI-008).
-- With `--device`, or when no browser opens, it prints an address and a code instead: open the
-  address in a browser on any device, enter the code there, and confirm. The code expires after
-  10 minutes (E-CLI-008).
+  minutes (E-CLI-008). `aicoded` does not open the browser itself.
+- On a computer without a browser, such as a remote server, use `--device`: it prints an address
+  and a code instead. Open the address in a browser on any device, enter the code there, and
+  confirm. The code expires after 10 minutes (E-CLI-008).
 - When the platform refuses you, the error quotes its reason (E-CLI-006). When you are not in
   your organisation's builder group, or not invited, ask your administrator to add you to it.
 - It prints `Signed in to <organisation> as <email>.` A new sign-in replaces and revokes the one
   before it.
 
 ```text
-To sign in to acme, finish in your browser. If it does not open, open this address:
+To sign in to acme, open this address in a browser on this computer, or run aicoded login --device on a computer without one:
 
     https://api.aicoded.cloud/oauth/authorize?client_id=aicoded&...
 

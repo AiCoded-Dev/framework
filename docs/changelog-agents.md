@@ -5,9 +5,10 @@ Changes to the API that AI assistants build apps with. Newest first.
 ## Unreleased
 
 - New commands sign a builder in to the platform: `aicoded login [--org <organisation>]
-  [--device]` signs in, in the browser or with a code entered in a browser on any device;
-  `aicoded logout` revokes the sign-in and deletes it; `aicoded whoami [--json]` prints the
-  organisation, email and scopes of the sign-in. The first login needs `--org`, and later ones
+  [--device]` signs in, at an address it prints for a browser on this computer, or, with
+  `--device` on a computer without a browser, with a code entered in a browser on any device,
+  and never opens a browser itself; `aicoded logout` revokes the sign-in and deletes it;
+  `aicoded whoami [--json]` prints the organisation, email and scopes of the sign-in. The first login needs `--org`, and later ones
   remember it. `AICODED_PLATFORM` names the platform, `https://api.aicoded.cloud` by default. The
   sign-in needs a person and a browser, so no MCP tool offers it: when a command says you are not
   signed in (E-CLI-004), ask the person to run `aicoded login`. New codes: E-CLI-004 (not signed

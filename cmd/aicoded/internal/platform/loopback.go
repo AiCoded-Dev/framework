@@ -11,8 +11,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os/exec"
-	"runtime"
 	"sync"
 	"time"
 
@@ -25,28 +23,9 @@ import (
 // to.
 const callbackPath = "/callback"
 
-// OpenBrowser opens address, an https address or http to 127.0.0.1, in the person's browser:
-// with open on macOS, rundll32 on Windows and xdg-open elsewhere.
-func OpenBrowser(ctx context.Context, address string) error {
-	u, err := url.Parse(address)
-	if err != nil || u.User != nil || (u.Scheme != "https" || u.Host == "") && (u.Scheme != "http" || u.Hostname() != "127.0.0.1") {
-		return errors.New("aicoded opens only https addresses in the browser")
-	}
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.CommandContext(ctx, "open", address)
-	case "windows":
-		cmd = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", address)
-	default:
-		cmd = exec.CommandContext(ctx, "xdg-open", address)
-	}
-	return cmd.Run()
-}
-
-// browserLogin signs in in the browser: it listens on a loopback address, opens the sign-in
-// there, and exchanges the code the platform sends the browser back with. When no browser opens
-// it signs in with a code instead.
+// browserLogin signs in in a browser on this computer: it prints the address of the sign-in,
+// listens for the browser's answer on a loopback address, and exchanges the code the platform
+// sends the browser back with.
 func (c *Client) browserLogin(ctx context.Context, org string) (*oauth2.Token, error) {
 	var lc net.ListenConfig
 	ln, err := lc.Listen(ctx, "tcp", "127.0.0.1:0")
@@ -61,30 +40,19 @@ func (c *Client) browserLogin(ctx context.Context, org string) (*oauth2.Token, e
 	cfg := c.config("http://" + ln.Addr().String() + callbackPath)
 	verifier := oauth2.GenerateVerifier()
 	authURL := cfg.AuthCodeURL(cb.state, oauth2.S256ChallengeOption(verifier), oauth2.SetAuthURLParam("org", org))
-	_, _ = fmt.Fprintf(c.out, "To sign in to %s, finish in your browser. If it does not open, open this address:\n\n    %s\n", org, authURL)
-	opened := make(chan error, 1)
-	go func() { opened <- c.Open(ctx, authURL) }()
+	_, _ = fmt.Fprintf(c.out, "To sign in to %s, open this address in a browser on this computer, "+
+		"or run aicoded login --device on a computer without one:\n\n    %s\n", org, authURL)
 	timeout := time.NewTimer(c.Timeout)
 	defer timeout.Stop()
-	for {
-		select {
-		case err := <-opened:
-			if err == nil {
-				opened = nil
-				continue
-			}
-			_ = srv.Close()
-			_, _ = fmt.Fprintf(c.out, "\nNo browser opened (%s), so sign in with a code instead.\n\n", clean(err.Error(), 200))
-			return c.codeLogin(ctx, org)
-		case q := <-cb.done:
-			shutdown(srv)
-			return c.exchange(ctx, cfg, q, verifier)
-		case <-timeout.C:
-			return nil, errs.New("E-CLI-008", "the sign-in was not finished in the browser in time",
-				"run aicoded login again and finish the sign-in in the browser within 5 minutes, or run aicoded login --device")
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
+	select {
+	case q := <-cb.done:
+		shutdown(srv)
+		return c.exchange(ctx, cfg, q, verifier)
+	case <-timeout.C:
+		return nil, errs.New("E-CLI-008", "the sign-in was not finished in the browser in time",
+			"run aicoded login again and finish the sign-in in the browser within 5 minutes, or run aicoded login --device")
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 }
 

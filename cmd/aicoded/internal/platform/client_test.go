@@ -3,13 +3,9 @@ package platform_test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -26,24 +22,27 @@ import (
 
 var ana = platform.Whoami{Org: "acme", Email: "ana@acme.example", Scopes: []string{"app:create"}}
 
-// newClient returns a client of p, in a home of its own, whose output is out. No browser opens
-// unless the test sets Open, and no token may appear in out.
-func newClient(t *testing.T, p *platformtest.Platform) (*platform.Client, *bytes.Buffer) {
+// newClient returns a client of p, in a home of its own, and its output, in which no token may
+// appear. A browser signs in at each address of a sign-in that the client prints, and sends the
+// text of its last page to pages.
+func newClient(t *testing.T, p *platformtest.Platform) (*platform.Client, *bytes.Buffer, <-chan string) {
+	browse, pages := platformtest.Browser()
+	c, out := clientActing(t, p, browse)
+	return c, out, pages
+}
+
+// clientActing returns a client of p, in a home of its own, and its output, in which no token
+// may appear. act gets each address of a sign-in in a browser that the client prints.
+func clientActing(t *testing.T, p *platformtest.Platform, act func(address string)) (*platform.Client, *bytes.Buffer) {
 	testhome.Set(t)
 	out := &bytes.Buffer{}
-	c := platform.New(p.URL, out)
-	c.Open = func(context.Context, string) error {
-		t.Error("a browser opened")
-		return errors.New("no browser")
-	}
+	c := platform.New(p.URL, platformtest.Watch(out, act))
 	t.Cleanup(func() { assert.NotRegexp(t, `aicoded_(at|rt|ac|dc)_`, out.String(), "a token was printed") })
 	return c, out
 }
 
 // signIn signs in to p in the browser.
-func signIn(t *testing.T, c *platform.Client) {
-	open, pages := platformtest.Browser()
-	c.Open = open
+func signIn(t *testing.T, c *platform.Client, pages <-chan string) {
 	_, err := c.Login(t.Context(), "acme", false)
 	require.NoError(t, err)
 	<-pages
@@ -51,14 +50,13 @@ func signIn(t *testing.T, c *platform.Client) {
 
 func TestLoginInTheBrowser(t *testing.T) {
 	p := platformtest.New(t)
-	c, out := newClient(t, p)
-	open, pages := platformtest.Browser()
-	c.Open = open
+	c, out, pages := newClient(t, p)
 	who, err := c.Login(t.Context(), "acme", false)
 	require.NoError(t, err)
 	assert.Equal(t, ana, who)
 	assert.Equal(t, "You can close this window and go back to the terminal.\n", <-pages)
-	assert.Contains(t, out.String(), "\n    "+p.URL+"/oauth/authorize?")
+	assert.True(t, strings.HasPrefix(out.String(), "To sign in to acme, open this address in a browser on this computer, "+
+		"or run aicoded login --device on a computer without one:\n\n    "+p.URL+"/oauth/authorize?"), out.String())
 
 	cr, err := platform.Load(p.URL)
 	require.NoError(t, err)
@@ -70,23 +68,19 @@ func TestLoginInTheBrowser(t *testing.T) {
 
 func TestLoginAgainRevokesTheOldSignIn(t *testing.T) {
 	p := platformtest.New(t)
-	c, _ := newClient(t, p)
-	signIn(t, c)
+	c, _, pages := newClient(t, p)
+	signIn(t, c, pages)
 	old, err := platform.Load(p.URL)
 	require.NoError(t, err)
-	signIn(t, c)
+	signIn(t, c, pages)
 	assert.Equal(t, []string{old.RefreshToken}, p.Revoked())
 }
 
 func TestLoginRefusesAWrongState(t *testing.T) {
 	p := platformtest.New(t)
-	c, _ := newClient(t, p)
-	c.Timeout = 500 * time.Millisecond
 	statuses := make(chan []int, 1)
-	c.Open = func(_ context.Context, address string) error {
-		go func() { statuses <- forge(address) }()
-		return nil
-	}
+	c, _ := clientActing(t, p, func(address string) { go func() { statuses <- forge(address) }() })
+	c.Timeout = 500 * time.Millisecond
 	_, err := c.Login(t.Context(), "acme", false)
 	assert.Equal(t, "E-CLI-008", errs.Code(err), "a wrong state neither signs in nor ends the sign-in")
 	assert.Equal(t, []int{http.StatusBadRequest, http.StatusBadRequest, http.StatusNotFound}, <-statuses)
@@ -149,10 +143,8 @@ func TestLoginRefused(t *testing.T) {
 			"run aicoded login again"},
 	} {
 		p := platformtest.New(t)
-		c, _ := newClient(t, p)
+		c, _, pages := newClient(t, p)
 		p.Refuse(tc.code, tc.description)
-		open, pages := platformtest.Browser()
-		c.Open = open
 		_, err := c.Login(t.Context(), "acme", false)
 		assert.Equal(t, "E-CLI-006", errs.Code(err), tc.code)
 		require.ErrorContains(t, err, tc.want)
@@ -164,7 +156,7 @@ func TestLoginRefused(t *testing.T) {
 
 func TestLoginWithACode(t *testing.T) {
 	p := platformtest.New(t)
-	c, out := newClient(t, p)
+	c, out, _ := newClient(t, p)
 	p.Pending(1)
 	who, err := c.Login(t.Context(), "acme", true)
 	require.NoError(t, err)
@@ -177,23 +169,10 @@ func TestLoginWithACode(t *testing.T) {
 	assert.Equal(t, "acme", cr.Org)
 }
 
-func TestLoginWithACodeWhenNoBrowserOpens(t *testing.T) {
-	p := platformtest.New(t)
-	c, out := newClient(t, p)
-	c.Open = func(context.Context, string) error {
-		return errors.New(`exec: "xdg-open": executable file not found in $PATH`)
-	}
-	who, err := c.Login(t.Context(), "acme", false)
-	require.NoError(t, err)
-	assert.Equal(t, ana, who)
-	assert.Contains(t, out.String(), "\nNo browser opened (exec: \"xdg-open\": executable file not found in $PATH), "+
-		"so sign in with a code instead.\n\nTo sign in to acme, open\n")
-}
-
 func TestLoginWithACodeEnds(t *testing.T) {
 	for code, want := range map[string]string{"expired_token": "E-CLI-008", "access_denied": "E-CLI-006"} {
 		p := platformtest.New(t)
-		c, _ := newClient(t, p)
+		c, _, _ := newClient(t, p)
 		p.DeviceError(code)
 		_, err := c.Login(t.Context(), "acme", true)
 		assert.Equal(t, want, errs.Code(err), code)
@@ -216,7 +195,7 @@ func TestLoginChecksTheCodeAnswer(t *testing.T) {
 		"a bad interval":  func(a map[string]any) { a["interval"] = -1 },
 	} {
 		p := platformtest.New(t)
-		c, out := newClient(t, p)
+		c, out, _ := newClient(t, p)
 		p.DeviceAnswer(edit)
 		_, err := c.Login(t.Context(), "acme", true)
 		require.ErrorContains(t, err, "not valid", name)
@@ -227,15 +206,13 @@ func TestLoginChecksTheCodeAnswer(t *testing.T) {
 
 func TestLoginOrganisation(t *testing.T) {
 	p := platformtest.New(t)
-	c, _ := newClient(t, p)
+	c, _, pages := newClient(t, p)
 	_, err := c.Login(t.Context(), "", true)
 	require.ErrorIs(t, err, platform.ErrNoOrg, "the first login needs one")
 	_, err = c.Login(t.Context(), "Acme Corp", true)
 	require.ErrorContains(t, err, "not an organisation's name")
 
-	signIn(t, c)
-	open, pages := platformtest.Browser()
-	c.Open = open
+	signIn(t, c, pages)
 	who, err := c.Login(t.Context(), "", false)
 	require.NoError(t, err, "it is remembered")
 	assert.Equal(t, ana, who)
@@ -244,9 +221,9 @@ func TestLoginOrganisation(t *testing.T) {
 
 func TestWhoamiRefreshes(t *testing.T) {
 	p := platformtest.New(t)
-	c, _ := newClient(t, p)
+	c, _, pages := newClient(t, p)
 	p.ExpiresIn(20)
-	signIn(t, c)
+	signIn(t, c, pages)
 	before, err := platform.Load(p.URL)
 	require.NoError(t, err)
 
@@ -268,7 +245,7 @@ func TestWhoamiRefreshes(t *testing.T) {
 
 func TestWhoamiSignedOut(t *testing.T) {
 	p := platformtest.New(t)
-	c, _ := newClient(t, p)
+	c, _, _ := newClient(t, p)
 	_, err := c.Whoami(t.Context())
 	assert.Equal(t, "E-CLI-004", errs.Code(err))
 	require.ErrorContains(t, err, "fix: run aicoded login --org <your organisation>")
@@ -278,7 +255,7 @@ func TestWhoamiSignedOut(t *testing.T) {
 
 func TestRefreshRefused(t *testing.T) {
 	p := platformtest.New(t)
-	c, _ := newClient(t, p)
+	c, _, _ := newClient(t, p)
 	require.NoError(t, platform.Save(p.URL, platform.Credentials{Org: "acme", AccessToken: "aicoded_at_old",
 		RefreshToken: "aicoded_rt_revoked", Expires: time.Now()}))
 	_, err := c.Token(t.Context())
@@ -291,7 +268,7 @@ func TestRefreshRefused(t *testing.T) {
 
 func TestWhoamiRefusedToken(t *testing.T) {
 	p := platformtest.New(t)
-	c, _ := newClient(t, p)
+	c, _, _ := newClient(t, p)
 	require.NoError(t, platform.Save(p.URL, platform.Credentials{Org: "acme", AccessToken: "aicoded_at_revoked",
 		RefreshToken: "aicoded_rt_revoked", Expires: time.Now().Add(time.Hour)}))
 	_, err := c.Whoami(t.Context())
@@ -300,8 +277,8 @@ func TestWhoamiRefusedToken(t *testing.T) {
 
 func TestLogout(t *testing.T) {
 	p := platformtest.New(t)
-	c, _ := newClient(t, p)
-	signIn(t, c)
+	c, _, pages := newClient(t, p)
+	signIn(t, c, pages)
 	cr, err := platform.Load(p.URL)
 	require.NoError(t, err)
 
@@ -321,8 +298,8 @@ func TestLogout(t *testing.T) {
 
 func TestLogoutWithoutThePlatform(t *testing.T) {
 	p := platformtest.New(t)
-	c, _ := newClient(t, p)
-	signIn(t, c)
+	c, _, pages := newClient(t, p)
+	signIn(t, c, pages)
 	p.Close()
 	signedIn, revoked, err := c.Logout(t.Context())
 	require.NoError(t, err)
@@ -358,25 +335,4 @@ func TestNoRedirects(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, revoked)
 	assert.Zero(t, reached.Load(), "no token followed a redirect")
-}
-
-func TestOpenBrowser(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the fake browser is a shell script")
-	}
-	dir := t.TempDir()
-	ran := filepath.Join(dir, "ran")
-	name := "xdg-open"
-	if runtime.GOOS == "darwin" {
-		name = "open"
-	}
-	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("#!/bin/sh\necho \"$@\" >>"+ran+"\n"), 0o700))
-	t.Setenv("PATH", dir)
-	for _, address := range []string{"file:///etc/passwd", "http://evil.example/", "https://ana@evil.example/", "-a", "javascript:alert(1)"} {
-		require.Error(t, platform.OpenBrowser(t.Context(), address), address)
-	}
-	require.NoError(t, platform.OpenBrowser(t.Context(), "https://api.aicoded.cloud/oauth/authorize?a=b&c=d"))
-	b, err := os.ReadFile(ran)
-	require.NoError(t, err)
-	assert.Equal(t, "https://api.aicoded.cloud/oauth/authorize?a=b&c=d\n", string(b), "only the https address opened")
 }

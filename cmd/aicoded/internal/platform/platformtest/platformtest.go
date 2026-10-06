@@ -3,6 +3,7 @@
 package platformtest
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -116,15 +117,41 @@ func (p *Platform) TokenRequests() int {
 	return p.tokenRequests
 }
 
-// Browser returns an opener that acts as the person's browser: in the background, it opens the
-// address and follows the sign-in back to aicoded, then sends the text of the last page it got,
-// or its error, to pages.
-func Browser() (open func(context.Context, string) error, pages <-chan string) {
-	ch := make(chan string, 1)
-	return func(_ context.Context, address string) error {
-		go func() { ch <- get(address) }()
-		return nil
-	}, ch
+// Browser returns what a person does with the address of a sign-in in a browser: in the
+// background, open it and follow the sign-in back to aicoded. The text of the last page it got,
+// or its error, goes to pages.
+func Browser() (browse func(address string), pages <-chan string) {
+	ch := make(chan string, 4)
+	return func(address string) { go func() { ch <- get(address) }() }, ch
+}
+
+// Watch returns a writer for aicoded's output that goes on to out and calls act with the address
+// of each sign-in in a browser that aicoded prints on a line of its own.
+func Watch(out io.Writer, act func(address string)) io.Writer {
+	return &watcher{out: out, act: act}
+}
+
+type watcher struct {
+	out     io.Writer
+	act     func(string)
+	text    []byte
+	scanned int
+}
+
+func (w *watcher) Write(b []byte) (int, error) {
+	w.text = append(w.text, b...)
+	for {
+		i := bytes.IndexByte(w.text[w.scanned:], '\n')
+		if i < 0 {
+			break
+		}
+		line := strings.TrimSpace(string(w.text[w.scanned : w.scanned+i]))
+		w.scanned += i + 1
+		if strings.HasPrefix(line, "http") && strings.Contains(line, "/oauth/authorize?") {
+			w.act(line)
+		}
+	}
+	return w.out.Write(b)
 }
 
 func get(address string) string {

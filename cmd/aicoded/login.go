@@ -14,9 +14,6 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 )
 
-// openURL opens the sign-in in the person's browser.
-var openURL = platform.OpenBrowser
-
 // platformClient returns a client of the platform that AICODED_PLATFORM names, which tells the
 // person what to do to sign in on stdout.
 func platformClient(stdout io.Writer) (*platform.Client, error) {
@@ -24,9 +21,7 @@ func platformClient(stdout io.Writer) (*platform.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := platform.New(address, stdout)
-	c.Open = openURL
-	return c, nil
+	return platform.New(address, stdout), nil
 }
 
 // runLogin runs aicoded login with the arguments after the command.
