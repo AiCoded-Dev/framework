@@ -37,6 +37,12 @@ var (
 	fence  = regexp.MustCompile("^(\\s*)(```+)")
 	link   = regexp.MustCompile(`\]\(([^)\s]+)(?:\s+"[^"]*")?\)`)
 	scheme = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
+	// tag matches the start of raw HTML: a tag, a comment, a declaration or a processing
+	// instruction.
+	tag = regexp.MustCompile(`<[a-zA-Z/!?][^<>\s]*>?`)
+	// block matches a line that starts a heading, a list item or a table row, which ends the
+	// paragraph before it.
+	block = regexp.MustCompile(`^\s*(#|[-*+] |[0-9]+[.)] |\|)`)
 )
 
 // checkDocs runs every check of the docs on the repo at root and returns the problems found.
@@ -59,7 +65,11 @@ func checkDocs(root string, update bool) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		problems = append(append(problems, code...), links...)
+		html, err := checkHTML(root, f)
+		if err != nil {
+			return nil, err
+		}
+		problems = append(append(append(problems, code...), links...), html...)
 	}
 	return problems, nil
 }
@@ -391,28 +401,77 @@ func checkLink(root, rel, target string) string {
 	return ""
 }
 
-// withoutCode returns line without its code spans.
-func withoutCode(line string) string {
+// checkHTML checks that the doc at rel holds no raw HTML, which GitHub and the docs site drop: a
+// < followed by a letter, /, ! or ?, outside code blocks and code spans. The markers that
+// checkCode reads are allowed on lines of their own.
+func checkHTML(root, rel string) ([]string, error) {
+	data, err := os.ReadFile(filepath.Join(root, rel))
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(data), "\n")
+	var problems []string
+	open, first := "", 0
+	for i, line := range lines {
+		if open != "" {
+			if closes(line, open) {
+				open = ""
+			}
+			first = i + 1
+			continue
+		}
+		f := fence.FindStringSubmatch(line)
+		skip := f != nil || strings.TrimSpace(line) == "" || marker.MatchString(line) || line == rulesStart || line == rulesEnd
+		if skip || block.MatchString(line) {
+			problems = append(problems, rawHTML(rel, first, lines[first:i])...)
+			first = i
+			if skip {
+				first = i + 1
+			}
+		}
+		if f != nil {
+			open = f[2]
+		}
+	}
+	return append(problems, rawHTML(rel, first, lines[first:])...), nil
+}
+
+// rawHTML returns a problem for every piece of raw HTML in para, the lines of a paragraph of the
+// doc rel from the line index first. A code span may run over the lines.
+func rawHTML(rel string, first int, para []string) []string {
+	var problems []string
+	for k, line := range strings.Split(withoutCode(strings.Join(para, "\n")), "\n") {
+		for _, m := range tag.FindAllString(line, -1) {
+			problems = append(problems, fmt.Sprintf("%s:%d: Markdown reads %s as HTML and drops it; put the text in a code span", rel, first+k+1, m))
+		}
+	}
+	return problems
+}
+
+// withoutCode returns text without its code spans. It keeps the line breaks of a span, so every
+// line stays where it was.
+func withoutCode(text string) string {
 	var b strings.Builder
 	for {
-		i := strings.IndexByte(line, '`')
+		i := strings.IndexByte(text, '`')
 		if i < 0 {
-			b.WriteString(line)
+			b.WriteString(text)
 			return b.String()
 		}
-		b.WriteString(line[:i])
+		b.WriteString(text[:i])
 		n := i
-		for n < len(line) && line[n] == '`' {
+		for n < len(text) && text[n] == '`' {
 			n++
 		}
-		run, rest := line[i:n], line[n:]
+		run, rest := text[i:n], text[n:]
 		end := closingRun(rest, len(run))
 		if end < 0 {
 			b.WriteString(run)
-			line = rest
+			text = rest
 			continue
 		}
-		line = rest[end+len(run):]
+		b.WriteString(strings.Repeat("\n", strings.Count(rest[:end], "\n")))
+		text = rest[end+len(run):]
 	}
 }
 

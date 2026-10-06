@@ -2,6 +2,7 @@ package docs
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -297,6 +298,36 @@ func TestLinks(t *testing.T) {
 		"docs/guides/a.md:13: the link /docs/guides/b.md starts at /; make it relative to this file",
 		"docs/guides/a.md:14: the link ../../../x.md points outside the repo",
 	}, problems)
+}
+
+// dropped is what checkHTML reports for the raw HTML text on line of docs/a.md.
+func dropped(line int, text string) string {
+	return fmt.Sprintf("docs/a.md:%d: Markdown reads %s as HTML and drops it; put the text in a code span", line, text)
+}
+
+func TestRawHTML(t *testing.T) {
+	for text, want := range map[string][]string{
+		"Use <b>bold</b>.\n":         {dropped(5, "<b>"), dropped(5, "</b>")},
+		"Name it x_<os>.go.\n":       {dropped(5, "<os>")},
+		"<!-- a note -->\n":          {dropped(5, "<!--")},
+		"A `span\nover` and <br>\n":  {dropped(6, "<br>")},
+		"A `span\n\nand <os>`\n":     {dropped(7, "<os>")},
+		"- one `item\n- and <os>`\n": {dropped(6, "<os>")},
+	} {
+		root := tree(t, map[string]string{"docs/a.md": "# Doc\n\nText.\n\n" + text})
+		problems, err := checkHTML(root, "docs/a.md")
+		require.NoError(t, err)
+		assert.Equal(t, want, problems, text)
+	}
+}
+
+func TestRawHTMLInCode(t *testing.T) {
+	root := tree(t, map[string]string{"docs/a.md": "# Doc\n\nText.\n\n" +
+		"A code span `_<os>`, one ``over\n<two> lines`` and a < b.\n\n" +
+		"```html\n<p>\n```\n\n<!-- code: notes/notes.go -->\n```go\n```\n\n<!-- rules -->\n<!-- end rules -->\n"})
+	problems, err := checkHTML(root, "docs/a.md")
+	require.NoError(t, err)
+	assert.Empty(t, problems)
 }
 
 func TestLLMs(t *testing.T) {
