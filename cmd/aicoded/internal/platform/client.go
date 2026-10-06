@@ -228,9 +228,9 @@ func (c *Client) whoami(ctx context.Context, token string) (Whoami, error) {
 	return w, nil
 }
 
-// Logout revokes the sign-in at the platform (RFC 7009), then deletes it. It deletes it even when
-// the platform cannot revoke it, and then returns revoked false. signedIn is false when there was
-// no sign-in.
+// Logout revokes the sign-in at the platform (RFC 7009), then deletes its tokens and keeps its
+// organisation for the next login. It deletes them even when the platform cannot revoke them, and
+// then returns revoked false. signedIn is false when there was no sign-in.
 func (c *Client) Logout(ctx context.Context) (signedIn, revoked bool, err error) {
 	cr, err := Load(c.address)
 	if err != nil {
@@ -240,7 +240,10 @@ func (c *Client) Logout(ctx context.Context) (signedIn, revoked bool, err error)
 		signedIn = true
 		revoked = c.revoke(ctx, cr.RefreshToken) == nil
 	}
-	return signedIn, revoked, Delete(c.address)
+	if cr.Org == "" {
+		return signedIn, revoked, Delete(c.address)
+	}
+	return signedIn, revoked, Save(c.address, Credentials{Org: cr.Org})
 }
 
 // revoke asks the platform to revoke the refresh token and the sign-in it belongs to.

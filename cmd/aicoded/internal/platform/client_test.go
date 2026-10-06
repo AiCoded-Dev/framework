@@ -289,7 +289,7 @@ func TestLogout(t *testing.T) {
 	assert.Equal(t, []string{cr.RefreshToken}, p.Revoked())
 	cr, err = platform.Load(p.URL)
 	require.NoError(t, err)
-	assert.Empty(t, cr)
+	assert.Equal(t, platform.Credentials{Org: "acme"}, cr)
 
 	signedIn, _, err = c.Logout(t.Context())
 	require.NoError(t, err)
@@ -307,7 +307,7 @@ func TestLogoutWithoutThePlatform(t *testing.T) {
 	assert.False(t, revoked)
 	cr, err := platform.Load(p.URL)
 	require.NoError(t, err)
-	assert.Empty(t, cr, "the sign-in is deleted all the same")
+	assert.Equal(t, platform.Credentials{Org: "acme"}, cr, "the tokens are deleted all the same")
 }
 
 func TestNoRedirects(t *testing.T) {

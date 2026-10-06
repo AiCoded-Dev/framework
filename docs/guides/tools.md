@@ -170,7 +170,8 @@ There is no MCP tool for signing in: it needs a person and a browser.
 
 `aicoded logout` asks the platform to revoke your sign-in, then deletes it from this computer. It
 deletes it even when the platform cannot be reached, and then says that the sign-in stays valid
-on the platform until it expires, within 30 days.
+on the platform until it expires, within 30 days. It keeps the name of your organisation, so the
+next `aicoded login` needs no `--org`.
 
 ## aicoded whoami
 

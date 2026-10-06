@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform/platformtest"
 	"aicoded.dev/framework/cmd/aicoded/internal/testhome"
 )
@@ -52,6 +53,21 @@ func TestRunLoginWhoamiLogout(t *testing.T) {
 	code, out, _ = aicoded("logout")
 	assert.Equal(t, 0, code)
 	assert.Equal(t, "Not signed in to "+p.URL+".\n", out)
+}
+
+func TestRunLogoutKeepsTheOrg(t *testing.T) {
+	p, aicoded := fakePlatform(t)
+	code, _, _ := aicoded("login", "--org", "acme")
+	require.Equal(t, 0, code)
+	code, _, _ = aicoded("logout")
+	require.Equal(t, 0, code)
+	cr, err := platform.Load(p.URL)
+	require.NoError(t, err)
+	assert.Equal(t, platform.Credentials{Org: "acme"}, cr, "no token is kept")
+
+	code, out, errOut := aicoded("login")
+	require.Equal(t, 0, code, errOut)
+	assert.Contains(t, out, "\nSigned in to acme as ana@acme.example.\n")
 }
 
 func TestRunLoginWithACode(t *testing.T) {
