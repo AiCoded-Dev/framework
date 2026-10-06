@@ -40,9 +40,6 @@ var (
 	// tag matches the start of raw HTML: a tag, a comment, a declaration or a processing
 	// instruction.
 	tag = regexp.MustCompile(`<[a-zA-Z/!?][^<>\s]*>?`)
-	// block matches a line that starts a heading, a list item or a table row, which ends the
-	// paragraph before it.
-	block = regexp.MustCompile(`^\s*(#|[-*+] |[0-9]+[.)] |\|)`)
 )
 
 // checkDocs runs every check of the docs on the repo at root and returns the problems found.
@@ -69,7 +66,7 @@ func checkDocs(root string, update bool) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		problems = append(append(append(problems, code...), links...), html...)
+		problems = slices.Concat(problems, code, links, html)
 	}
 	return problems, nil
 }
@@ -403,7 +400,9 @@ func checkLink(root, rel, target string) string {
 
 // checkHTML checks that the doc at rel holds no raw HTML, which GitHub and the docs site drop: a
 // < followed by a letter, /, ! or ?, outside code blocks and code spans. The markers that
-// checkCode reads are allowed on lines of their own.
+// checkCode reads are allowed on lines of their own. A code span may run over the lines of a
+// paragraph, which a blank line, a code block, a marker or a line that notProse matches ends; a
+// heading is a paragraph of its own.
 func checkHTML(root, rel string) ([]string, error) {
 	data, err := os.ReadFile(filepath.Join(root, rel))
 	if err != nil {
@@ -412,6 +411,10 @@ func checkHTML(root, rel string) ([]string, error) {
 	lines := strings.Split(string(data), "\n")
 	var problems []string
 	open, first := "", 0
+	flush := func(end int) {
+		problems = append(problems, rawHTML(rel, first, lines[first:end])...)
+		first = end
+	}
 	for i, line := range lines {
 		if open != "" {
 			if closes(line, open) {
@@ -421,28 +424,32 @@ func checkHTML(root, rel string) ([]string, error) {
 			continue
 		}
 		f := fence.FindStringSubmatch(line)
-		skip := f != nil || strings.TrimSpace(line) == "" || marker.MatchString(line) || line == rulesStart || line == rulesEnd
-		if skip || block.MatchString(line) {
-			problems = append(problems, rawHTML(rel, first, lines[first:i])...)
-			first = i
-			if skip {
-				first = i + 1
-			}
+		l := strings.TrimSpace(line)
+		switch {
+		case f != nil || l == "" || marker.MatchString(line) || line == rulesStart || line == rulesEnd:
+			flush(i)
+			first = i + 1
+		case strings.HasPrefix(l, "#"):
+			flush(i)
+			flush(i + 1)
+		case notProse.MatchString(l):
+			flush(i)
 		}
 		if f != nil {
 			open = f[2]
 		}
 	}
-	return append(problems, rawHTML(rel, first, lines[first:])...), nil
+	flush(len(lines))
+	return problems, nil
 }
 
 // rawHTML returns a problem for every piece of raw HTML in para, the lines of a paragraph of the
-// doc rel from the line index first. A code span may run over the lines.
+// doc rel from the line index first.
 func rawHTML(rel string, first int, para []string) []string {
 	var problems []string
 	for k, line := range strings.Split(withoutCode(strings.Join(para, "\n")), "\n") {
 		for _, m := range tag.FindAllString(line, -1) {
-			problems = append(problems, fmt.Sprintf("%s:%d: Markdown reads %s as HTML and drops it; put the text in a code span", rel, first+k+1, m))
+			problems = append(problems, fmt.Sprintf("%s:%d: Markdown may read %s as HTML and drop it; put the text in a code span", rel, first+k+1, m))
 		}
 	}
 	return problems

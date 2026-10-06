@@ -302,7 +302,7 @@ func TestLinks(t *testing.T) {
 
 // dropped is what checkHTML reports for the raw HTML text on line of docs/a.md.
 func dropped(line int, text string) string {
-	return fmt.Sprintf("docs/a.md:%d: Markdown reads %s as HTML and drops it; put the text in a code span", line, text)
+	return fmt.Sprintf("docs/a.md:%d: Markdown may read %s as HTML and drop it; put the text in a code span", line, text)
 }
 
 func TestRawHTML(t *testing.T) {
@@ -310,9 +310,13 @@ func TestRawHTML(t *testing.T) {
 		"Use <b>bold</b>.\n":         {dropped(5, "<b>"), dropped(5, "</b>")},
 		"Name it x_<os>.go.\n":       {dropped(5, "<os>")},
 		"<!-- a note -->\n":          {dropped(5, "<!--")},
+		"<?xml version=\"1\"?>\n":    {dropped(5, "<?xml")},
 		"A `span\nover` and <br>\n":  {dropped(6, "<br>")},
 		"A `span\n\nand <os>`\n":     {dropped(7, "<os>")},
 		"- one `item\n- and <os>`\n": {dropped(6, "<os>")},
+		"## Head `x\nline <os>`\n":   {dropped(6, "<os>")},
+		"A `span\n> quote <os>`\n":   {dropped(6, "<os>")},
+		"A ``span\n<div> here``\n":   {dropped(6, "<div>")},
 	} {
 		root := tree(t, map[string]string{"docs/a.md": "# Doc\n\nText.\n\n" + text})
 		problems, err := checkHTML(root, "docs/a.md")
@@ -323,11 +327,25 @@ func TestRawHTML(t *testing.T) {
 
 func TestRawHTMLInCode(t *testing.T) {
 	root := tree(t, map[string]string{"docs/a.md": "# Doc\n\nText.\n\n" +
-		"A code span `_<os>`, one ``over\n<two> lines`` and a < b.\n\n" +
+		"A code span `_<os>`, one ``over\ntwo <lines>`` and a < b.\n\n" +
 		"```html\n<p>\n```\n\n<!-- code: notes/notes.go -->\n```go\n```\n\n<!-- rules -->\n<!-- end rules -->\n"})
 	problems, err := checkHTML(root, "docs/a.md")
 	require.NoError(t, err)
 	assert.Empty(t, problems)
+}
+
+func TestDocsRefuseRawHTML(t *testing.T) {
+	root := tree(t, map[string]string{
+		"docs/a.md":                "# Doc\n\nText.\n\nName it x_<os>.go.\n",
+		"docs/changelog-agents.md": changelogMD,
+		"docs/errors/README.md":    "# Error catalogue\n\nEvery error has a code.\n",
+	})
+	problems, err := checkLLMs(root, true)
+	require.NoError(t, err)
+	require.Empty(t, problems)
+	problems, err = checkDocs(root, false)
+	require.NoError(t, err)
+	assert.Equal(t, []string{dropped(5, "<os>")}, problems)
 }
 
 func TestLLMs(t *testing.T) {
