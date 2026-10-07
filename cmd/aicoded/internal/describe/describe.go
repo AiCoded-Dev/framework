@@ -27,23 +27,44 @@ type Summary struct {
 
 // App describes one app.
 type App struct {
-	Name     string              `json:"name"`
-	Dir      string              `json:"dir"`
-	Pages    []Page              `json:"pages,omitempty"`
-	Serves   []Serve             `json:"serves,omitempty"`
-	Calls    map[string][]string `json:"calls,omitempty"`
-	SQLDB    bool                `json:"sqldb,omitempty"`
-	Stores   []string            `json:"stores,omitempty"`
-	Email    *Email              `json:"email,omitempty"`
-	Settings []string            `json:"settings,omitempty"`
-	Secrets  []string            `json:"secrets,omitempty"` // names only
-	Modules  []string            `json:"modules,omitempty"`
+	Name       string              `json:"name"`
+	Dir        string              `json:"dir"`
+	Class      string              `json:"class,omitempty"`
+	Owner      string              `json:"owner,omitempty"`
+	Audience   *Audience           `json:"audience,omitempty"`
+	Pages      []Page              `json:"pages,omitempty"`
+	Serves     []Serve             `json:"serves,omitempty"`
+	Calls      map[string][]string `json:"calls,omitempty"`
+	SQLDB      bool                `json:"sqldb,omitempty"`
+	Stores     []string            `json:"stores,omitempty"`
+	Connectors []string            `json:"connectors,omitempty"`
+	Email      *Email              `json:"email,omitempty"`
+	Egress     []string            `json:"egress,omitempty"`
+	Schedule   []Job               `json:"schedule,omitempty"`
+	Settings   []string            `json:"settings,omitempty"`
+	Secrets    []string            `json:"secrets,omitempty"` // names only
+	Modules    []string            `json:"modules,omitempty"`
+	Size       string              `json:"size,omitempty"`
+	Resources  string              `json:"resources,omitempty"`
+	TTL        string              `json:"ttl,omitempty"`
 	// Surface is the app's size. Its writes come from lint, and are left out, with a warning, when
 	// lint cannot read the app or its precheck stops it.
 	Surface  surface.Surface `json:"surface"`
 	Warnings []string        `json:"warnings,omitempty"`
 	// Findings are the generated files that are out of date, E-CHK-001, and the errors of generate.
 	Findings []problem.Problem `json:"findings,omitempty"`
+}
+
+// Audience is who may use the app: people of the company and outside people.
+type Audience struct {
+	Internal []string `json:"internal,omitempty"`
+	External []string `json:"external,omitempty"`
+}
+
+// Job is one scheduled job and the cron expression, in UTC, of when it runs.
+type Job struct {
+	Name string `json:"job"`
+	Cron string `json:"cron"`
 }
 
 // Page is one page of the access section: its path, the role rules a viewer must meet, whether it
@@ -103,16 +124,26 @@ func describeApp(ctx context.Context, a workspace.App, names map[string]string) 
 	}
 	res, err := generate.Run(a.Dir, generate.Options{Workspace: names, Frozen: true})
 	d := App{
-		Name:     a.Name,
-		Dir:      a.Dir,
-		Calls:    m.Services.Calls,
-		SQLDB:    m.SQLDB(),
-		Stores:   m.Stores(),
-		Settings: m.Settings,
-		Secrets:  m.Secrets,
-		Modules:  m.Modules,
-		Warnings: res.Warnings,
-		Findings: problem.From(a.Name, err),
+		Name:       a.Name,
+		Dir:        a.Dir,
+		Class:      m.Class,
+		Owner:      m.Owner,
+		Calls:      m.Services.Calls,
+		SQLDB:      m.SQLDB(),
+		Stores:     m.Stores(),
+		Connectors: m.Connectors(),
+		Egress:     m.Egress,
+		Settings:   m.Settings,
+		Secrets:    m.Secrets,
+		Modules:    m.Modules,
+		Size:       m.Size,
+		Resources:  m.Resources,
+		TTL:        m.TTL,
+		Warnings:   res.Warnings,
+		Findings:   problem.From(a.Name, err),
+	}
+	if len(m.Audience.Internal) > 0 || len(m.Audience.External) > 0 {
+		d.Audience = &Audience{Internal: m.Audience.Internal, External: m.Audience.External}
 	}
 	for _, path := range slices.Sorted(maps.Keys(m.Access)) {
 		access := m.Access[path]
@@ -124,6 +155,9 @@ func describeApp(ctx context.Context, a workspace.App, names map[string]string) 
 	}
 	if m.Email != nil {
 		d.Email = &Email{From: m.Email.From, ToDomains: m.Email.ToDomains}
+	}
+	for _, j := range m.Schedule {
+		d.Schedule = append(d.Schedule, Job{Name: j.Name, Cron: j.Cron})
 	}
 	r, err := lint.Run(ctx, a.Dir, lint.Config{Generated: res.Files, Modules: m.Modules})
 	if ctx.Err() != nil {

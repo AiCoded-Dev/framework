@@ -1,0 +1,65 @@
+{
+  "apps": [
+    {
+      "name": "room-maintenance",
+      "dir": "/apps/room-maintenance",
+      "class": "internal-tool",
+      "owner": "group:hotel-ops-leads",
+      "audience": {
+        "internal": [
+          "group:hotel-staff"
+        ]
+      },
+      "pages": [
+        {
+          "path": "/tickets",
+          "require": [
+            "staff"
+          ]
+        },
+        {
+          "path": "/tickets/report",
+          "require": [
+            "staff"
+          ]
+        },
+        {
+          "path": "/tickets/{id}",
+          "require": [
+            "staff"
+          ],
+          "guard": true
+        },
+        {
+          "path": "/tickets/{id}/edit",
+          "require": [
+            "staff"
+          ],
+          "guard": true
+        },
+        {
+          "path": "/tickets/{id}/status",
+          "require": [
+            "staff",
+            "hotel-ops"
+          ],
+          "guard": true
+        }
+      ],
+      "sqldb": true,
+      "size": "S",
+      "resources": "small",
+      "ttl": "180d",
+      "surface": {
+        "size": 5,
+        "entry_points": 5,
+        "effects": 3,
+        "writes": [
+          "INSERT rooms",
+          "INSERT tickets",
+          "UPDATE tickets"
+        ]
+      }
+    }
+  ]
+}

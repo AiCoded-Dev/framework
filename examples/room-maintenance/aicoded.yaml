@@ -1,4 +1,11 @@
 app: room-maintenance
+class: internal-tool
+owner: group:hotel-ops-leads
+audience:
+  internal: [group:hotel-staff]
+size: S
+resources: small
+ttl: 180d
 data:
   - source: sqldb
     classes: [internal]

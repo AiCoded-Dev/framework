@@ -91,17 +91,21 @@ data:
     classes: [internal, finance]
   - source: connector:m365-sharepoint
     classes: [internal]
+  - source: connector:crm
+    classes: [internal]
 email:
   from: ops@acme.example
   to_domains: [acme.example, partner.example]
 `)
 	assert.True(t, m.SQLDB())
 	assert.Equal(t, []string{"invoices"}, m.Stores())
+	assert.Equal(t, []string{"crm", "m365-sharepoint"}, m.Connectors())
 	assert.Equal(t, &manifest.Email{From: "ops@acme.example", ToDomains: []string{"acme.example", "partner.example"}}, m.Email)
 
 	m = load(t, "app: plain\n")
 	assert.False(t, m.SQLDB())
 	assert.Empty(t, m.Stores())
+	assert.Empty(t, m.Connectors())
 	assert.Nil(t, m.Email)
 }
 

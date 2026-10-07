@@ -103,9 +103,19 @@ func (m Manifest) SQLDB() bool {
 
 // Stores returns the names of the file stores the app declares, sorted.
 func (m Manifest) Stores() []string {
+	return m.sources("filestore:")
+}
+
+// Connectors returns the names of the connectors the app declares, sorted.
+func (m Manifest) Connectors() []string {
+	return m.sources("connector:")
+}
+
+// sources returns the names after prefix of the data sources that start with it, sorted.
+func (m Manifest) sources(prefix string) []string {
 	var out []string
 	for _, d := range m.Data {
-		if name, ok := strings.CutPrefix(d.Source, "filestore:"); ok {
+		if name, ok := strings.CutPrefix(d.Source, prefix); ok {
 			out = append(out, name)
 		}
 	}

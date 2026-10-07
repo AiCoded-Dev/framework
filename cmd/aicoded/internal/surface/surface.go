@@ -13,12 +13,12 @@ import (
 type Surface struct {
 	// Size is the larger of EntryPoints and Effects.
 	Size int `json:"size"`
-	// EntryPoints counts the pages, the page calls, once for each page that offers one, and the
-	// functions the app serves other apps, from the access and services sections of its
-	// permission list.
+	// EntryPoints counts the pages, the page calls, once for each page that offers one, the
+	// functions the app serves other apps and its scheduled jobs, from the access, services and
+	// schedule sections of its permission list.
 	EntryPoints int `json:"entry_points"`
-	// Effects counts the tables its SQL writes, once for each kind of write, and the domains it
-	// may send mail to.
+	// Effects counts the tables its SQL writes, once for each kind of write, the connectors it
+	// declares, the outside services it may call and the domains it may send mail to.
 	Effects int `json:"effects"`
 	// Writes lists the writes of its SQL as "INSERT notes", sorted.
 	Writes []string `json:"writes,omitempty"`
@@ -30,11 +30,11 @@ func Of(m manifest.Manifest, writes []lint.Write) Surface {
 	for _, a := range m.Access {
 		s.EntryPoints += 1 + len(a.Calls)
 	}
-	s.EntryPoints += len(m.Services.Serves)
+	s.EntryPoints += len(m.Services.Serves) + len(m.Schedule)
 	for _, w := range writes {
 		s.Writes = append(s.Writes, w.Op+" "+w.Table)
 	}
-	s.Effects = len(writes)
+	s.Effects = len(writes) + len(m.Connectors()) + len(m.Egress)
 	if m.Email != nil {
 		s.Effects += len(m.Email.ToDomains)
 	}

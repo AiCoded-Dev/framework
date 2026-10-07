@@ -1,0 +1,15 @@
+app room-maintenance (/apps/room-maintenance)
+  class internal-tool
+  owner group:hotel-ops-leads
+  audience group:hotel-staff
+  page /tickets  require staff
+  page /tickets/report  require staff
+  page /tickets/{id}  require staff  guard
+  page /tickets/{id}/edit  require staff  guard
+  page /tickets/{id}/status  require staff, hotel-ops  guard
+  database
+  size S
+  resources small
+  ttl 180d
+  writes INSERT rooms, INSERT tickets, UPDATE tickets
+  surface 5 (5 entry points, 3 effects)

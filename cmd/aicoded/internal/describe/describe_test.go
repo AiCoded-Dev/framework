@@ -3,6 +3,7 @@ package describe
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +18,8 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/surface"
 	"aicoded.dev/framework/internal/errs"
 )
+
+var update = flag.Bool("update", false, "rewrite the golden files")
 
 // copyWorkspace copies the e2e rpc pair and the dev runner's hello app into a temp folder, with
 // their replace directives pointing at this checkout, generates them, and returns the folder. It
@@ -79,6 +82,34 @@ func TestDescribe(t *testing.T) {
 		"surface": {"size": 0, "entry_points": 0, "effects": 0}}]}`, string(data))
 }
 
+// The room-maintenance example, described in text and JSON, matches its golden files.
+func TestDescribeExample(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go toolchain not in PATH")
+	}
+	s, err := Describe(t.Context(), filepath.Join("..", "..", "..", "..", "examples"), "room-maintenance")
+	require.NoError(t, err)
+	require.Len(t, s.Apps, 1)
+	s.Apps[0].Dir = "/apps/room-maintenance"
+	var text bytes.Buffer
+	require.NoError(t, s.WriteText(&text))
+	golden(t, text.Bytes(), "room-maintenance.txt")
+	data, err := json.MarshalIndent(s, "", "  ")
+	require.NoError(t, err)
+	golden(t, append(data, '\n'), "room-maintenance.json")
+}
+
+func golden(t *testing.T, got []byte, name string) {
+	t.Helper()
+	p := filepath.Join("testdata", name)
+	if *update {
+		require.NoError(t, os.WriteFile(p, got, 0o600))
+	}
+	want, err := os.ReadFile(p)
+	require.NoError(t, err)
+	assert.Equal(t, string(want), string(got))
+}
+
 func TestDescribeSurface(t *testing.T) {
 	root := copyWorkspace(t)
 	notes := `package main
@@ -132,6 +163,31 @@ func TestDescribeModules(t *testing.T) {
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"apps": [{"name": "hello", "dir": `+quote(filepath.Join(root, "hello"))+`, "settings": ["greeting"], "secrets": ["token"],
 		"modules": ["golang.org/x/text"], "surface": {"size": 0, "entry_points": 0, "effects": 0}}]}`, string(data))
+}
+
+func TestDescribeReach(t *testing.T) {
+	root := copyWorkspace(t)
+	yaml := filepath.Join(root, "hello", "aicoded.yaml")
+	data, err := os.ReadFile(yaml)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(yaml, append(data, `audience:
+  external: [magic-link]
+data:
+  - source: connector:crm
+    classes: [internal]
+egress: [api.partner.example, hooks.partner.example]
+schedule:
+  - {cron: "0 6 * * *", job: daily-summary}
+`...), 0o600))
+
+	s, err := Describe(t.Context(), root, "hello")
+	require.NoError(t, err)
+	data, err = json.Marshal(s)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"apps": [{"name": "hello", "dir": `+quote(filepath.Join(root, "hello"))+`, "audience": {"external": ["magic-link"]},
+		"connectors": ["crm"], "egress": ["api.partner.example", "hooks.partner.example"],
+		"schedule": [{"job": "daily-summary", "cron": "0 6 * * *"}], "settings": ["greeting"], "secrets": ["token"],
+		"surface": {"size": 3, "entry_points": 1, "effects": 3}}]}`, string(data))
 }
 
 func quote(s string) string {
@@ -190,6 +246,20 @@ func TestDescribeText(t *testing.T) {
 			Findings: problem.From("shop", errs.At("pages/route_gen.go:1", "E-CHK-001", "pages/route_gen.go is out of date", "run aicoded generate")),
 		},
 		{Name: "tiny", Dir: "/w/tiny", Email: &Email{From: "tiny@acme.example"}},
+		{
+			Name: "ops", Dir: "/w/ops", Class: "internal-tool", Owner: "group:ops-leads",
+			Audience:   &Audience{Internal: []string{"group:ops", "everyone"}, External: []string{"idp:partners", "magic-link"}},
+			Pages:      []Page{{Path: "/", Require: []string{"*"}}},
+			Stores:     []string{"photos"},
+			Connectors: []string{"crm", "m365-sharepoint"},
+			Email:      &Email{From: "ops@acme.example", ToDomains: []string{"acme.example"}},
+			Egress:     []string{"api.partner.example", "hooks.partner.example"},
+			Schedule:   []Job{{Name: "daily-summary", Cron: "0 6 * * *"}, {Name: "sync", Cron: "*/15 * * * *"}},
+			Settings:   []string{"report_day"},
+			Modules:    []string{"golang.org/x/text"},
+			Size:       "M", Resources: "medium", TTL: "90d",
+			Surface: surface.Surface{Size: 5, EntryPoints: 3, Effects: 5},
+		},
 	}}
 	var out bytes.Buffer
 	require.NoError(t, s.WriteText(&out))
@@ -217,5 +287,23 @@ app shop (/w/shop)
 app tiny (/w/tiny)
   email from tiny@acme.example
   surface 0 (0 entry points, 0 effects)
+app ops (/w/ops)
+  class internal-tool
+  owner group:ops-leads
+  audience group:ops, everyone
+  external audience idp:partners, magic-link
+  page /  require *
+  files photos
+  connectors crm, m365-sharepoint
+  email from ops@acme.example to acme.example
+  egress api.partner.example, hooks.partner.example
+  schedule daily-summary  cron 0 6 * * *
+  schedule sync  cron */15 * * * *
+  settings report_day
+  modules golang.org/x/text
+  size M
+  resources medium
+  ttl 90d
+  surface 5 (3 entry points, 5 effects)
 `, out.String())
 }
