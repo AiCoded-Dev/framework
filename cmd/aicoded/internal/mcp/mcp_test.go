@@ -216,11 +216,14 @@ func TestToolsListed(t *testing.T) {
 	readOnly := map[string]bool{}
 	var openWorld []string
 	for _, tool := range res.Tools {
+		require.NotNil(t, tool.Annotations, tool.Name)
+		require.NotNil(t, tool.Annotations.OpenWorldHint, tool.Name)
 		readOnly[tool.Name] = tool.Annotations.ReadOnlyHint
 		if *tool.Annotations.OpenWorldHint {
 			openWorld = append(openWorld, tool.Name)
 		}
 		if !tool.Annotations.ReadOnlyHint {
+			require.NotNil(t, tool.Annotations.DestructiveHint, tool.Name)
 			assert.False(t, *tool.Annotations.DestructiveHint, tool.Name)
 		}
 	}

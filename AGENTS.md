@@ -86,7 +86,7 @@ not for changing the framework itself. Follow them in every change.
   `web.HTMLConst`, `web.EscapeHTML` or `web.JoinHTML`.
 - Never add a `replace` line to `go.mod`, a `go.work` file or a `vendor` folder: `aicoded check`
   refuses them (E-LINT-011) but for the framework's `replace` that `aicoded init` writes from a
-  framework checkout, and the delivery pipeline refuses every one (E-GATE-001). Require releases.
+  checkout, and the delivery pipeline refuses every one (E-GATE-001). Require released versions.
 - Never add `//nolint` or `#nosec`, skip a test or weaken a check to make it pass. Stop and
   explain the problem to the developer.
 
