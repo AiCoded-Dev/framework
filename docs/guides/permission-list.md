@@ -71,7 +71,7 @@ not stated.
   Names are lower-case letters, digits and dashes, and each source is listed once (E-MAN-007).
 - `egress` lists the outside services the app calls, by host name, over HTTPS on port 443: a
   lower-case name such as `api.partner.example`, with no scheme, port, path, wildcard or IP
-  address, and none that ends in `localhost`, `local`, `internal` or `arpa`, each once
+  address, and none whose last label is `localhost`, `local`, `internal` or `arpa`, each once
   (E-MAN-018). No building block calls one yet.
 - `email` has `from`, one plain lower-case address, and `to_domains`, the lower-case domains the
   app may send to, with no wildcards and no non-ASCII names (E-MAN-009). See [mail](mail.md).
