@@ -18,8 +18,11 @@ var cronFields = []struct {
 // a, a-b or a-b/n in decimal, within the field's range.
 func cronProblem(expr string) string {
 	fields := strings.FieldsFunc(expr, func(r rune) bool { return r == ' ' })
-	if len(fields) != len(cronFields) || expr[0] == ' ' || expr[len(expr)-1] == ' ' {
+	switch {
+	case len(fields) != len(cronFields):
 		return "is not five fields separated by spaces: minute, hour, day, month and weekday"
+	case expr[0] == ' ' || expr[len(expr)-1] == ' ':
+		return "has a space at the start or end"
 	}
 	for i, f := range fields {
 		if p := cronField(f, cronFields[i].name, cronFields[i].min, cronFields[i].max); p != "" {
