@@ -217,9 +217,10 @@ record. [Publishing](publishing.md) tells the whole story.
   seconds for up to 35 minutes, and prints the steps, the problems as `aicoded check` prints
   them, and the status. It exits with 0 when the publish passed and 1 otherwise. Ctrl-C stops the
   waiting, not the publish. `--no-wait` returns at once.
-- When the platform refuses the sign-in for want of an app's scopes, it refreshes the sign-in
-  once and asks again, which is how a sign-in gets the scopes of the app its first publish
-  created.
+- When the platform refuses the sign-in for want of an app's scopes, or does not accept its
+  token, as when this computer's clock is off, it refreshes the sign-in once and asks again. That
+  is how a sign-in gets the scopes of the app its first publish created. A token the platform
+  still does not accept is E-CLI-004. `aicoded status` does the same.
 
 ## aicoded status
 

@@ -99,6 +99,7 @@ type builder struct {
 	pubs     []*fakePublish
 	answers  []Publish
 	refused  *refusal
+	rejected int
 	newApps  int
 	uploads  []Upload
 	requests map[string]int
@@ -187,6 +188,15 @@ func (p *Platform) Answers(answers ...Publish) {
 	p.answers = answers
 }
 
+// RejectTokens answers the next n requests to the builder API with 401 invalid_token, as the
+// platform does for a token it does not accept, such as one sent from a computer whose clock is
+// off.
+func (p *Platform) RejectTokens(n int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.rejected = n
+}
+
 // RefuseUpload refuses the next upload, once it is read, with status, the error errorCode and,
 // unless it is "", the framework's code.
 func (p *Platform) RefuseUpload(status int, errorCode, code string) {
@@ -253,6 +263,11 @@ func (p *Platform) answer(pub *fakePublish, next bool) Publish {
 // false when it is refused. The caller holds p.mu.
 func (p *Platform) builderCall(w http.ResponseWriter, r *http.Request, in any) (session, bool) {
 	p.requests[r.URL.Path]++
+	if p.rejected > 0 {
+		p.rejected--
+		oauthError(w, http.StatusUnauthorized, "invalid_token", "the token is not valid yet")
+		return session{}, false
+	}
 	s, ok := p.session(w, r)
 	if !ok {
 		return session{}, false

@@ -118,13 +118,32 @@ func TestRefreshKeepsANewerToken(t *testing.T) {
 	assert.Equal(t, 1, p.TokenRequests())
 }
 
+func TestBuilderAPIRefreshesAfterA401(t *testing.T) {
+	p, c := signedIn(t)
+	p.RejectTokens(1)
+	_, found, err := c.App(t.Context(), "demo")
+	require.NoError(t, err)
+	assert.False(t, found)
+	assert.Equal(t, 1, p.TokenRequests(), "refreshed once")
+	assert.Equal(t, 2, p.Requests("/v1/apps/get"), "and asked again")
+
+	p.RejectTokens(2)
+	_, _, err = c.App(t.Context(), "demo")
+	assert.Equal(t, "E-CLI-004", errs.Code(err))
+	require.ErrorContains(t, err, "the platform at "+p.URL+" no longer accepts your sign-in")
+	assert.Equal(t, 2, p.TokenRequests(), "refreshed once more, and no more")
+}
+
 func TestBuilderAPISignedOut(t *testing.T) {
 	p, c := signedIn(t)
 	require.NoError(t, platform.Save(p.URL, platform.Credentials{Org: "acme", AccessToken: "aicoded_at_revoked",
 		RefreshToken: "aicoded_rt_revoked", Expires: time.Now().Add(time.Hour)}))
 	_, _, err := c.App(t.Context(), "demo")
 	assert.Equal(t, "E-CLI-004", errs.Code(err))
-	require.ErrorContains(t, err, "no longer accepts your sign-in")
+	require.ErrorContains(t, err, "your sign-in to the platform at "+p.URL+" has ended: the refresh token is not valid")
+	cr, err := platform.Load(p.URL)
+	require.NoError(t, err)
+	assert.Equal(t, platform.Credentials{Org: "acme"}, cr, "the refresh refused for good ends the sign-in")
 }
 
 func TestPublishIsCleaned(t *testing.T) {

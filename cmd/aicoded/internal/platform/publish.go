@@ -301,10 +301,10 @@ func (p *Publish) clean() {
 }
 
 // call posts body, of type contentType, to the builder API at path with hc and the access token
-// of the sign-in, and returns the answer's status and body, of at most limit bytes. A token the
-// platform no longer accepts is E-CLI-004. When the platform refuses the token for want of a
-// scope, call refreshes the sign-in once, which brings the scopes of the apps the builder owns
-// now, and posts again.
+// of the sign-in, and returns the answer's status and body, of at most limit bytes. When the
+// platform does not accept the token, as when this computer's clock is off, or refuses it for want
+// of a scope, call refreshes the sign-in once, which also brings the scopes of the apps the
+// builder owns now, and posts again. A token the platform still does not accept is E-CLI-004.
 func (c *Client) call(ctx context.Context, hc *http.Client, path, contentType string, body []byte, limit int64) (int, []byte, error) {
 	tok, err := c.Token(ctx)
 	if err != nil {
@@ -322,8 +322,9 @@ func (c *Client) call(ctx context.Context, hc *http.Client, path, contentType st
 		switch {
 		case err != nil:
 			return 0, nil, err
-		case status == http.StatusUnauthorized:
+		case status == http.StatusUnauthorized && refreshed:
 			return 0, nil, signedOut("the platform at " + c.address + " no longer accepts your sign-in")
+		case status == http.StatusUnauthorized:
 		case status != http.StatusForbidden || refreshed || parseError(answer).Error != "insufficient_scope":
 			return status, answer, nil
 		}

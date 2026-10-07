@@ -326,9 +326,10 @@ func TestRunStatus(t *testing.T) {
 	require.Equal(t, 0, code, errOut)
 	id := publishID(t, out)
 	p.Answers(platformtest.Publish{Status: "running", Steps: []platformtest.Step{{Name: "checkout", Outcome: "passed"}}})
+	p.RejectTokens(1)
 
 	code, out, errOut = aicoded("status", id)
-	assert.Equal(t, 0, code, errOut)
+	assert.Equal(t, 0, code, errOut, "a token the platform does not accept is refreshed once")
 	assert.Equal(t, "publish "+id+" of demo at "+gittest.Head(t, dir)[:7]+": Add demo\n"+
 		"  checkout  passed\nrunning\n", out)
 
