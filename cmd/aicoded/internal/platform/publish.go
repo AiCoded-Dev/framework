@@ -24,6 +24,9 @@ const MaxBundle = 32 << 20
 // uploadTimeout bounds the sending of a bundle, which takes longer than other requests.
 const uploadTimeout = 10 * time.Minute
 
+// maxMeta is the size of the largest meta part of an upload the platform takes: 4 KiB.
+const maxMeta = 4 << 10
+
 // maxPublish is the largest answer about a publish read from the platform, which holds its
 // problems: 8 MiB.
 const maxPublish = 8 << 20
@@ -179,9 +182,14 @@ func (c *Client) App(ctx context.Context, name string) (app App, found bool, err
 // publish of a name creates the app. A bundle whose prerequisite is no longer the app's base is
 // ErrBaseChanged; the other refusals have the code the platform gives, E-PUB-005 to E-PUB-010.
 func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
-	meta, err := json.Marshal(map[string]string{"app": u.App, "sha": u.SHA, "summary": u.Summary})
-	if err != nil {
+	var meta bytes.Buffer
+	enc := json.NewEncoder(&meta)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(map[string]string{"app": u.App, "sha": u.SHA, "summary": u.Summary}); err != nil {
 		return Created{}, err
+	}
+	if meta.Len() > maxMeta {
+		return Created{}, errors.New("the summary of the publish is too long for the platform")
 	}
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
@@ -189,7 +197,7 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 		disposition, contentType string
 		data                     []byte
 	}{
-		{`form-data; name="meta"`, "application/json", meta},
+		{`form-data; name="meta"`, "application/json", meta.Bytes()},
 		{`form-data; name="bundle"; filename="app.bundle"`, "application/octet-stream", u.Bundle},
 	} {
 		w, err := mw.CreatePart(textproto.MIMEHeader{"Content-Disposition": {p.disposition}, "Content-Type": {p.contentType}})

@@ -20,8 +20,12 @@ import (
 	"aicoded.dev/framework/internal/errs"
 )
 
-// maxSummary is the length of the longest summary, in characters.
-const maxSummary = 1000
+// The longest summary: 1000 characters, and 3900 bytes of JSON, so that the meta part of an
+// upload, which also holds the app's name and the commit, fits the platform's 4 KiB.
+const (
+	maxSummary      = 1000
+	maxSummaryBytes = 3900
+)
 
 // Options are the choices of a publish.
 type Options struct {
@@ -97,10 +101,10 @@ func Prepare(ctx context.Context, dir string, opts Options) (Commit, error) {
 	return Commit{Dir: dir, App: m.App, SHA: sha, Summary: summary}, nil
 }
 
-// summarize returns s without control characters, a space for each line break or tab, and at
-// most 1000 characters long.
+// summarize returns s without control or format characters, with a space for each line break or
+// tab, cut at 1000 characters, or before its JSON, unescaped for HTML, would pass 3900 bytes.
 func summarize(s string) string {
-	s = strings.Map(func(r rune) rune {
+	s = strings.TrimSpace(strings.Map(func(r rune) rune {
 		switch {
 		case unicode.IsSpace(r):
 			return ' '
@@ -108,8 +112,20 @@ func summarize(s string) string {
 			return -1
 		}
 		return r
-	}, s)
-	return strings.TrimSpace(cut(strings.TrimSpace(s), maxSummary))
+	}, s))
+	runes, size := 0, 0
+	for i, r := range s {
+		size += utf8.RuneLen(r)
+		if r == '"' || r == '\\' {
+			size++
+		}
+		if runes == maxSummary || size > maxSummaryBytes {
+			s = s[:i]
+			break
+		}
+		runes++
+	}
+	return strings.TrimSpace(s)
 }
 
 // cut returns the first n characters of s.

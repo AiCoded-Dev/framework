@@ -118,6 +118,8 @@ func TestSummarize(t *testing.T) {
 	assert.Equal(t, "Fix the list of rooms", summarize("  Fix the\tlist\nof rooms\r\n"))
 	assert.Equal(t, "Bidi text", summarize("Bidi\u202e text\x00\x07"))
 	assert.Equal(t, strings.Repeat("é", 1000), summarize(strings.Repeat("é", 1200)))
+	assert.Equal(t, strings.Repeat("\U0001F680", 975), summarize(strings.Repeat("\U0001F680", 1000)), "3900 bytes")
+	assert.Equal(t, strings.Repeat(`"\`, 500), summarize(strings.Repeat(`"\`, 600)), "2000 bytes of JSON")
 }
 
 func TestHeader(t *testing.T) {

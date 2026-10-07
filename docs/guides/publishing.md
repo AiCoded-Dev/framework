@@ -69,7 +69,7 @@ and commit what it writes.
   tags, stashes, ignored files and the repository's configuration stay on your computer.
 - The app's name, the commit, and a summary for the change record: `-m <summary>`, or else the
   commit's subject. Control characters are removed, line breaks and tabs become spaces, and the
-  first 1000 characters are kept.
+  first 1000 characters are kept, or fewer when they take more than 3900 bytes, as emoji do.
 
 The bundle may be at most 32 MiB (E-PUB-009). A committed file stays in the history after you
 delete it, so keep large files out of the repository. `aicoded` runs git without your `GIT_`

@@ -68,6 +68,22 @@ func TestRunPublishSendsTheHistorySinceTheBase(t *testing.T) {
 	assert.Equal(t, 1, p.TokenRequests(), "the sign-in from before the app existed is refreshed once, for its scopes")
 }
 
+func TestRunPublishLongSummaries(t *testing.T) {
+	p, aicoded := signedIn(t)
+	dir := gittest.NewApp(t, "demo")
+	rockets, marks := strings.Repeat("\U0001F680", 1000), strings.Repeat("<>&", 334)[:1000]
+	code, _, errOut := aicoded("publish", "--no-wait", "-m", rockets, dir)
+	require.Equal(t, 0, code, errOut)
+	gittest.Commit(t, dir, "Again")
+	code, _, errOut = aicoded("publish", "--no-wait", "-m", marks, dir)
+	require.Equal(t, 0, code, errOut)
+
+	uploads := p.Uploads()
+	require.Len(t, uploads, 2)
+	assert.Equal(t, rockets[:3900], uploads[0].Summary, "cut where its JSON reaches 3900 bytes")
+	assert.Equal(t, marks, uploads[1].Summary, "sent whole, unescaped")
+}
+
 func TestRunPublishRewrittenHistory(t *testing.T) {
 	p, aicoded := signedIn(t)
 	dir := gittest.NewApp(t, "demo")

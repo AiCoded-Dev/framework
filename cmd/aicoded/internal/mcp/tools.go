@@ -139,7 +139,7 @@ var (
   "type": "object",
   "properties": {
     "app": {"type": "string", "description": "the app's name, from the app: line of its aicoded.yaml"},
-    "summary": {"type": "string", "minLength": 1, "description": "what changed and why, in a sentence of the person's words, for the change record; at most 1000 characters are kept"}
+    "summary": {"type": "string", "minLength": 1, "description": "what changed and why, in a sentence of the person's words, for the change record; at most 1000 characters are kept, fewer of emoji"}
   },
   "required": ["app", "summary"],
   "additionalProperties": false

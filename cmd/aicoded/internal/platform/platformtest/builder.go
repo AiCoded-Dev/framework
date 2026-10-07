@@ -423,7 +423,11 @@ func readUpload(r *http.Request, meta *uploadMeta) ([]byte, error) {
 	if err != nil || part.FormName() != "meta" {
 		return nil, errors.New("the first part is not meta")
 	}
-	dec := json.NewDecoder(io.LimitReader(part, 4<<10))
+	b, err := io.ReadAll(io.LimitReader(part, 4<<10+1))
+	if err != nil || len(b) > 4<<10 {
+		return nil, errors.New("meta is larger than 4 KiB")
+	}
+	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(meta); err != nil {
 		return nil, fmt.Errorf("meta is not valid: %w", err)
