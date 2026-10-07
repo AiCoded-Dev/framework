@@ -4,6 +4,19 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- New commands publish an app to the platform: `aicoded publish [--app <name>] [-m <summary>]
+  [--no-wait] [dir]` sends the commit `HEAD` names, of an app folder that is the top level of its
+  own git repository, to the platform's delivery pipeline, once nothing is left uncommitted and
+  `aicoded check --frozen --no-tests` finds no problem, and waits for the outcome;
+  `aicoded status [--json] <id>` shows a publish's steps, problems and status. The first publish
+  of a name creates the app, owned by the builder. A publish sends a git bundle of the history
+  since the app's last verified publish, or all of it, at most 32 MiB, and needs git 2.31 or
+  later. `aicoded mcp` gains the tools `publish`, which takes an app and a summary and returns a
+  publish id at once, and `release_status`, which takes that id. Publish only when the person
+  asks, commit first, report the outcome, and fix its problems as those of `aicoded check`; on
+  E-CLI-004, ask the person to run `aicoded login`. The guide "Releasing" is now "Publishing",
+  `guides/publishing`. New codes: E-PUB-001 to E-PUB-014 (publishing) and E-GATE-001 to
+  E-GATE-012 (the checks of the delivery pipeline).
 - `aicoded check --no-tests` runs every step of `check` but the tests, and does not probe
   `-race`; the report has `"no_tests": true` in JSON, and its text ends with
   `tests did not run (--no-tests)`. The `check` tool of `aicoded mcp` does not take it: run the

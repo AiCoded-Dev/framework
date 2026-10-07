@@ -20,8 +20,8 @@ make install
 
 It installs `aicoded` into Go's bin folder. An app this `aicoded` creates uses the checkout
 through a `replace` line in its `go.mod`, which `aicoded check` accepts only from this `aicoded`
-(E-LINT-011). The delivery pipeline will refuse a `replace` line, so require a released framework
-version before you publish.
+(E-LINT-011). The delivery pipeline refuses a `replace` line (E-GATE-001), so require a released
+framework version before you publish.
 
 ## Create an app
 

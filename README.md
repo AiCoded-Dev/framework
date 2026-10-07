@@ -42,7 +42,7 @@ offline, and the `howto` tool of `aicoded mcp` gives the same pages to your AI a
     pipeline;
   - building blocks, calls and tools: the permission list, the SQL database, file stores, mail,
     settings and secrets, telemetry, calls between apps, `aicoded dev`, the tools, MCP and
-    releasing.
+    publishing.
 - [Error catalogue](docs/errors/README.md): every error code, with its fix.
 - [Examples](examples/README.md): people, a staff directory; contacts, the app it calls; and
   room-maintenance, a list of tickets with an ownership check.

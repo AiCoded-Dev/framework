@@ -153,11 +153,13 @@ live values or page calls also opens one live connection. It runs the same acces
 - [Telemetry](telemetry.md): logs and trace spans, with no personal data.
 - [Calls between apps](calls-between-apps.md): serving and calling functions of other apps.
 - [aicoded dev](dev.md): running the apps on your computer, `dev.yaml`, personas and the dev UI.
-- [Tools](tools.md): `init`, `generate`, `check`, `describe`, `explain` and `rpc add`.
+- [Tools](tools.md): `init`, `generate`, `check`, `describe`, `explain`, `rpc add`, `login`,
+  `publish` and `status`.
 - [Rules for app code](rules.md): what `aicoded check` refuses in app code, what to write
   instead, and the error code of each rule.
 - [MCP](mcp.md): the tools your AI assistant uses.
-- [Releasing](releasing.md): what a commit must hold before you publish it.
+- [Publishing](publishing.md): sending an app to the platform's delivery pipeline, what the
+  commit holds, and reading the outcome.
 
 ## Tasks
 

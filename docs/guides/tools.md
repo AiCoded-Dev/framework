@@ -1,8 +1,9 @@
 # Tools: the aicoded commands
 
 `aicoded` creates apps, generates their code, checks them, describes them, explains its errors
-and docs, connects apps that call each other, and signs you in to the platform. Every problem it reports has a code, a
-`file:line` where there is one, a one-line fix and a docs link.
+and docs, connects apps that call each other, signs you in to the platform and publishes apps
+to it. Every problem it reports has a code, a `file:line` where there is one, a one-line fix and
+a docs link.
 
 ## The commands
 
@@ -18,6 +19,8 @@ aicoded mcp [dir]
 aicoded login [--org <organisation>] [--device]
 aicoded logout
 aicoded whoami [--json]
+aicoded publish [--app <name>] [-m <summary>] [--no-wait] [dir]
+aicoded status [--json] <id>
 aicoded version
 ```
 
@@ -38,8 +41,8 @@ app. It then runs `aicoded generate` and `go mod tidy`.
   says so. `aicoded check` accepts that line only from the `aicoded` installed from that very
   checkout, and refuses every other `replace`, any `go.work` file, a `vendor` folder, a module
   cache that `go mod verify` does not pass and every GOFLAGS entry outside the short list it
-  allows (E-LINT-011); the delivery pipeline will refuse a `replace` line too, so require a
-  released version before you publish.
+  allows (E-LINT-011); the delivery pipeline refuses a `replace` line too (E-GATE-001), so
+  require a released version before you publish.
   An `aicoded` that knows neither refuses (E-CLI-003).
 - When `go mod tidy` fails, often for want of a network, `aicoded init` removes the new folder
   (E-CHK-006).
@@ -195,6 +198,37 @@ email: ana@acme.example
 scopes: app:create
 ```
 
+## aicoded publish
+
+`aicoded publish [--app <name>] [-m <summary>] [--no-wait] [dir]` sends the commit `HEAD` names,
+of the app in `dir`, to the platform's delivery pipeline, which checks it and writes its change
+record. [Publishing](publishing.md) tells the whole story.
+
+- `dir` must hold `aicoded.yaml` and be the top level of a git repository with a commit
+  (E-PUB-001), with nothing left uncommitted (E-PUB-002). `--app` refuses an app of another name
+  (E-PUB-003). It needs git 2.31 or later (E-PUB-012).
+- It runs `aicoded check --frozen --no-tests` as a released `aicoded` does, and prints its
+  problems and sends nothing when it finds any (E-PUB-004).
+- It sends a git bundle of the commit with its history since the app's last verified publish,
+  or all of it on the first publish, at most 32 MiB (E-PUB-009), with the app's name and a
+  summary: `-m`, or the commit's subject. The first publish of a name creates the app, owned by
+  you.
+- It prints `Published <app> at <commit> as <id>.`, then waits for the outcome, asking every 3
+  seconds for up to 35 minutes, and prints the steps, the problems as `aicoded check` prints
+  them, and the status. It exits with 0 when the publish passed and 1 otherwise. Ctrl-C stops the
+  waiting, not the publish. `--no-wait` returns at once.
+- When the platform refuses the sign-in for want of an app's scopes, it refreshes the sign-in
+  once and asks again, which is how a sign-in gets the scopes of the app its first publish
+  created.
+
+## aicoded status
+
+`aicoded status [--json] <id>` prints a publish as the end of `aicoded publish` does, at once:
+its steps, its problems and its status, `queued`, `running`, `passed`, `failed`, `refused` or
+`error`. `--json` prints the publish as JSON. It exits with 1 when the publish failed, was
+refused or ended in error. An id is `pub_` and 26 lowercase letters and digits; another shape
+exits with 2, and an id the platform does not know among your apps is E-PUB-013.
+
 ## The control socket
 
 One `aicoded dev` runs per workspace. It serves a control socket, `control.sock` with mode 600,
@@ -213,5 +247,5 @@ checkout built in for `aicoded init`.
 
 - [aicoded dev](dev.md): running the apps.
 - [MCP](mcp.md): these tools for your AI assistant.
-- [Releasing](releasing.md): what to check before you publish.
+- [Publishing](publishing.md): sending an app to the platform, and reading the outcome.
 - [The error catalogue](../errors/README.md): every code with its page.

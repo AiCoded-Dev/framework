@@ -1,17 +1,15 @@
 # AGENTS.md
 
-Rules for AI assistants that build apps with the aicoded framework,
-`aicoded.dev/framework`. Follow them in every change. They are for building apps, not
-for changing the framework itself.
+Rules for AI assistants that build apps with the aicoded framework, `aicoded.dev/framework`,
+not for changing the framework itself. Follow them in every change.
 
 ## What an app is
 
 - An app is a Go module with a permission list, `aicoded.yaml`, and a `main.go` that calls
   `app.Main`. The permission list names the app and everything it reaches: its SQL database,
   file stores, mail, settings, secrets and the apps it calls. The runner holds the app to it.
-- Pages are folders under `pages/`. Each holds an `index.html` template and a `dataprovider.go`
-  whose hooks fill it: `pages/notes/n_id/` is the page `/notes/42`. `aicoded generate` turns
-  the pages into Go code.
+- Pages are folders under `pages/`, each with an `index.html` template and a `dataprovider.go`
+  whose hooks fill it: `pages/notes/n_id/` is `/notes/42`. `aicoded generate` makes them Go code.
 - App code imports the framework's packages `app`, `auth`, `config`, `filestore`, `mailer`,
   `rpc`, `secrets`, `sqldb`, `telemetry`, `web`, `web/form` and `web/reactive`: each is
   `aicoded.dev/framework/<name>`, so the types of form fields, such as
@@ -39,17 +37,15 @@ for changing the framework itself.
   anyone else with the code `PermissionDenied`.
 - Store `auth.Viewer(ctx).Subject` as a record's owner, never the viewer's name.
 - Pass every value in SQL with a `?` placeholder.
-- Give every mail an `IdempotencyKey` that names what it is about, such as
-  `invoice-42-reminder`, so that a retried request never mails twice. Send it after the data it
-  reports is committed.
+- Give every mail an `IdempotencyKey` that names what it is about, such as `invoice-42-reminder`,
+  so that a retried request never mails twice. Send it after the data it reports is committed.
 - Declare in `aicoded.yaml` every data source, mail address, setting, secret and third-party
   module the app uses.
 - Open the database and file stores once, in `OnStart`. Use the context of the request or call
   being served for everything else.
 - To end a request from a hook, return `web.NotFound()`, `web.Forbidden()`,
   `web.Error(status, message)` or `web.Redirect("/path")`; otherwise return nil, or the error.
-  The viewer sees only these messages; any other error shows "Something went wrong." and is
-  logged.
+  The viewer sees only these messages; any other error shows "Something went wrong.", logged.
 - Put page scripts in `index.ts` and styles in `index.css` next to the template, and pass data to
   scripts with `<ssr:json>`.
 - Run `aicoded check` after every change and fix every problem it lists. Commit the generated
@@ -89,9 +85,8 @@ for changing the framework itself.
 - Never write markup with `{{$ }}` from anything but a `web.SafeHTML` made with
   `web.HTMLConst`, `web.EscapeHTML` or `web.JoinHTML`.
 - Never add a `replace` line to `go.mod`, a `go.work` file or a `vendor` folder: `aicoded check`
-  refuses them (E-LINT-011). Only the framework's `replace` that `aicoded init` writes from a
-  framework checkout passes there, and the delivery pipeline will refuse it. Require released
-  versions.
+  refuses them (E-LINT-011) but for the framework's `replace` that `aicoded init` writes from a
+  framework checkout, and the delivery pipeline refuses every one (E-GATE-001). Require releases.
 - Never add `//nolint` or `#nosec`, skip a test or weaken a check to make it pass. Stop and
   explain the problem to the developer.
 
@@ -116,15 +111,25 @@ page `aicoded explain E-DEV-002` prints. When an app lacks a value (E-DEV-003), 
 to add it, and never copy a value from `dev.yaml` into the app.
 
 With MCP, the same loop is a set of tools that take app names, never paths. Add the server with
-`claude mcp add aicoded -- aicoded mcp` in the workspace folder, or as the dev UI's MCP setup
-page shows. The tools are:
+`claude mcp add aicoded -- aicoded mcp` in the workspace folder, or as the dev UI shows:
 
 - `app_create` creates an app; `check` is `aicoded check`;
 - `preview` builds and starts an app and returns its address, or the problems that stop it;
 - `what_broke` lists the failed apps, error log lines and failed spans;
 - `describe` summarises the apps; `howto` reads the docs;
 - `logs`, `traces`, `trace`, `mail_list` and `mail_get` show what `aicoded dev` saw, and
-  `mail_receive` delivers a test mail to an app's inbox.
+  `mail_receive` delivers a test mail to an app's inbox;
+- `publish` and `release_status` publish an app and show the outcome, as below.
+
+## Publishing
+
+Publish only when the developer asks, and commit everything first: a publish sends the commit
+`HEAD` names, never what is not committed. Run `aicoded publish` in the app's folder, or call the
+MCP tool `publish` with the app and a summary of the change: it runs `aicoded check --frozen`
+without the tests, sends the commit to the platform's delivery pipeline and gives a publish id.
+`aicoded status <id>`, or `release_status`, shows the steps, the problems and the outcome. Tell
+the developer the outcome, and fix its problems as you fix those of `aicoded check`. On E-CLI-004,
+ask the developer to run `aicoded login`: signing in needs a person.
 
 ## Where to read
 
@@ -132,17 +137,14 @@ The docs are built into `aicoded`. `aicoded explain <topic>` prints a page, and 
 `howto` returns the same page; without a topic, both list every page.
 
 - `guides/overview` is the place to start: how an app works, with a link to every guide.
-- `guides/rules` lists every rule that lint applies to app code: what not to do, what to do
-  instead, and its error code.
+- `guides/rules` lists each rule lint applies to app code, what to do instead, and its code.
 - The task recipes take their code from the framework's example apps: `tasks/new-app`,
   `tasks/add-page`, `tasks/add-form`, `tasks/add-live-value`, `tasks/list-from-database`,
   `tasks/list-by-role`, `tasks/ownership-check`, `tasks/email-after-a-write`,
   `tasks/upload-a-file` and `tasks/call-another-app`.
 - `changelog` lists what changed in the framework, and an error code such as `E-DEV-003`
   explains that error.
-- `aicoded describe` summarises the apps: pages and their access rules, functions served and
-  called, database, file stores, mail, settings, secret names, modules, the tables their SQL
-  writes, their surface, and generated files that are out of date.
-- `go doc aicoded.dev/framework/<package>` prints a package's overview and rules. Its
-  examples are in its `example_test.go`, in the folder that
-  `go list -m -f '{{.Dir}}' aicoded.dev/framework` prints.
+- `aicoded describe` summarises the apps: pages, access rules, functions served and called, data,
+  mail, settings, secret names, modules, SQL writes, surface and stale generated files.
+- `go doc aicoded.dev/framework/<package>` prints a package's overview and rules; its examples
+  are in `example_test.go` in the folder `go list -m -f '{{.Dir}}' aicoded.dev/framework` prints.

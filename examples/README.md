@@ -10,7 +10,7 @@ with `?` placeholders.
 
 Each app is its own Go module and uses this checkout of the framework through a `replace` line,
 which `aicoded check` accepts only from an `aicoded` installed from this checkout (E-LINT-011).
-The delivery pipeline will refuse a `replace` line, so an app of your own requires a released
+The delivery pipeline refuses a `replace` line, so an app of your own requires a released
 framework version instead.
 
 ## Running them

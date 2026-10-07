@@ -13,7 +13,9 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | DEV | `aicoded dev`, its control socket and its dev UI, and the apps of a workspace in `aicoded check`, `aicoded describe` and `aicoded mcp` |
 | CHK | `aicoded check` and the Go build it runs, also in `aicoded dev` |
 | LINT | the rules for app code that `aicoded check` applies after `go vet`, listed in [the rules guide](../guides/rules.md) |
-| CLI | `aicoded init`, `aicoded explain`, `aicoded login`, `logout` and `whoami`, and the `app_create` and `howto` tools of `aicoded mcp` |
+| CLI | `aicoded init`, `aicoded explain`, `aicoded login`, `logout` and `whoami`, the sign-in that `aicoded publish` and `status` use, and the `app_create` and `howto` tools of `aicoded mcp` |
+| PUB | `aicoded publish` and `aicoded status`, and the `publish` and `release_status` tools of `aicoded mcp` |
+| GATE | the platform's delivery pipeline, in the problems of a publish |
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
 | MAIL | mail rules |
@@ -45,6 +47,20 @@ Signing in to the platform uses these codes:
 - E-CLI-007: a credentials file or folder that others can read.
 - E-CLI-008: a sign-in that was not finished in time.
 - E-CLI-009: a sign-in that the platform could not refresh right now.
+
+Publishing uses these codes:
+
+- E-PUB-001 to E-PUB-004 and E-PUB-012: a commit that `aicoded publish` refuses before it sends
+  anything: not the top level of a git repository with a commit, changes not committed, an
+  `--app` of another name, problems that `aicoded check` found, and git missing or too old.
+- E-PUB-005 to E-PUB-010: a publish that the platform refuses: another builder's app, an
+  archived app, a commit already published, too many new apps, a bundle too large, and a bundle
+  not as claimed.
+- E-PUB-011 and E-PUB-014: a publish that ended in `error` or `refused`.
+- E-PUB-013: a publish id that the platform does not know among your apps.
+- E-GATE-001 to E-GATE-008: `go.mod`, `go.sum` and the modules an app uses.
+- E-GATE-009 to E-GATE-011: the files of the commit and the app it names.
+- E-GATE-012: a step that ran out of time, memory or disk.
 
 `aicoded explain <CODE>` prints the page.
 
