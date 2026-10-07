@@ -377,6 +377,7 @@ func TestNoAnchors(t *testing.T) {
 		"app: a1\nemail:\n  <<: {from: a@acme.example, to_domains: [acme.example]}\n":                           {":3"},
 	} {
 		_, err := manifest.Parse(manifest.FileName, []byte(src))
+		require.Error(t, err, src)
 		var got []string
 		for _, err := range err.(interface{ Unwrap() []error }).Unwrap() {
 			var e *errs.Error

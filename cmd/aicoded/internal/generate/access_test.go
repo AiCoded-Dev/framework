@@ -1,13 +1,17 @@
 package generate
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/internal/errs"
 )
 
@@ -148,4 +152,28 @@ func TestGenerateRefusesManifestItCannotSplice(t *testing.T) {
 	data, err := os.ReadFile(manifest)
 	require.NoError(t, err)
 	assert.Equal(t, "{app: app}\n", string(data))
+}
+
+func TestParseManifestRefusesAnchors(t *testing.T) {
+	_, _, err := parseManifest([]byte("app: app\nsettings: &s [x]\nsecrets: *s\nemail:\n  <<: {from: a@acme.example}\n"))
+	var got []string
+	for _, p := range problem.From("app", err) {
+		got = append(got, p.Pos+" "+p.Code+" "+p.Message)
+	}
+	const msg = " E-MAN-003 aicoded.yaml uses an anchor, alias or merge key"
+	assert.Equal(t, []string{"aicoded.yaml:2" + msg, "aicoded.yaml:3" + msg, "aicoded.yaml:5" + msg}, got)
+}
+
+func TestParseManifestRefusesAliasBomb(t *testing.T) {
+	var b strings.Builder
+	b.WriteString("app: app\na0: &a0 [x, x, x, x, x, x, x, x, x, x]\n")
+	for i := 1; i < 10; i++ {
+		fmt.Fprintf(&b, "a%d: &a%d [%s]\n", i, i, strings.Repeat(fmt.Sprintf("*a%d, ", i-1), 9)+fmt.Sprintf("*a%d", i-1))
+	}
+	start := time.Now()
+	_, _, err := parseManifest([]byte(b.String()))
+	assert.Less(t, time.Since(start), time.Second)
+	var e *errs.Error
+	require.ErrorAs(t, err, &e)
+	assert.Equal(t, "aicoded.yaml:2 E-MAN-003 aicoded.yaml uses an anchor, alias or merge key", e.Pos+" "+e.Code+" "+e.Msg)
 }

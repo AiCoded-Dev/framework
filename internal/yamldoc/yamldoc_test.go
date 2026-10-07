@@ -39,3 +39,26 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, pos+" E-MAN-003", e.Pos+" "+e.Code, src)
 	}
 }
+
+func TestDocumentRefusesAnchors(t *testing.T) {
+	for src, want := range map[string][]string{
+		"a: &x [1]\n":                          {"aicoded.yaml:1"},
+		"a: &x [1]\nb: *x\n":                   {"aicoded.yaml:1", "aicoded.yaml:2"},
+		"a: &x {b: 1}\nc:\n  <<: *x\n  d: 2\n": {"aicoded.yaml:1", "aicoded.yaml:3"},
+		"a:\n  <<: {b: 1}\n":                   {"aicoded.yaml:2"},
+	} {
+		_, err := yamldoc.Document("aicoded.yaml", []byte(src))
+		require.Error(t, err, src)
+		var got []string
+		for _, err := range err.(interface{ Unwrap() []error }).Unwrap() {
+			var e *errs.Error
+			require.ErrorAs(t, err, &e, src)
+			assert.Equal(t, "E-MAN-003 aicoded.yaml uses an anchor, alias or merge key", e.Code+" "+e.Msg, src)
+			assert.Equal(t, "write each value out in full: aicoded.yaml may not use &name, *name or <<", e.Fix, src)
+			got = append(got, e.Pos)
+		}
+		assert.Equal(t, want, got, src)
+	}
+	_, err := yamldoc.Document("aicoded.yaml", []byte("a:\n  \"<<\": 1\n"))
+	assert.NoError(t, err, "a quoted << is a plain key")
+}

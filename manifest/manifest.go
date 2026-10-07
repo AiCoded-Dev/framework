@@ -171,28 +171,25 @@ func Load(path string) (Manifest, error) {
 }
 
 // Parse checks the manifest data and returns it. Path is used only in the positions of
-// problems. It reports every problem it finds as one coded error each, joined with
-// errors.Join and sorted by line. Data that is not one YAML document of the expected shape,
-// or that uses an anchor, an alias or a merge key, is not checked any further.
+// problems. It reports every problem it finds as one coded error each: its error unwraps, with
+// Unwrap() []error, to them, sorted by line. Data that is not one YAML document of the expected
+// shape, or that uses an anchor, an alias or a merge key, is not checked any further.
 func Parse(path string, data []byte) (Manifest, error) {
 	doc, err := yamldoc.Document(path, data)
 	if err != nil {
-		return Manifest{}, errors.Join(err)
+		return Manifest{}, err
 	}
 	c := checker{path: path, field: -1}
 	var m Manifest
 	if len(doc.Content) > 0 {
 		c.root = doc.Content[0]
-		stop := c.anchors(&doc)
-		if !stop {
-			if err := doc.Decode(&m); err != nil {
-				c.add(yamldoc.LineOr1(err), "E-MAN-003", "aicoded.yaml has an unexpected shape: "+err.Error(),
-					"compare it with the example in the docs")
-				stop = true
-			}
+		decodeErr := doc.Decode(&m)
+		if decodeErr != nil {
+			c.add(yamldoc.LineOr1(decodeErr), "E-MAN-003", "aicoded.yaml has an unexpected shape: "+decodeErr.Error(),
+				"compare it with the example in the docs")
 		}
 		c.unknownKeys()
-		if stop {
+		if decodeErr != nil {
 			return Manifest{}, c.err()
 		}
 	}
@@ -296,30 +293,6 @@ func line(n *yaml.Node) int {
 	return n.Line
 }
 
-// anchors reports every line of the document that holds an anchor, an alias or a merge key,
-// and whether there is one. It never follows an alias.
-func (c *checker) anchors(doc *yaml.Node) bool {
-	seen := map[int]bool{}
-	var walk func(n *yaml.Node, key bool)
-	walk = func(n *yaml.Node, key bool) {
-		if (n.Anchor != "" || n.Kind == yaml.AliasNode || key && isMerge(n)) && !seen[n.Line] {
-			seen[n.Line] = true
-			c.add(n.Line, "E-MAN-003", "aicoded.yaml uses an anchor, alias or merge key",
-				"write each value out in full: aicoded.yaml may not use &name, *name or <<")
-		}
-		for i, child := range n.Content {
-			walk(child, n.Kind == yaml.MappingNode && i%2 == 0)
-		}
-	}
-	walk(doc, false)
-	return len(seen) > 0
-}
-
-// isMerge reports whether the mapping key k is a merge key, <<.
-func isMerge(k *yaml.Node) bool {
-	return k.Kind == yaml.ScalarNode && k.ShortTag() == "!!merge"
-}
-
 // unknownKeys reports every key of a mapping with fixed keys that is not one of them.
 func (c *checker) unknownKeys() {
 	const generated = "remove it: aicoded generate writes this section from the code, so never edit it"
@@ -353,7 +326,7 @@ func (c *checker) keys(m *yaml.Node, known []string, place, fix string) {
 		fix = "remove it, or correct its name: the keys there are " + strings.Join(known, ", ")
 	}
 	for i := 0; i+1 < len(m.Content); i += 2 {
-		if k := m.Content[i]; k.Kind == yaml.ScalarNode && !isMerge(k) && !slices.Contains(known, k.Value) {
+		if k := m.Content[i]; k.Kind == yaml.ScalarNode && !slices.Contains(known, k.Value) {
 			c.add(k.Line, "E-MAN-014", fmt.Sprintf("unknown key %q in %s", k.Value, place), fix)
 		}
 	}
