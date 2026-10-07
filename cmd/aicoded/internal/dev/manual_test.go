@@ -17,8 +17,8 @@ import (
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
 )
 

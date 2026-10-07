@@ -12,12 +12,12 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/check"
 	"aicoded.dev/framework/cmd/aicoded/internal/describe"
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/publish"
 	"aicoded.dev/framework/cmd/aicoded/internal/scaffold"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
+	"aicoded.dev/framework/manifest"
 )
 
 type appCreateIn struct {

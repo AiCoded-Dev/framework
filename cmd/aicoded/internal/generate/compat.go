@@ -12,10 +12,10 @@ import (
 	"slices"
 	"strings"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/rpcschema"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 )
 
 // CheckSnapshots checks every snapshot of a called app that an app of the workspace holds,

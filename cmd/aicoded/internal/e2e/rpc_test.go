@@ -20,7 +20,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/dev"
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
+	"aicoded.dev/framework/manifest"
 )
 
 var (

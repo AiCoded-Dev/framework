@@ -19,8 +19,8 @@ import (
 
 	"google.golang.org/protobuf/encoding/protowire"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 )
 
 // Schema is the snapshot of one app's functions.

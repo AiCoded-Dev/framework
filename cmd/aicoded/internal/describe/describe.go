@@ -12,12 +12,12 @@ import (
 	"strings"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/surface"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
 	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/lint"
+	"aicoded.dev/framework/manifest"
 )
 
 // Summary describes the apps of a workspace.

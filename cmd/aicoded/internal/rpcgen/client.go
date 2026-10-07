@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/generate/gobuf"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/rpcschema"
+	"aicoded.dev/framework/manifest"
 )
 
 // heldFile returns the position of the snapshot of app that a calling app holds.

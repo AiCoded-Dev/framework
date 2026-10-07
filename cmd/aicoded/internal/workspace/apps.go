@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 )
 
 // App is one app of a workspace: the name on the app: line of its permission list, and its

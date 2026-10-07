@@ -10,8 +10,8 @@ import (
 	"slices"
 	"strings"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 )
 
 // skipped are the folders Discover does not look into, besides those whose names start with .

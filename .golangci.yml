@@ -22,7 +22,11 @@ linters:
         text: "G204"
         linters: [gosec]
       # The CLI reads the developer's files by design.
-      - path: internal/(devconfig|generate|manifest)/
+      - path: internal/(devconfig|generate)/
+        text: "G304"
+        linters: [gosec]
+      # manifest.Load reads the permission list its caller names.
+      - path: ^manifest/manifest\.go$
         text: "G304"
         linters: [gosec]
 

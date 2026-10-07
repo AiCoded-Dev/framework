@@ -15,9 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 )
 

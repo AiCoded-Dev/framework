@@ -16,9 +16,9 @@ import (
 
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
 	"aicoded.dev/framework/cmd/aicoded/internal/gotool"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/lint"
+	"aicoded.dev/framework/manifest"
 )
 
 const fixName = "choose a name of lowercase letters, digits and dashes that no folder here has"

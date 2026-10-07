@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
+	"aicoded.dev/framework/manifest"
 )
 
 // directive starts the line that says who may call a function.

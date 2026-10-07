@@ -17,10 +17,10 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/watch"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
+	"aicoded.dev/framework/manifest"
 )
 
 // quiet is how long aicoded dev waits after a change for more before it rebuilds.

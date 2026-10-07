@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/lint"
+	"aicoded.dev/framework/manifest"
 )
 
 func TestOf(t *testing.T) {

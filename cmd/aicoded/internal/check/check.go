@@ -10,12 +10,12 @@ import (
 
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
 	"aicoded.dev/framework/cmd/aicoded/internal/gotool"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/surface"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
 	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/lint"
+	"aicoded.dev/framework/manifest"
 )
 
 // Options says what aicoded check checks.

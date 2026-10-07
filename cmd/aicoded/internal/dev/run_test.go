@@ -18,9 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/testhome"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 )
 
 func freePort(t *testing.T) int {

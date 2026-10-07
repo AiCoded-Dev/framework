@@ -15,9 +15,9 @@ import (
 	"unicode/utf8"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/check"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 )
 
 // The longest summary: 1000 characters, and 3900 bytes of JSON, so that the meta part of an

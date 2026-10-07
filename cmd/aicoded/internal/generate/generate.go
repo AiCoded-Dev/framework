@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"slices"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/rpcschema"
+	"aicoded.dev/framework/manifest"
 )
 
 // Generate turns the app in dir into generated code: its pages/ folder into Go code and assets,

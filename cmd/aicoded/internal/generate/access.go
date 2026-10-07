@@ -8,11 +8,10 @@ import (
 	"slices"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
-	"aicoded.dev/framework/cmd/aicoded/internal/yamlerr"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/internal/yamldoc"
 )
 
 // manifestFile is the app's permission list.
@@ -223,7 +222,7 @@ func blankOrComment(line []byte) bool {
 // mapping, or nothing. It returns the mapping's values and its node, which is nil when there is
 // none.
 func parseManifest(data []byte) (map[string]any, *yaml.Node, error) {
-	doc, err := manifest.Document(manifestFile, data)
+	doc, err := yamldoc.Document(manifestFile, data)
 	if err != nil || doc.Kind == 0 {
 		return nil, nil, err
 	}
@@ -238,7 +237,7 @@ func parseManifest(data []byte) (map[string]any, *yaml.Node, error) {
 }
 
 func errLine(err error) int {
-	if line, ok := yamlerr.Line(err); ok {
+	if line, ok := yamldoc.Line(err); ok {
 		return line
 	}
 	return 1

@@ -11,10 +11,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/yamlerr"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/internal/yamldoc"
 )
 
 // DefaultPort is the dev gateway's port when the workspace sets none.
@@ -122,7 +122,7 @@ func Load(path, root string) (Workspace, error) {
 // invalid reports a decoding error by file and line only, never with yaml's message, which can
 // quote part of a secret value.
 func invalid(path string, err error) error {
-	if line, ok := yamlerr.Line(err); ok {
+	if line, ok := yamldoc.Line(err); ok {
 		return errs.At(fmt.Sprintf("%s:%d", path, line), "E-DEV-002", "dev.yaml is not valid",
 			"fix the file at this line; its format is in the docs")
 	}

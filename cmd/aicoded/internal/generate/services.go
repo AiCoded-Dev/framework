@@ -11,12 +11,12 @@ import (
 	"slices"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/rpcgen"
 	"aicoded.dev/framework/cmd/aicoded/internal/rpcschema"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 )
 
 // servicesMarker is the comment the generator writes above the services section.

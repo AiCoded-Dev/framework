@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/rpcgen"
 	"aicoded.dev/framework/cmd/aicoded/internal/rpcschema"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 )
 
 // Add lets the app in dir call the app named app. It finds that app among the apps under the

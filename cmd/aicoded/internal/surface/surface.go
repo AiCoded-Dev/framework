@@ -5,8 +5,8 @@ package surface
 import (
 	"fmt"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/lint"
+	"aicoded.dev/framework/manifest"
 )
 
 // Surface is the size of an app.

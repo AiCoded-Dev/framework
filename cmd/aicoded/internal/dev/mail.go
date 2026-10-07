@@ -15,8 +15,8 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto/mailrules"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 )

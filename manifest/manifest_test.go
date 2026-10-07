@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 )
 
 func write(t *testing.T, src string) string {
@@ -53,6 +53,15 @@ func TestLoadErrors(t *testing.T) {
 	}
 	_, err := manifest.Load(filepath.Join(t.TempDir(), manifest.FileName))
 	assert.Equal(t, "E-MAN-006", errs.Code(err))
+}
+
+func TestParse(t *testing.T) {
+	m, err := manifest.Parse("apps/rooms/aicoded.yaml", []byte("app: rooms\n"))
+	require.NoError(t, err)
+	assert.Equal(t, "rooms", m.App)
+
+	_, err = manifest.Parse("apps/rooms/aicoded.yaml", []byte("app: rooms\nsettings: [Bad]\n"))
+	require.ErrorContains(t, err, "apps/rooms/aicoded.yaml:2: E-MAN-005")
 }
 
 func TestModuleBesideFramework(t *testing.T) {

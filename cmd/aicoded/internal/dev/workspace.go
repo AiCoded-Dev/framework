@@ -25,11 +25,11 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/cmd/aicoded/internal/devui"
 	"aicoded.dev/framework/cmd/aicoded/internal/devui/deps"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/watch"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 )
 

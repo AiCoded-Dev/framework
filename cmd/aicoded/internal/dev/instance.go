@@ -19,9 +19,9 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
 	"aicoded.dev/framework/cmd/aicoded/internal/gotool"
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/cmd/aicoded/internal/mysqlproxy"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
 	"aicoded.dev/framework/runnerproto/socket"
 )

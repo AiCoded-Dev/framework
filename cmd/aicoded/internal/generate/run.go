@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/manifest"
 )
 
 // Options says how Run generates an app.

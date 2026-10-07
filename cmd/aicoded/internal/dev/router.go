@@ -14,9 +14,9 @@ import (
 
 	"connectrpc.com/connect"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
 	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/internal/tracectx"
+	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 	"aicoded.dev/framework/runnerproto/runnerv1/runnerv1connect"

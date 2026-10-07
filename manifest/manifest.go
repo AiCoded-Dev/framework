@@ -1,11 +1,8 @@
-// Package manifest loads and checks the slice of aicoded.yaml the CLI reads.
 package manifest
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"maps"
 	"os"
@@ -13,19 +10,21 @@ import (
 	"slices"
 	"strings"
 
+	"go.yaml.in/yaml/v3"
 	"golang.org/x/mod/module"
-	"gopkg.in/yaml.v3"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/yamlerr"
 	"aicoded.dev/framework/internal/errs"
-	"aicoded.dev/framework/lint"
+	"aicoded.dev/framework/internal/yamldoc"
 	"aicoded.dev/framework/runnerproto/mailrules"
 )
 
 // FileName is the name of the permission list in an app's directory.
 const FileName = "aicoded.yaml"
 
-// Manifest is the slice of aicoded.yaml the CLI reads.
+// framework is the module path of the framework.
+const framework = "aicoded.dev/framework"
+
+// Manifest is the part of aicoded.yaml this package reads.
 type Manifest struct {
 	App      string            `yaml:"app"`
 	Data     []Data            `yaml:"data"`
@@ -124,7 +123,7 @@ func ValidApp(name string) bool {
 	return appName.MatchString(name)
 }
 
-// Load reads and checks the manifest at path. Sections this package does not know are ignored.
+// Load reads and checks the manifest at path, as Parse does.
 func Load(path string) (Manifest, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -133,7 +132,13 @@ func Load(path string) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
-	doc, err := Document(path, data)
+	return Parse(path, data)
+}
+
+// Parse checks the manifest data and returns it. Path is used only in the positions of
+// problems. Sections this package does not know are ignored.
+func Parse(path string, data []byte) (Manifest, error) {
+	doc, err := yamldoc.Document(path, data)
 	if err != nil {
 		return Manifest{}, err
 	}
@@ -167,30 +172,8 @@ func Load(path string) (Manifest, error) {
 	return m, nil
 }
 
-// Document returns the YAML document of the permission list data read from path, or an empty
-// node when data holds none. It refuses data that is not valid YAML or holds more than one
-// document with E-MAN-003 at path:line.
-func Document(path string, data []byte) (yaml.Node, error) {
-	dec := yaml.NewDecoder(bytes.NewReader(data))
-	var doc, next yaml.Node
-	if err := dec.Decode(&doc); errors.Is(err, io.EOF) {
-		return yaml.Node{}, nil
-	} else if err != nil {
-		return yaml.Node{}, errs.At(errPos(path, err), "E-MAN-003", "aicoded.yaml is not valid YAML: "+err.Error(), "fix the YAML syntax")
-	}
-	if err := dec.Decode(&next); !errors.Is(err, io.EOF) {
-		pos := fmt.Sprintf("%s:%d", path, next.Line)
-		if err != nil {
-			pos = errPos(path, err)
-		}
-		return yaml.Node{}, errs.At(pos, "E-MAN-003", "aicoded.yaml has more than one YAML document",
-			"keep one YAML document: remove the --- line and everything below it")
-	}
-	return doc, nil
-}
-
 func errPos(path string, err error) string {
-	line, ok := yamlerr.Line(err)
+	line, ok := yamldoc.Line(err)
 	if !ok {
 		line = 1
 	}
@@ -270,7 +253,7 @@ func checkModules(paths []string, at func(string, int) string) error {
 			return errs.At(at("modules", i), "E-MAN-013", fmt.Sprintf("modules entry %q is not a module path", p),
 				"write the module path as go.mod requires it, such as golang.org/x/text, with no version")
 		}
-		if p == lint.Framework || strings.HasPrefix(p, lint.Framework+"/") {
+		if p == framework || strings.HasPrefix(p, framework+"/") {
 			return errs.At(at("modules", i), "E-MAN-013", fmt.Sprintf("modules entry %q is the framework, which needs no declaration", p),
 				"remove it: modules: lists only third-party modules")
 		}
