@@ -19,10 +19,11 @@ Changes to the API that AI assistants build apps with. Newest first.
   reports all its problems at once, in line order, instead of the first: fix them all, then run
   `aicoded check` again. The guide `guides/permission-list` covers every field. The permission
   list's schema is now the public package `aicoded.dev/framework/manifest`, with `Load` and
-  `Parse`, for runners and the platform; app code may not import it (E-LINT-001). New codes:
-  E-MAN-014 (an unknown key), E-MAN-015 (`class`), E-MAN-016 (`owner`), E-MAN-017 (`audience`),
-  E-MAN-018 (`egress`), E-MAN-019 (`schedule`), E-MAN-020 (`size`), E-MAN-021 (`resources`) and
-  E-MAN-022 (`ttl`).
+  `Parse`, for runners and the platform; app code may not import it (E-LINT-001). The package
+  also has `Diff`, which lists what changed between two permission lists field by field, as the
+  platform's change records show it. New codes: E-MAN-014 (an unknown key), E-MAN-015
+  (`class`), E-MAN-016 (`owner`), E-MAN-017 (`audience`), E-MAN-018 (`egress`), E-MAN-019
+  (`schedule`), E-MAN-020 (`size`), E-MAN-021 (`resources`) and E-MAN-022 (`ttl`).
 - New commands publish an app to the platform: `aicoded publish [--app <name>] [-m <summary>]
   [--no-wait] [dir]` sends the commit `HEAD` names, of an app folder that is the top level of its
   own git repository, to the platform's delivery pipeline, once nothing is left uncommitted and

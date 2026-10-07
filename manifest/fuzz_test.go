@@ -33,5 +33,6 @@ func FuzzParse(f *testing.F) {
 		again, err := manifest.Parse(manifest.FileName, data)
 		require.NoError(t, err)
 		assert.Equal(t, m, again)
+		assert.Nil(t, manifest.Diff(m, m))
 	})
 }
