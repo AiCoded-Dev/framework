@@ -3,6 +3,7 @@ package check
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -101,14 +102,18 @@ func TestAdd(t *testing.T) {
 	return dir
 }
 
-// record makes the steps of a check note the app folder they run in.
+// record makes the steps of a check, and the probe of -race, note the app folder they run in.
 func record(t *testing.T) *[]string {
 	var ran []string
-	pre, build, vet, analyze, test := precheck, goBuild, goVet, runLint, goTest
-	t.Cleanup(func() { precheck, goBuild, goVet, runLint, goTest = pre, build, vet, analyze, test })
+	pre, probe, build, vet, analyze, test := precheck, probeRace, goBuild, goVet, runLint, goTest
+	t.Cleanup(func() { precheck, probeRace, goBuild, goVet, runLint, goTest = pre, probe, build, vet, analyze, test })
 	precheck = func(ctx context.Context, dir string) ([]*errs.Error, error) {
 		ran = append(ran, "precheck "+filepath.Base(dir))
 		return pre(ctx, dir)
+	}
+	probeRace = func(ctx context.Context, dir string) (bool, string, error) {
+		ran = append(ran, "race "+filepath.Base(dir))
+		return probe(ctx, dir)
 	}
 	goBuild = func(ctx context.Context, dir string) ([]*errs.Error, error) {
 		ran = append(ran, "build "+filepath.Base(dir))
@@ -153,7 +158,7 @@ func TestCheckOK(t *testing.T) {
 	assert.True(t, r.OK())
 	assert.Equal(t, []App{{Name: "shop", Dir: dir, Changed: []string{"services/billing/client_gen.go"},
 		Surface: &surface.Surface{Size: 1, EntryPoints: 1}}}, r.Apps, "one page")
-	assert.Equal(t, []string{"precheck shop", "build shop", "vet shop", "lint shop", "test shop"}, *ran)
+	assert.Equal(t, []string{"precheck shop", "race shop", "build shop", "vet shop", "lint shop", "test shop"}, *ran)
 	assert.NoFileExists(t, stale)
 }
 
@@ -179,7 +184,7 @@ func TestCheckLint(t *testing.T) {
 	assert.Equal(t, `app code may not import "os"`, r.Apps[0].Problems[0].Message)
 	assert.Equal(t, "app code may not use http.NewServeMux", r.Apps[0].Problems[1].Message)
 	assert.Equal(t, "a secret reaches telemetry.Span.SetAttr", r.Apps[0].Problems[7].Message)
-	assert.Equal(t, []string{"precheck hello", "build hello", "vet hello", "lint hello"}, *ran, "the tests do not run")
+	assert.Equal(t, []string{"precheck hello", "race hello", "build hello", "vet hello", "lint hello"}, *ran, "the tests do not run")
 }
 
 func TestCheckLintTemplate(t *testing.T) {
@@ -256,7 +261,7 @@ func TestCheckLintCannotRun(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, r.OK(), "an app that lint cannot read does not pass")
 	assert.Equal(t, []brief{{"shop", "E-CHK-007", ""}}, briefs(r.Apps[0].Problems))
-	assert.Equal(t, []string{"precheck shop", "build shop", "vet shop", "lint shop"}, *ran, "the tests do not run")
+	assert.Equal(t, []string{"precheck shop", "race shop", "build shop", "vet shop", "lint shop"}, *ran, "the tests do not run")
 }
 
 func TestCheckLintLoadError(t *testing.T) {
@@ -272,7 +277,7 @@ func TestCheckLintLoadError(t *testing.T) {
 
 	_, err := Run(t.Context(), root, Options{FrameworkDir: checkout(t)})
 	require.EqualError(t, err, "lint cannot load package shop/pages: pages/x.go:3:9: undefined: y", "an uncoded lint error stops the whole check")
-	assert.Equal(t, []string{"precheck shop", "build shop", "vet shop", "lint shop"}, *ran)
+	assert.Equal(t, []string{"precheck shop", "race shop", "build shop", "vet shop", "lint shop"}, *ran)
 }
 
 func TestCheckLintGetsModules(t *testing.T) {
@@ -329,7 +334,7 @@ func TestCheckFrozenDrift(t *testing.T) {
 	assert.Equal(t, []string{"pages/route_gen.go"}, r.Apps[0].Changed)
 	assert.Equal(t, []brief{{"shop", "E-CHK-001", "pages/route_gen.go:1"}}, briefs(r.Apps[0].Problems))
 	assert.Equal(t, "pages/route_gen.go is out of date", r.Apps[0].Problems[0].Message)
-	assert.Equal(t, []string{"precheck shop"}, *ran, "nothing is built after generate fails")
+	assert.Equal(t, []string{"precheck shop", "race shop"}, *ran, "nothing is built after generate fails")
 	assert.Equal(t, edited, read(t, route), "a frozen check writes nothing")
 }
 
@@ -343,7 +348,7 @@ func TestCheckStopsAfterBuildFailure(t *testing.T) {
 	r, err := Run(t.Context(), root, Options{})
 	require.NoError(t, err)
 	assert.Equal(t, []brief{{"calc", "E-CHK-002", "main.go:4"}}, briefs(r.Apps[0].Problems))
-	assert.Equal(t, []string{"precheck calc", "build calc"}, *ran, "vet and the tests do not run")
+	assert.Equal(t, []string{"precheck calc", "race calc", "build calc"}, *ran, "vet and the tests do not run")
 }
 
 func TestCheckNamesFrameworkPackage(t *testing.T) {
@@ -401,6 +406,23 @@ func TestCheckRaceNote(t *testing.T) {
 	assert.Equal(t, []string{"tests ran without -race: cgo is off; the delivery pipeline will run them with -race"}, r.Notes)
 }
 
+func TestCheckNoTests(t *testing.T) {
+	requireGo(t)
+	root := tempRoot(t)
+	calc(t, root, "calc", true)
+	ran := record(t)
+
+	r, err := Run(t.Context(), root, Options{NoTests: true})
+	require.NoError(t, err)
+	assert.True(t, r.OK(), "the failing test does not run")
+	assert.Equal(t, []string{"precheck calc", "build calc", "vet calc", "lint calc"}, *ran, "neither -race is probed nor the tests run")
+	assert.False(t, r.Race)
+	assert.Empty(t, r.Notes)
+	b, err := json.Marshal(r)
+	require.NoError(t, err)
+	assert.Contains(t, string(b), `"no_tests":true`)
+}
+
 func TestCheckPrecheckFirst(t *testing.T) {
 	requireGo(t)
 	t.Setenv("GOTOOLCHAIN", "auto")
@@ -416,7 +438,7 @@ func TestCheckPrecheckFirst(t *testing.T) {
 	assert.Equal(t, []brief{{"adder", "E-LINT-011", "GOFLAGS"}}, briefs(r.Apps[0].Problems))
 	assert.Regexp(t, "^lint cannot read GOFLAGS with go env: go: [^\n]+$", r.Apps[0].Problems[0].Message, "the first line of what go env printed")
 	assert.Empty(t, r.Apps[1].Problems)
-	assert.Equal(t, []string{"precheck adder", "precheck summer", "build summer", "vet summer", "lint summer", "test summer"}, *ran,
+	assert.Equal(t, []string{"precheck adder", "precheck summer", "race summer", "build summer", "vet summer", "lint summer", "test summer"}, *ran,
 		"no other go command runs for an app that the precheck refuses, and -race is probed in summer")
 	for _, n := range r.Notes {
 		assert.NotContains(t, n, "go env failed")
@@ -485,7 +507,7 @@ func TestCheckHeldSnapshots(t *testing.T) {
 	r, err = Run(t.Context(), root, Options{App: "shop", FrameworkDir: checkout(t)})
 	require.NoError(t, err)
 	assert.Equal(t, []brief{{"shop", "E-RPC-013", held + ":4"}}, briefs(r.Apps[0].Problems))
-	assert.Equal(t, []string{"precheck shop"}, *ran, "nothing is built with a broken held snapshot")
+	assert.Equal(t, []string{"precheck shop", "race shop"}, *ran, "nothing is built with a broken held snapshot")
 }
 
 func TestCheckRefusesWorkspace(t *testing.T) {
@@ -524,4 +546,9 @@ aicoded check: 2 problems in 1 app
 	out.Reset()
 	require.NoError(t, r.WriteText(&out))
 	assert.Equal(t, "ok  billing\n  out of date rpc/server_gen.go\naicoded check: ok\n", out.String())
+
+	r = Report{NoTests: true, Apps: []App{{Name: "billing"}}}
+	out.Reset()
+	require.NoError(t, r.WriteText(&out))
+	assert.Equal(t, "ok  billing\naicoded check: ok\ntests did not run (--no-tests)\n", out.String())
 }

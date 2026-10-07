@@ -28,14 +28,18 @@ type Options struct {
 	// released aicoded. Lint lets an app's go.mod replace the framework with this folder only
 	// (E-LINT-011).
 	FrameworkDir string
+	// NoTests skips the tests and the probe of -race.
+	NoTests bool
 }
 
 // Report is what aicoded check found.
 type Report struct {
-	Apps   []App    `json:"apps"`
-	Frozen bool     `json:"frozen,omitempty"`
-	Race   bool     `json:"race"`
-	Notes  []string `json:"notes,omitempty"`
+	Apps   []App `json:"apps"`
+	Frozen bool  `json:"frozen,omitempty"`
+	// NoTests is set when the tests did not run.
+	NoTests bool     `json:"no_tests,omitempty"`
+	Race    bool     `json:"race"`
+	Notes   []string `json:"notes,omitempty"`
 }
 
 // App is what aicoded check found in one app.
@@ -51,11 +55,12 @@ type App struct {
 }
 
 var (
-	precheck = lint.Precheck
-	goBuild  = gotool.Build
-	goVet    = gotool.Vet
-	runLint  = lint.Run
-	goTest   = gotool.Test
+	precheck  = lint.Precheck
+	probeRace = gotool.Race
+	goBuild   = gotool.Build
+	goVet     = gotool.Vet
+	runLint   = lint.Run
+	goTest    = gotool.Test
 )
 
 // Run checks the apps under dir. Its error is one of the whole workspace: no app, a permission
@@ -64,7 +69,8 @@ var (
 // of an app, such as E-CHK-007 when lint cannot run with this go command. Lint's precheck of
 // GOFLAGS and the vendor folder runs for every app before any other go command, since both
 // decide what the go command builds and runs; -race is then probed in the first app that passed
-// it. A step that fails skips the later steps of its app, and every app is checked.
+// it, unless Options.NoTests skips the tests. A step that fails skips the later steps of its app,
+// and every app is checked.
 func Run(ctx context.Context, dir string, opts Options) (Report, error) {
 	root, err := filepath.Abs(dir)
 	if err != nil {
@@ -94,9 +100,9 @@ func Run(ctx context.Context, dir string, opts Options) (Report, error) {
 			probe = a.Dir
 		}
 	}
-	r := Report{Frozen: opts.Frozen}
-	if probe != "" {
-		race, why, err := gotool.Race(ctx, probe)
+	r := Report{Frozen: opts.Frozen, NoTests: opts.NoTests}
+	if probe != "" && !opts.NoTests {
+		race, why, err := probeRace(ctx, probe)
 		if err != nil {
 			why = err.Error()
 		}
@@ -159,7 +165,9 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 			}
 			return r.Problems, err
 		},
-		func() ([]*errs.Error, error) { return goTest(ctx, a.Dir, race) },
+	}
+	if !opts.NoTests {
+		steps = append(steps, func() ([]*errs.Error, error) { return goTest(ctx, a.Dir, race) })
 	}
 	for _, step := range steps {
 		ps, err := step()

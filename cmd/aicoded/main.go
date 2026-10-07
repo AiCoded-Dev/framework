@@ -27,7 +27,7 @@ import (
 const usage = `usage: aicoded <command> [arguments]
 
 commands:
-  check [dir]     generate, build, vet, lint and test every app in dir or below it (--frozen, --json, --app <name>)
+  check [dir]     generate, build, vet, lint and test every app in dir or below it (--frozen, --no-tests, --json, --app <name>)
   describe [dir]  summarise what every app in dir or below it serves, calls and reaches (--json, --app <name>)
   dev [dir]       run every app in dir or below it (default: current directory) on a local runner (--manual <app>)
   explain [topic] print a page of the docs, such as guides/overview, changelog or E-DEV-001, or list them all
@@ -244,6 +244,7 @@ func fail(stderr io.Writer, err error) int {
 func runCheck(args []string, stdout, stderr io.Writer) int {
 	fs := newFlags("check", stderr)
 	frozen := fs.Bool("frozen", false, "write nothing, and fail on generated files that are out of date")
+	noTests := fs.Bool("no-tests", false, "skip the tests: generate, build, vet and lint only")
 	asJSON := fs.Bool("json", false, "print the report as JSON")
 	app := fs.String("app", "", "check only the app with this name")
 	rest, code, ok := parseArgs(fs, args, 0, 1)
@@ -253,7 +254,7 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	fw, _ := scaffold.Detect(frameworkDir)
-	report, err := check.Run(ctx, dirArg(rest), check.Options{Frozen: *frozen, App: *app, FrameworkDir: fw.Dir})
+	report, err := check.Run(ctx, dirArg(rest), check.Options{Frozen: *frozen, NoTests: *noTests, App: *app, FrameworkDir: fw.Dir})
 	if err != nil {
 		return fail(stderr, err)
 	}

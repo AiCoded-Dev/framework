@@ -200,6 +200,7 @@ func TestRunCheck(t *testing.T) {
 	var out, errOut bytes.Buffer
 	assert.Equal(t, 2, run([]string{"check", "a", "b"}, &out, &errOut))
 	assert.Equal(t, 2, run([]string{"check", "--nope"}, &out, &errOut))
+	assert.Contains(t, errOut.String(), "(--frozen, --no-tests, --json, --app <name>)")
 	assert.Equal(t, 1, run([]string{"check", t.TempDir()}, &out, &errOut))
 	assert.Contains(t, errOut.String(), "E-MAN-006")
 
@@ -213,6 +214,13 @@ func TestRunCheck(t *testing.T) {
 	require.Len(t, report.Apps, 1)
 	require.Len(t, report.Apps[0].Problems, 1)
 	assert.Equal(t, "E-CHK-004", report.Apps[0].Problems[0].Code)
+
+	out.Reset()
+	assert.Equal(t, 0, run([]string{"check", "--no-tests", "--json", testApp(t, `t.Error("fails")`)}, &out, &errOut))
+	report = check.Report{}
+	require.NoError(t, json.Unmarshal(out.Bytes(), &report))
+	assert.True(t, report.NoTests)
+	assert.Empty(t, report.Apps[0].Problems, "the tests did not run")
 
 	out.Reset()
 	assert.Equal(t, 0, run([]string{"check", "--app", "calc", testApp(t, "")}, &out, &errOut))

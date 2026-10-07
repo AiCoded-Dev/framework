@@ -16,8 +16,8 @@ func (r Report) OK() bool {
 	return true
 }
 
-// WriteText writes the report as aicoded check prints it: a block per app, the notes, and a line
-// that sums it up.
+// WriteText writes the report as aicoded check prints it: a block per app, the notes, a line
+// that sums it up, and a last line when the tests did not run.
 func (r Report) WriteText(w io.Writer) error {
 	var b strings.Builder
 	problems, failed := 0, 0
@@ -53,6 +53,9 @@ func (r Report) WriteText(w io.Writer) error {
 		b.WriteString("aicoded check: ok\n")
 	} else {
 		fmt.Fprintf(&b, "aicoded check: %s in %s\n", count(problems, "problem"), count(failed, "app"))
+	}
+	if r.NoTests {
+		b.WriteString("tests did not run (--no-tests)\n")
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
