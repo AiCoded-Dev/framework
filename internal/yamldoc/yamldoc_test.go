@@ -19,6 +19,8 @@ func TestLine(t *testing.T) {
 
 	_, ok = yamldoc.Line(yaml.Unmarshal([]byte("a: b: c\n"), &v))
 	assert.False(t, ok)
+	assert.Equal(t, 1, yamldoc.LineOr1(yaml.Unmarshal([]byte("a: b: c\n"), &v)))
+	assert.Equal(t, 2, yamldoc.LineOr1(yaml.Unmarshal([]byte("b: 1\na: x\n"), &v)))
 }
 
 func TestDocument(t *testing.T) {

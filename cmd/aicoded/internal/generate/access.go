@@ -228,19 +228,12 @@ func parseManifest(data []byte) (map[string]any, *yaml.Node, error) {
 	}
 	var m map[string]any
 	if err := doc.Decode(&m); err != nil {
-		return nil, nil, manifestError(errLine(err), "aicoded.yaml has an unexpected shape: "+err.Error())
+		return nil, nil, manifestError(yamldoc.LineOr1(err), "aicoded.yaml has an unexpected shape: "+err.Error())
 	}
 	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
 		return m, nil, nil
 	}
 	return m, doc.Content[0], nil
-}
-
-func errLine(err error) int {
-	if line, ok := yamldoc.Line(err); ok {
-		return line
-	}
-	return 1
 }
 
 // manifestError reports that aicoded.yaml cannot take the generated sections.

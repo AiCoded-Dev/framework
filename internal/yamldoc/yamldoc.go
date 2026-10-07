@@ -38,11 +38,7 @@ func Document(path string, data []byte) (yaml.Node, error) {
 }
 
 func errPos(path string, err error) string {
-	line, ok := Line(err)
-	if !ok {
-		line = 1
-	}
-	return fmt.Sprintf("%s:%d", path, line)
+	return fmt.Sprintf("%s:%d", path, LineOr1(err))
 }
 
 var lineRe = regexp.MustCompile(`line (\d+)`)
@@ -55,4 +51,12 @@ func Line(err error) (int, bool) {
 	}
 	n, err := strconv.Atoi(m[1])
 	return n, err == nil
+}
+
+// LineOr1 returns the first line number a YAML error mentions, or 1 when it mentions none.
+func LineOr1(err error) int {
+	if line, ok := Line(err); ok {
+		return line
+	}
+	return 1
 }

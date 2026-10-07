@@ -1,0 +1,31 @@
+app: room-maintenance
+class: internal-ops                  # "app type" in the UI, defined by security
+owner: group:hotel-ops-leads
+audience:
+  internal: [group:hotel-ops-lisbon]
+  external: []                       # e.g. [idp:partners, magic-link]
+data:
+  - source: connector:m365-sharepoint   # read with each viewer's own access
+    classes: [internal]
+  - source: sqldb                       # app's own tables
+    classes: [internal]
+  - source: filestore:invoices          # app's own files
+    classes: [internal]
+access:                              # written by aicoded generate from <ssr:access>
+  "/rooms":           {require: ["hotel-ops"]}
+  "/rooms/{id}/edit": {require: ["hotel-ops"], guard: true}
+services:                            # generated call graph
+  calls: {inventory: [ReserveParts]}
+  serves: {RoomStatus: {callers: [front-desk], require: ["hotel-ops"]}}
+egress: []                           # allowed outbound hosts
+email:
+  from: ops@acme.example
+  to_domains: [acme.example]
+schedule:
+  - {cron: "0 6 * * *", job: daily-summary}
+settings: [report_day]
+secrets: [partner_api_key]
+modules: []                          # third-party Go modules the code uses, e.g. [golang.org/x/text]
+size: S                              # size limit; raised only by the budget owner
+resources: small                     # runtime limit; raised only by the budget owner
+ttl: 180d
