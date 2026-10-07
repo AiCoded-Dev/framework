@@ -326,6 +326,22 @@ func TestRunStatus(t *testing.T) {
 	code, _, errOut = aicoded("status", "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa")
 	assert.Equal(t, 1, code)
 	assert.Contains(t, errOut, "E-PUB-013: ")
+
+	p.Answers(platformtest.Failed(400, 4000))
+	code, out, errOut = aicoded("status", id)
+	assert.Equal(t, 1, code, errOut)
+	assert.True(t, strings.HasSuffix(out, "    docs: https://aicoded.dev/docs/errors/E-CHK-004\n  partial checks: only aicoded check "+
+		"and the tests run; the full security checks come later\nfailed: 400 problems\n"), "an answer above 1 MiB")
+	code, out, _ = aicoded("status", "--json", id)
+	assert.Equal(t, 1, code)
+	require.NoError(t, json.Unmarshal([]byte(out), &got))
+	assert.Len(t, got.Problems, 400)
+
+	p.Answers(platformtest.Failed(2200, 4000))
+	code, out, errOut = aicoded("status", id)
+	assert.Equal(t, 1, code)
+	assert.Empty(t, out)
+	assert.Equal(t, "the platform's answer is larger than 8 MiB, more than aicoded reads\n", errOut)
 }
 
 func TestRunStatusUsage(t *testing.T) {

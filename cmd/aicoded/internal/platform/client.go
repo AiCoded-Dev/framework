@@ -24,7 +24,7 @@ const (
 	scope = "app:create"
 	// refreshBefore is how long before it expires an access token is refreshed.
 	refreshBefore = 30 * time.Second
-	// maxAnswer is the largest answer read from the platform.
+	// maxAnswer is the largest answer read from the platform, but for a publish's.
 	maxAnswer = 1 << 20
 	// maxCodeWait is the longest a sign-in with a code waits, whatever the platform says.
 	maxCodeWait = 15 * time.Minute
@@ -337,19 +337,23 @@ func (c *Client) revoke(ctx context.Context, refresh string) error {
 
 // do sends req and returns the answer's body and status. It follows no redirect.
 func (c *Client) do(req *http.Request) ([]byte, int, error) {
-	return send(c.HTTP, req)
+	return send(c.HTTP, req, maxAnswer)
 }
 
-// send sends req with hc and returns the answer's body, at most 1 MiB of it, and status.
-func send(hc *http.Client, req *http.Request) ([]byte, int, error) {
+// send sends req with hc and returns the answer's body and status. A body longer than limit
+// bytes is an error.
+func send(hc *http.Client, req *http.Request, limit int64) ([]byte, int, error) {
 	resp, err := hc.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("reach the platform: %s", clean(err.Error(), 300))
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxAnswer))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return nil, 0, fmt.Errorf("read the platform's answer: %s", clean(err.Error(), 300))
+	}
+	if int64(len(body)) > limit {
+		return nil, 0, fmt.Errorf("the platform's answer is larger than %d MiB, more than aicoded reads", limit>>20)
 	}
 	return body, resp.StatusCode, nil
 }

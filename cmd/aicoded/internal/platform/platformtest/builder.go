@@ -76,6 +76,17 @@ func Passed() Publish {
 	return Publish{Status: "passed", Checks: "partial", Steps: Steps("passed", "passed", "passed", "passed"), Record: 1}
 }
 
+// Failed is the answer about a publish that failed with n problems, each with a message of size
+// letters.
+func Failed(n, size int) Publish {
+	problems := make([]Problem, n)
+	for i := range problems {
+		problems[i] = Problem{Code: "E-CHK-004", Pos: fmt.Sprintf("demo_test.go:%d", i+1), Message: strings.Repeat("x", size),
+			Fix: "fix the code or the test until go test passes"}
+	}
+	return Publish{Status: "failed", Checks: "partial", Steps: Steps("passed", "passed", "passed", "failed"), Problems: problems}
+}
+
 // Upload is a publish the fake took.
 type Upload struct {
 	App, SHA, Summary string

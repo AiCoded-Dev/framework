@@ -24,6 +24,10 @@ const MaxBundle = 32 << 20
 // uploadTimeout bounds the sending of a bundle, which takes longer than other requests.
 const uploadTimeout = 10 * time.Minute
 
+// maxPublish is the largest answer about a publish read from the platform, which holds its
+// problems: 8 MiB.
+const maxPublish = 8 << 20
+
 var (
 	// PublishID matches the id of a publish.
 	PublishID = regexp.MustCompile(`^pub_[a-z2-7]{26}$`)
@@ -139,7 +143,7 @@ func (c *Client) App(ctx context.Context, name string) (app App, found bool, err
 	if err != nil {
 		return App{}, false, err
 	}
-	status, answer, err := c.call(ctx, c.HTTP, "/v1/apps/get", "application/json", body)
+	status, answer, err := c.call(ctx, c.HTTP, "/v1/apps/get", "application/json", body, maxAnswer)
 	if err != nil {
 		return App{}, false, err
 	}
@@ -201,7 +205,7 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 	}
 	upload := *c.HTTP
 	upload.Timeout = uploadTimeout
-	status, answer, err := c.call(ctx, &upload, "/v1/publishes/create", mw.FormDataContentType(), body.Bytes())
+	status, answer, err := c.call(ctx, &upload, "/v1/publishes/create", mw.FormDataContentType(), body.Bytes(), maxAnswer)
 	if err != nil {
 		return Created{}, err
 	}
@@ -229,15 +233,15 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 	return Created{ID: a.ID, CreatedApp: a.CreatedApp}, nil
 }
 
-// Publish returns the publish id, which must match PublishID. An id the platform does not know is
-// E-PUB-013, and a publish of an app the builder does not own E-PUB-005, as the platform's answer
-// says.
+// Publish returns the publish id, which must match PublishID. It reads an answer of up to 8 MiB,
+// since a publish may have many problems. An id the platform does not know is E-PUB-013, and a
+// publish of an app the builder does not own E-PUB-005, as the platform's answer says.
 func (c *Client) Publish(ctx context.Context, id string) (Publish, error) {
 	body, err := json.Marshal(map[string]string{"id": id})
 	if err != nil {
 		return Publish{}, err
 	}
-	status, answer, err := c.call(ctx, c.HTTP, "/v1/publishes/get", "application/json", body)
+	status, answer, err := c.call(ctx, c.HTTP, "/v1/publishes/get", "application/json", body, maxPublish)
 	if err != nil {
 		return Publish{}, err
 	}
@@ -289,10 +293,11 @@ func (p *Publish) clean() {
 }
 
 // call posts body, of type contentType, to the builder API at path with hc and the access token
-// of the sign-in, and returns the answer's status and body. A token the platform no longer
-// accepts is E-CLI-004. When the platform refuses the token for want of a scope, call refreshes
-// the sign-in once, which brings the scopes of the apps the builder owns now, and posts again.
-func (c *Client) call(ctx context.Context, hc *http.Client, path, contentType string, body []byte) (int, []byte, error) {
+// of the sign-in, and returns the answer's status and body, of at most limit bytes. A token the
+// platform no longer accepts is E-CLI-004. When the platform refuses the token for want of a
+// scope, call refreshes the sign-in once, which brings the scopes of the apps the builder owns
+// now, and posts again.
+func (c *Client) call(ctx context.Context, hc *http.Client, path, contentType string, body []byte, limit int64) (int, []byte, error) {
 	tok, err := c.Token(ctx)
 	if err != nil {
 		return 0, nil, err
@@ -305,7 +310,7 @@ func (c *Client) call(ctx context.Context, hc *http.Client, path, contentType st
 		req.Header.Set("Authorization", "Bearer "+tok)
 		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("Accept", "application/json")
-		answer, status, err := send(hc, req)
+		answer, status, err := send(hc, req, limit)
 		switch {
 		case err != nil:
 			return 0, nil, err

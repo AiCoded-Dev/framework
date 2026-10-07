@@ -152,6 +152,20 @@ func TestPublishIsCleaned(t *testing.T) {
 	assert.True(t, got.Done())
 }
 
+func TestPublishOfManyProblems(t *testing.T) {
+	p, c := signedIn(t)
+	created, err := c.CreatePublish(t.Context(), upload(sha))
+	require.NoError(t, err)
+	p.Answers(platformtest.Failed(400, 4000))
+	got, err := c.Publish(t.Context(), created.ID)
+	require.NoError(t, err, "an answer of 1.6 MB")
+	assert.Len(t, got.Problems, 400)
+
+	p.Answers(platformtest.Failed(2200, 4000))
+	_, err = c.Publish(t.Context(), created.ID)
+	require.EqualError(t, err, "the platform's answer is larger than 8 MiB, more than aicoded reads")
+}
+
 func TestPublishRefused(t *testing.T) {
 	p, c := signedIn(t)
 	_, err := c.Publish(t.Context(), "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa")

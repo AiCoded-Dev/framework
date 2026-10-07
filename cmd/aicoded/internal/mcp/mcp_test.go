@@ -531,6 +531,10 @@ func TestPublishTools(t *testing.T) {
 	got := result[platform.Publish](t, callTool("release_status", map[string]any{"id": out.ID}))
 	assert.Equal(t, "passed", got.Status)
 	assert.Equal(t, out.ID, got.ID)
+	p.Answers(platformtest.Failed(400, 4000))
+	got = result[platform.Publish](t, callTool("release_status", map[string]any{"id": out.ID}))
+	assert.Len(t, got.Problems, 400, "an answer above 1 MiB")
+	p.Answers(platformtest.Passed())
 
 	res := callTool("publish", map[string]any{"app": "demo", "summary": "Again"})
 	assert.True(t, res.IsError)
