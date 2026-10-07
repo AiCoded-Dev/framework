@@ -36,7 +36,9 @@ commands:
   login           sign in to the platform, in the browser or with a code (--org <organisation>, --device)
   logout          revoke the sign-in to the platform and forget it
   mcp [dir]       serve the AI assistant's tools for the apps in dir over MCP on stdin and stdout
+  publish [dir]   send the commit of the app in dir to the platform's delivery pipeline and wait for the outcome (--app <name>, -m <summary>, --no-wait)
   rpc add <app>   let the app in the current directory call the functions of the app named <app>
+  status <id>     print the steps, problems and outcome of a publish (--json)
   version         print the aicoded version
   whoami          print the organisation, email and scopes of the sign-in to the platform (--json)
 `
@@ -150,6 +152,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runLogout(args, stdout, stderr)
 	case "mcp":
 		return runMCP(args, stdout, stderr)
+	case "publish":
+		return runPublish(args, stdout, stderr)
 	case "rpc":
 		if len(args) == 0 || args[0] != "add" {
 			fmt.Fprint(stderr, usage)
@@ -163,6 +167,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return fail(stderr, err)
 		}
 		return exitOK
+	case "status":
+		return runStatus(args, stdout, stderr)
 	case "version":
 		if _, code, ok := parseArgs(newFlags("version", stderr), args, 0, 0); !ok {
 			return code

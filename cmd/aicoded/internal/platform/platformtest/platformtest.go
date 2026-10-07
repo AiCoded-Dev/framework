@@ -1,5 +1,6 @@
-// Package platformtest fakes the platform's sign-in, token, revocation and whoami endpoints on
-// 127.0.0.1, for the tests of aicoded login, logout and whoami.
+// Package platformtest fakes the platform on 127.0.0.1, for the tests of aicoded: its sign-in,
+// token, revocation and whoami endpoints, and the builder API that aicoded publish and status
+// call.
 package platformtest
 
 import (
@@ -26,7 +27,9 @@ const (
 	Email = "ana@acme.example"
 )
 
-// Platform is a fake platform. Everyone who signs in gets scope app:create.
+// Platform is a fake platform. Everyone who signs in gets the scope app:create, and the scopes
+// app:<id>:release:request and app:<id>:status of each app they own that is not archived, as they
+// are when the token is issued.
 type Platform struct {
 	// URL is its address, http://127.0.0.1:<port>.
 	URL string
@@ -40,11 +43,18 @@ type Platform struct {
 	expiresIn     int
 	deviceAnswer  func(map[string]any)
 	codes         map[string]grant
-	access        map[string]time.Time
+	access        map[string]session
 	refresh       map[string]bool
 	devices       map[string]int
 	revoked       []string
 	tokenRequests int
+	builder
+}
+
+// session is what an access token grants until it expires.
+type session struct {
+	expires time.Time
+	scopes  []string
 }
 
 type grant struct{ challenge, redirect string }
@@ -56,14 +66,17 @@ type failure struct {
 
 // New starts a fake platform, closed when the test ends.
 func New(t testing.TB) *Platform {
-	p := &Platform{expiresIn: 900, codes: map[string]grant{}, access: map[string]time.Time{}, refresh: map[string]bool{},
-		devices: map[string]int{}}
+	p := &Platform{expiresIn: 900, codes: map[string]grant{}, access: map[string]session{}, refresh: map[string]bool{},
+		devices: map[string]int{}, builder: newBuilder()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /oauth/authorize", p.authorize)
 	mux.HandleFunc("POST /oauth/token", p.token)
 	mux.HandleFunc("POST /oauth/device", p.device)
 	mux.HandleFunc("POST /oauth/revoke", p.revoke)
 	mux.HandleFunc("GET /v1/whoami", p.whoami)
+	mux.HandleFunc("POST /v1/apps/get", p.getApp)
+	mux.HandleFunc("POST /v1/publishes/create", p.createPublish)
+	mux.HandleFunc("POST /v1/publishes/get", p.getPublish)
 	p.srv = httptest.NewServer(mux)
 	t.Cleanup(p.srv.Close)
 	p.URL = p.srv.URL
@@ -267,11 +280,18 @@ func (p *Platform) token(w http.ResponseWriter, r *http.Request) {
 		oauthError(w, http.StatusBadRequest, "unsupported_grant_type", "unknown grant_type")
 		return
 	}
-	access, refresh := secret("aicoded_at_"), secret("aicoded_rt_")
-	p.access[access] = time.Now().Add(time.Duration(p.expiresIn) * time.Second)
-	p.refresh[refresh] = true
+	access, refresh := p.issue()
 	writeJSON(w, http.StatusOK, map[string]any{"access_token": access, "token_type": "Bearer", "expires_in": p.expiresIn,
-		"refresh_token": refresh, "scope": "app:create"})
+		"refresh_token": refresh, "scope": strings.Join(p.access[access].scopes, " ")})
+}
+
+// issue issues an access token and a refresh token, with the scopes of the person who signs in.
+// The caller holds p.mu.
+func (p *Platform) issue() (access, refresh string) {
+	access, refresh = secret("aicoded_at_"), secret("aicoded_rt_")
+	p.access[access] = session{expires: time.Now().Add(time.Duration(p.expiresIn) * time.Second), scopes: p.scopes()}
+	p.refresh[refresh] = true
+	return access, refresh
 }
 
 func (p *Platform) device(w http.ResponseWriter, r *http.Request) {
@@ -303,14 +323,24 @@ func (p *Platform) revoke(w http.ResponseWriter, r *http.Request) {
 func (p *Platform) whoami(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	tok, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	expires, ok := p.access[tok]
-	if !ok || !time.Now().Before(expires) {
-		oauthError(w, http.StatusUnauthorized, "invalid_token", "the token is unknown, expired or revoked")
+	s, ok := p.session(w, r)
+	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"org": Org, "email": Email, "client": "aicoded", "scopes": []string{"app:create"},
-		"expires": expires.UTC()})
+	writeJSON(w, http.StatusOK, map[string]any{"org": Org, "email": Email, "client": "aicoded", "scopes": s.scopes,
+		"expires": s.expires.UTC()})
+}
+
+// session returns the session of the request's access token, or answers 401 and returns false.
+// The caller holds p.mu.
+func (p *Platform) session(w http.ResponseWriter, r *http.Request) (session, bool) {
+	tok, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	s, ok := p.access[tok]
+	if !ok || !time.Now().Before(s.expires) {
+		oauthError(w, http.StatusUnauthorized, "invalid_token", "the token is unknown, expired or revoked")
+		return session{}, false
+	}
+	return s, true
 }
 
 func secret(prefix string) string {

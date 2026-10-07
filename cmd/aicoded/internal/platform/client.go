@@ -160,6 +160,19 @@ func credentials(org string, tok *oauth2.Token) (Credentials, error) {
 // deletes its tokens, keeps its organisation, and returns E-CLI-004 too. When the platform cannot
 // refresh it right now, Token keeps it and returns E-CLI-009.
 func (c *Client) Token(ctx context.Context) (string, error) {
+	return c.token(ctx, "")
+}
+
+// Refresh refreshes the sign-in at once, as Token does when it expires, and returns its new
+// access token. stale is the access token the platform refused for want of a scope: when another
+// command has refreshed the sign-in since, Refresh returns the new token as it is. A refresh
+// brings the scopes of the apps the builder owns now, such as the app its first publish created.
+func (c *Client) Refresh(ctx context.Context, stale string) (string, error) {
+	return c.token(ctx, stale)
+}
+
+// token is Token, which also refreshes the sign-in while its access token is stale.
+func (c *Client) token(ctx context.Context, stale string) (string, error) {
 	unlock, err := lock(ctx)
 	if err != nil {
 		return "", err
@@ -172,7 +185,7 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 	if cr.AccessToken == "" || cr.RefreshToken == "" {
 		return "", signedOut("not signed in to the platform at " + c.address)
 	}
-	if time.Until(cr.Expires) > refreshBefore {
+	if time.Until(cr.Expires) > refreshBefore && cr.AccessToken != stale {
 		return cr.AccessToken, nil
 	}
 	tok, err := c.config("").TokenSource(c.ctx(ctx), &oauth2.Token{RefreshToken: cr.RefreshToken}).Token()
@@ -324,7 +337,12 @@ func (c *Client) revoke(ctx context.Context, refresh string) error {
 
 // do sends req and returns the answer's body and status. It follows no redirect.
 func (c *Client) do(req *http.Request) ([]byte, int, error) {
-	resp, err := c.HTTP.Do(req)
+	return send(c.HTTP, req)
+}
+
+// send sends req with hc and returns the answer's body, at most 1 MiB of it, and status.
+func send(hc *http.Client, req *http.Request) ([]byte, int, error) {
+	resp, err := hc.Do(req)
 	if err != nil {
 		return nil, 0, fmt.Errorf("reach the platform: %s", clean(err.Error(), 300))
 	}

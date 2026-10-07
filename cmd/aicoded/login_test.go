@@ -111,7 +111,7 @@ func TestRunLogoutWithoutThePlatform(t *testing.T) {
 func TestRunPlatformAddress(t *testing.T) {
 	_, aicoded := fakePlatform(t)
 	t.Setenv("AICODED_PLATFORM", "http://api.acme.example")
-	for _, args := range [][]string{{"login", "--org", "acme"}, {"logout"}, {"whoami"}} {
+	for _, args := range [][]string{{"login", "--org", "acme"}, {"logout"}, {"whoami"}, {"publish"}, {"status", "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"}} {
 		code, _, errOut := aicoded(args...)
 		assert.Equal(t, 1, code, args)
 		assert.Contains(t, errOut, "E-CLI-005", args)

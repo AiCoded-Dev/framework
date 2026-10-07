@@ -1,7 +1,8 @@
 // Package platform signs a builder in to the aicoded platform and keeps the sign-in: aicoded
 // login, logout and whoami, and the token that other commands send to the platform. It signs in
 // with OAuth 2.1, in the browser through a loopback redirect (RFC 8252) or with a code entered
-// on any device (RFC 8628).
+// on any device (RFC 8628). It also calls the builder API, which aicoded publish and status use,
+// and cleans every text of its answers before anyone prints it.
 package platform
 
 import (
