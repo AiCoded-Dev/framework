@@ -49,7 +49,9 @@ app with no pages.
 
    You write `app`, `data`, `email`, `settings` and `secrets`, so copy only those sections.
    `aicoded generate` writes the `access` section from the pages and the `services` section from
-   the calls between apps; never edit those two.
+   the calls between apps; never edit those two. When the person says who owns and uses the app,
+   write `owner` and `audience` too, as [the permission list](../guides/permission-list.md)
+   describes.
 3. Make `deps/deps.go`, package `deps`, with a type `Deps` for what every page shares and a
    `Start` that opens the building blocks before the app serves:
 

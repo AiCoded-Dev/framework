@@ -93,35 +93,45 @@ aicoded check: ok
 ## aicoded describe
 
 `aicoded describe [--json] [--app <name>] [dir]` summarises each app for your AI assistant:
-pages with their access rules, functions served and called, database, file stores, mail,
-settings, the names of its secrets, the modules it declares, the tables its SQL writes, its
-surface, and generated files that are out of date. It writes nothing. For the people example it
-prints, among other lines:
+its app type, owner and audience, pages with their access rules, functions served and called,
+database, file stores, connectors, mail, outside services, scheduled jobs, settings, the names of
+its secrets, the modules it declares, its size, resources and review period, the tables its SQL
+writes, its surface, and generated files that are out of date. Each line shows only when the app
+has the item. It writes nothing. For the room-maintenance example it prints:
 
 ```text
-app people (/home/me/apps/people)
-  page /contact  require *
-  page /users/{login}/contacts  require staff  guard
-  calls contacts: Contacts
+app room-maintenance (/home/me/apps/room-maintenance)
+  class internal-tool
+  owner group:hotel-ops-leads
+  audience group:hotel-staff
+  page /tickets  require staff
+  page /tickets/report  require staff
+  page /tickets/{id}  require staff  guard
+  page /tickets/{id}/edit  require staff  guard
+  page /tickets/{id}/status  require staff, hotel-ops  guard
   database
-  files photos
-  email from people@acme.example to acme.example
-  settings team_address
-  writes INSERT users
-  surface 5 (5 entry points, 2 effects)
+  size S
+  resources small
+  ttl 180d
+  writes INSERT rooms, INSERT tickets, UPDATE tickets
+  surface 5 (5 entry points, 3 effects)
 ```
 
+An app with more in its permission list gets more lines, such as `connectors crm` after
+`files`, `egress api.partner.example` and `schedule daily-summary  cron 0 6 * * *` after the
+mail, and `external audience magic-link` after `audience`.
+
 The surface is the app's size: the larger of its entry points and its effects. Its entry points
-are its pages, its page calls, counted once for each page that offers them, and the functions it
-serves other apps. Its effects are the tables its SQL writes, counted once for each of
-`INSERT`, `UPDATE`, `DELETE` and `REPLACE`, and the domains it may mail; connectors and outside
-services will count too once they exist. The writes come from lint, which reads the SQL; when
-the app does not compile, or lint's precheck refuses its GOFLAGS or `vendor` folder, `describe`
-counts no writes and says so in a warning. Only `INSERT`,
-`UPDATE`, `DELETE` and `REPLACE` count, and a write to several tables counts its first table; a
-`SELECT` and a `CREATE`, `ALTER` or `DROP` of a table or index are not writes, and statements
-lint refuses outright, such as `CALL`, `TRUNCATE`, `SET`, `PREPARE` and `EXECUTE` (E-LINT-007),
-never reach the surface. There are no size limits yet.
+are its pages, its page calls, counted once for each page that offers them, the functions it
+serves other apps and its scheduled jobs. Its effects are the tables its SQL writes, counted
+once for each of `INSERT`, `UPDATE`, `DELETE` and `REPLACE`, its connectors, the outside
+services it may call and the domains it may mail. The writes come from lint, which reads the
+SQL; when the app does not compile, or lint's precheck refuses its GOFLAGS or `vendor` folder,
+`describe` counts no writes and says so in a warning. Only `INSERT`, `UPDATE`, `DELETE` and
+`REPLACE` count, and a write to several tables counts its first table; a `SELECT` and a
+`CREATE`, `ALTER` or `DROP` of a table or index are not writes, and statements lint refuses
+outright, such as `CALL`, `TRUNCATE`, `SET`, `PREPARE` and `EXECUTE` (E-LINT-007), never reach
+the surface. Nothing compares the surface with `size` yet.
 
 ## aicoded explain
 

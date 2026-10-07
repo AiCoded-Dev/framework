@@ -4,6 +4,14 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `aicoded describe` and the `describe` tool of `aicoded mcp` show the new fields of the
+  permission list, each only when the app has it. The text gains the lines `class`, `owner`,
+  `audience` and `external audience` after the `app` line, `connectors` after `files`, `egress`
+  and one `schedule <job>  cron <expression>` for each job after the mail, and `size`,
+  `resources` and `ttl` after `modules`. The JSON gains `class`, `owner`, `audience` (with
+  `internal` and `external`), `connectors`, `egress`, `schedule` (with `job` and `cron`),
+  `size`, `resources` and `ttl`. The surface counts each scheduled job as an entry point, and
+  each connector and each `egress` host as an effect.
 - The permission list, `aicoded.yaml`, takes every field: besides `app`, `data`, `access`,
   `services`, `email`, `settings`, `secrets` and `modules`, the optional `class` (the app type),
   `owner` (`group:<name>`), `audience` (`internal`: `group:<name>` or `everyone`; `external`:

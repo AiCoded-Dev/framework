@@ -144,14 +144,18 @@ come later, so a publish that passes is checked and recorded, but runs nowhere y
 Security will approve what the app may do, not its code. The permission list is that statement, so
 read it before you publish:
 
+- `class`, `owner` and `audience` name its app type, who owns it and who may use it.
 - `data` names everything the app stores or reads, with its classes.
-- `email` names where its mail can go.
-- `settings` and `secrets` name what it is configured with.
+- `egress` names the outside services it calls, `email` where its mail can go, and `schedule`
+  the jobs it runs on its own.
+- `settings` and `secrets` name what it is configured with, and `modules` the third-party code
+  it uses.
+- `size`, `resources` and `ttl` name its limits and when it is reviewed.
 - `access`, which `aicoded generate` writes, names who may open each page, and `services` which
   apps it calls and which may call it.
 
-A page with no access rule does not generate at all, and the framework holds the app to the rest
-when it runs: see [the permission list](permission-list.md).
+A page with no access rule does not generate at all. [The permission list](permission-list.md)
+says which sections are enforced today, and which the platform only records for now.
 
 ## The codes
 
