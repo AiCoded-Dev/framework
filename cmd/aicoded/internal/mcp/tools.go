@@ -13,7 +13,9 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/describe"
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
 	"aicoded.dev/framework/cmd/aicoded/internal/manifest"
+	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
+	"aicoded.dev/framework/cmd/aicoded/internal/publish"
 	"aicoded.dev/framework/cmd/aicoded/internal/scaffold"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
 )
@@ -86,6 +88,23 @@ type idOut struct {
 	ID string `json:"id"`
 }
 
+type publishIn struct {
+	App     string `json:"app"`
+	Summary string `json:"summary"`
+}
+
+type publishOut struct {
+	ID         string `json:"id"`
+	App        string `json:"app"`
+	SHA        string `json:"sha"`
+	CreatedApp bool   `json:"created_app"`
+	Next       string `json:"next"`
+}
+
+type releaseStatusIn struct {
+	ID string `json:"id"`
+}
+
 // The schemas of the tools whose inputs have limits the Go types cannot state.
 var (
 	logsSchema = json.RawMessage(`{
@@ -116,6 +135,23 @@ var (
   "required": ["trace_id"],
   "additionalProperties": false
 }`)
+	publishSchema = json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "app": {"type": "string", "description": "the app's name, from the app: line of its aicoded.yaml"},
+    "summary": {"type": "string", "minLength": 1, "description": "what changed and why, in a sentence of the person's words, for the change record; at most 1000 characters are kept"}
+  },
+  "required": ["app", "summary"],
+  "additionalProperties": false
+}`)
+	releaseStatusSchema = json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "id": {"type": "string", "pattern": "^pub_[a-z2-7]{26}$", "description": "the id that publish returned"}
+  },
+  "required": ["id"],
+  "additionalProperties": false
+}`)
 )
 
 func (s *server) addTools(srv *mcpsdk.Server) {
@@ -123,6 +159,7 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 	readOnly := &mcpsdk.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &no}
 	rerun := &mcpsdk.ToolAnnotations{IdempotentHint: true, DestructiveHint: &no, OpenWorldHint: &no}
 	adds := &mcpsdk.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &no}
+	yes := true
 
 	tool(srv, &mcpsdk.Tool{Name: "app_create", Annotations: adds,
 		Description: "Create a new app in its own folder of this workspace, with a permission list (aicoded.yaml), a main.go, one page and AGENTS.md, the rules for AI assistants that build the app."},
@@ -209,6 +246,14 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 			id, err := withDev(ctx, s, func(b devapi.Backend) (string, error) { return b.MailReceive(ctx, in.App, m) })
 			return idOut{ID: id}, err
 		})
+	tool(srv, &mcpsdk.Tool{Name: "publish", Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &yes},
+		InputSchema: publishSchema,
+		Description: "Send the committed app to the platform's delivery pipeline, only when the person asks: it refuses changes that are not committed, runs aicoded check --frozen without the tests, sends the commit and returns the publish's id at once. The first publish of a name creates the app."},
+		s.publish)
+	tool(srv, &mcpsdk.Tool{Name: "release_status", Annotations: &mcpsdk.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &yes},
+		InputSchema: releaseStatusSchema,
+		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, and the problems with their code, file:line and fix."},
+		s.releaseStatus)
 }
 
 // tool adds a tool whose error reaches the client as a tool error with the text of its problems.
@@ -245,6 +290,69 @@ func (s *server) check(ctx context.Context, in checkIn) (check.Report, error) {
 		return check.Report{}, err
 	}
 	return check.Run(ctx, s.dir, check.Options{Frozen: in.Frozen, App: in.App, FrameworkDir: s.fw.Dir})
+}
+
+func (s *server) publish(ctx context.Context, in publishIn) (publishOut, error) {
+	if err := validApp(in.App, false); err != nil {
+		return publishOut{}, err
+	}
+	apps, err := workspace.Apps(s.dir)
+	if err != nil {
+		return publishOut{}, err
+	}
+	app, err := workspace.Select(apps, in.App)
+	if err != nil {
+		return publishOut{}, err
+	}
+	c, err := s.platformClient()
+	if err != nil {
+		return publishOut{}, err
+	}
+	cm, err := publish.Prepare(ctx, app[0].Dir, publish.Options{Summary: in.Summary})
+	if ce := (*publish.CheckError)(nil); errors.As(err, &ce) {
+		return publishOut{}, checkFailed(ce)
+	}
+	if err != nil {
+		return publishOut{}, err
+	}
+	sent, err := publish.Send(ctx, c, cm)
+	if err != nil {
+		return publishOut{}, err
+	}
+	return publishOut{ID: sent.ID, App: sent.App, SHA: sent.SHA, CreatedApp: sent.CreatedApp,
+		Next: fmt.Sprintf("call release_status with id %q about every 30 seconds until its status is passed, failed, refused or error, then tell the person the outcome; the delivery pipeline takes a few minutes", sent.ID)}, nil
+}
+
+// checkFailed is the tool error of a publish that aicoded check refused: each problem, then
+// E-PUB-004.
+func checkFailed(ce *publish.CheckError) error {
+	var lines []string
+	for _, a := range ce.Report.Apps {
+		for _, p := range a.Problems {
+			lines = append(lines, p.String())
+		}
+	}
+	return errors.New(strings.Join(append(lines, ce.Error()), "\n"))
+}
+
+func (s *server) releaseStatus(ctx context.Context, in releaseStatusIn) (platform.Publish, error) {
+	if !platform.PublishID.MatchString(in.ID) {
+		return platform.Publish{}, errors.New("the id of a publish is pub_ and 26 lowercase letters and digits")
+	}
+	c, err := s.platformClient()
+	if err != nil {
+		return platform.Publish{}, err
+	}
+	return c.Publish(ctx, in.ID)
+}
+
+// platformClient returns a client of the platform that AICODED_PLATFORM names.
+func (s *server) platformClient() (*platform.Client, error) {
+	address, err := platform.Address()
+	if err != nil {
+		return nil, err
+	}
+	return platform.New(address, s.logs), nil
 }
 
 // validApp refuses, with E-DEV-014, a name that no app can have. An empty name passes when the

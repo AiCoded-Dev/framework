@@ -1,6 +1,6 @@
 // Package mcp is aicoded mcp: the local MCP server through which an AI assistant creates,
-// checks, previews and debugs the apps of one workspace. It has no shell tool, no tool takes a
-// path, and nothing it returns holds a secret value.
+// checks, previews, debugs and publishes the apps of one workspace. It has no shell tool, no
+// tool takes a path, and nothing it returns holds a secret value.
 package mcp
 
 import (
@@ -32,6 +32,11 @@ Work in this loop:
    Fix every problem it lists.
 3. preview builds and starts an app in aicoded dev and returns its local address.
 4. When something fails, what_broke lists the failed apps, error log lines and failed spans.
+5. Only when the person asks to publish an app: commit everything in its git repository, then
+   call publish with the app and a summary of the change. It sends the commit to the platform's
+   delivery pipeline and returns a publish id at once. Call release_status with that id until
+   the status is passed, failed, refused or error, tell the person the outcome, and fix its
+   problems as you fix check's. On E-CLI-004, ask the person to run aicoded login.
 aicoded.yaml is the app's permission list: write app, owner, data, email, settings, secrets
 and modules by hand.
 aicoded generate writes its access and services sections, every *_gen.go and *_gen.ts file,

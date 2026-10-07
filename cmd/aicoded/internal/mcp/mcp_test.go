@@ -23,6 +23,9 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/dev"
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
 	"aicoded.dev/framework/cmd/aicoded/internal/explain"
+	"aicoded.dev/framework/cmd/aicoded/internal/gittest"
+	"aicoded.dev/framework/cmd/aicoded/internal/platform"
+	"aicoded.dev/framework/cmd/aicoded/internal/platform/platformtest"
 	"aicoded.dev/framework/cmd/aicoded/internal/scaffold"
 	"aicoded.dev/framework/cmd/aicoded/internal/testhome"
 	"aicoded.dev/framework/docs"
@@ -211,14 +214,22 @@ func TestToolsListed(t *testing.T) {
 	res, err := cs.ListTools(t.Context(), nil)
 	require.NoError(t, err)
 	readOnly := map[string]bool{}
+	var openWorld []string
 	for _, tool := range res.Tools {
-		readOnly[tool.Name] = tool.Annotations != nil && tool.Annotations.ReadOnlyHint
+		readOnly[tool.Name] = tool.Annotations.ReadOnlyHint
+		if *tool.Annotations.OpenWorldHint {
+			openWorld = append(openWorld, tool.Name)
+		}
+		if !tool.Annotations.ReadOnlyHint {
+			assert.False(t, *tool.Annotations.DestructiveHint, tool.Name)
+		}
 	}
 	assert.Equal(t, map[string]bool{
-		"app_create": false, "check": false, "preview": false, "mail_receive": false,
+		"app_create": false, "check": false, "preview": false, "mail_receive": false, "publish": false,
 		"what_broke": true, "describe": true, "howto": true, "logs": true, "traces": true, "trace": true,
-		"mail_list": true, "mail_get": true,
+		"mail_list": true, "mail_get": true, "release_status": true,
 	}, readOnly)
+	assert.ElementsMatch(t, []string{"publish", "release_status"}, openWorld, "only these reach the platform")
 }
 
 func TestHowto(t *testing.T) {
@@ -293,6 +304,8 @@ func TestInstructionsNameTheOverview(t *testing.T) {
 	testhome.Set(t)
 	cs := connect(t, t.TempDir(), io.Discard)
 	assert.Contains(t, cs.InitializeResult().Instructions, "howto guides/overview")
+	assert.Contains(t, cs.InitializeResult().Instructions, "call publish with the app and a summary")
+	assert.Contains(t, cs.InitializeResult().Instructions, "Call release_status with that id")
 }
 
 func TestAppNamesAreChecked(t *testing.T) {
@@ -311,6 +324,7 @@ func TestAppNamesAreChecked(t *testing.T) {
 			"check":        {"app": name},
 			"describe":     {"app": name},
 			"app_create":   {"name": name},
+			"publish":      {"app": name, "summary": "First"},
 		} {
 			if name == "" && (tool == "logs" || tool == "traces" || tool == "what_broke" || tool == "check" || tool == "describe") {
 				continue // no app means every app
@@ -334,11 +348,13 @@ func TestSchemasAreChecked(t *testing.T) {
 	home := testhome.Set(t)
 	cs := connect(t, t.TempDir(), io.Discard)
 	for tool, args := range map[string]map[string]any{
-		"trace":   {"trace_id": "../x"},
-		"logs":    {"level": "TRACE"},
-		"traces":  {"limit": 201},
-		"preview": {"app": "hello", "path": "/etc"},
-		"howto":   {"topic": "E-DEV-001", "file": "/etc/passwd"},
+		"trace":          {"trace_id": "../x"},
+		"logs":           {"level": "TRACE"},
+		"traces":         {"limit": 201},
+		"preview":        {"app": "hello", "path": "/etc"},
+		"howto":          {"topic": "E-DEV-001", "file": "/etc/passwd"},
+		"publish":        {"app": "hello", "summary": "First", "path": "/etc"},
+		"release_status": {"id": "../pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"},
 	} {
 		res := call(t, cs, tool, args)
 		assert.True(t, res.IsError, tool)
@@ -486,4 +502,56 @@ func TestMailReceiveAndList(t *testing.T) {
 	assert.Equal(t, "Towels", mail[0].Subject)
 	got := result[devapi.Mail](t, call(t, cs, "mail_get", map[string]any{"app": "hello", "id": id}))
 	assert.Equal(t, "Two more, please.", got.Text)
+}
+
+func TestPublishTools(t *testing.T) {
+	testhome.Set(t)
+	p := platformtest.New(t)
+	t.Setenv("AICODED_PLATFORM", p.URL)
+	p.SignIn(t)
+	dir := gittest.NewApp(t, "demo")
+	var logs logBuffer
+	cs := connect(t, dir, &logs)
+	var answers []*mcpsdk.CallToolResult
+	callTool := func(tool string, args any) *mcpsdk.CallToolResult {
+		res := call(t, cs, tool, args)
+		answers = append(answers, res)
+		return res
+	}
+
+	out := result[publishOut](t, callTool("publish", map[string]any{"app": "demo", "summary": "First"}))
+	assert.Regexp(t, `^pub_[a-z2-7]{26}$`, out.ID)
+	assert.Equal(t, publishOut{ID: out.ID, App: "demo", SHA: gittest.Head(t, dir), CreatedApp: true, Next: out.Next}, out)
+	assert.Contains(t, out.Next, `call release_status with id "`+out.ID+`"`)
+	require.Len(t, p.Uploads(), 1)
+	assert.Equal(t, "First", p.Uploads()[0].Summary)
+	got := result[platform.Publish](t, callTool("release_status", map[string]any{"id": out.ID}))
+	assert.Equal(t, "passed", got.Status)
+	assert.Equal(t, out.ID, got.ID)
+
+	res := callTool("publish", map[string]any{"app": "demo", "summary": "Again"})
+	assert.True(t, res.IsError)
+	assert.Contains(t, text(res), "E-PUB-007: demo already published the commit ")
+
+	gittest.Write(t, dir, map[string]string{"main.go": "package main\n\nfunc main() { x }\n"})
+	gittest.Commit(t, dir, "Break it")
+	res = callTool("publish", map[string]any{"app": "demo", "summary": "Broken"})
+	assert.True(t, res.IsError)
+	assert.Contains(t, text(res), "demo: main.go:3: E-CHK-002: ")
+	assert.Contains(t, text(res), "\nE-PUB-004: aicoded check --frozen --no-tests found problems in demo, so nothing was sent\n")
+	assert.Len(t, p.Uploads(), 1)
+
+	res = callTool("publish", map[string]any{"app": "demo", "summary": ""})
+	assert.True(t, res.IsError)
+	assert.Contains(t, text(res), `validating "arguments"`)
+	res = callTool("release_status", map[string]any{"id": "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"})
+	assert.True(t, res.IsError)
+	assert.Contains(t, text(res), "E-PUB-013: ")
+
+	for _, res := range answers {
+		data, err := json.Marshal(res)
+		require.NoError(t, err)
+		assert.NotRegexp(t, `aicoded_(at|rt)_`, string(data))
+	}
+	assert.NotRegexp(t, `aicoded_(at|rt)_`, logs.String())
 }
