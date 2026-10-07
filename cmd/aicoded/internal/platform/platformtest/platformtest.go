@@ -34,6 +34,7 @@ type Platform struct {
 
 	mu            sync.Mutex
 	refusal       []string
+	refreshError  *failure
 	deviceError   string
 	pending       int
 	expiresIn     int
@@ -47,6 +48,11 @@ type Platform struct {
 }
 
 type grant struct{ challenge, redirect string }
+
+type failure struct {
+	status int
+	code   string
+}
 
 // New starts a fake platform, closed when the test ends.
 func New(t testing.TB) *Platform {
@@ -73,6 +79,14 @@ func (p *Platform) Refuse(code, description string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.refusal = []string{code, description}
+}
+
+// RefreshError answers every refresh with status and the RFC 6749 error code, or with a body
+// that is not JSON when code is empty, and keeps the refresh token usable.
+func (p *Platform) RefreshError(status int, code string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.refreshError = &failure{status, code}
 }
 
 // DeviceError answers every poll of a device sign-in with the error code.
@@ -180,16 +194,19 @@ func (p *Platform) authorize(w http.ResponseWriter, r *http.Request) {
 	}
 	port, err := strconv.Atoi(back.Port())
 	if err != nil || q.Get("client_id") != "aicoded" || q.Get("response_type") != "code" || q.Get("code_challenge_method") != "S256" ||
-		len(q.Get("code_challenge")) != 43 || q.Get("state") == "" || q.Get("org") != Org || q.Get("scope") != "app:create" {
+		len(q.Get("code_challenge")) != 43 || q.Get("state") == "" || q.Get("scope") != "app:create" {
 		http.Error(w, "this sign-in link is not valid", http.StatusBadRequest)
 		return
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	answer := "state=" + url.QueryEscape(q.Get("state"))
-	if p.refusal != nil {
+	switch {
+	case q.Get("org") != Org:
+		answer += "&error=invalid_request&error_description=" + url.QueryEscape("no organisation has that name")
+	case p.refusal != nil:
 		answer += "&error=" + url.QueryEscape(p.refusal[0]) + "&error_description=" + url.QueryEscape(p.refusal[1])
-	} else {
+	default:
 		code := secret("aicoded_ac_")
 		p.codes[code] = grant{challenge: q.Get("code_challenge"), redirect: q.Get("redirect_uri")}
 		answer += "&code=" + url.QueryEscape(code)
@@ -216,6 +233,14 @@ func (p *Platform) token(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "refresh_token":
+		if f := p.refreshError; f != nil {
+			if f.code == "" {
+				http.Error(w, http.StatusText(f.status), f.status)
+			} else {
+				oauthError(w, f.status, f.code, "the refresh failed")
+			}
+			return
+		}
 		rt := r.PostFormValue("refresh_token")
 		if !p.refresh[rt] {
 			oauthError(w, http.StatusBadRequest, "invalid_grant", "the refresh token is not valid")

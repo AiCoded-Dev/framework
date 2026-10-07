@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,8 +45,41 @@ func Load(address string) (Credentials, error) {
 }
 
 // Save keeps cr as the credentials for the platform at address, in a file only the user can
-// read, in a folder only the user can open. A folder that others can open is E-CLI-007.
+// read, in a folder only the user can open, while it holds the lock on the file. A folder that
+// others can open is E-CLI-007.
 func Save(address string, cr Credentials) error {
+	_, err := swap(address, cr)
+	return err
+}
+
+// Delete deletes the credentials for the platform at address, and the file when it keeps no
+// others, while it holds the lock on the file.
+func Delete(address string) error {
+	unlock, err := lock(context.Background())
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return remove(address)
+}
+
+// swap keeps cr as the credentials for the platform at address, as Save does, and returns the
+// ones it replaced.
+func swap(address string, cr Credentials) (Credentials, error) {
+	unlock, err := lock(context.Background())
+	if err != nil {
+		return Credentials{}, err
+	}
+	defer unlock()
+	old, err := Load(address)
+	if err != nil {
+		return Credentials{}, err
+	}
+	return old, save(address, cr)
+}
+
+// save is Save for a caller that holds the lock.
+func save(address string, cr Credentials) error {
 	f, p, err := read()
 	if err != nil {
 		return err
@@ -57,9 +91,8 @@ func Save(address string, cr Credentials) error {
 	return write(p, f)
 }
 
-// Delete deletes the credentials for the platform at address, and the file when it keeps no
-// others.
-func Delete(address string) error {
+// remove is Delete for a caller that holds the lock.
+func remove(address string) error {
 	f, p, err := read()
 	if err != nil {
 		return err
@@ -72,6 +105,25 @@ func Delete(address string) error {
 		return os.Remove(p)
 	}
 	return write(p, f)
+}
+
+// lockWait is how long lock waits for another aicoded to release the lock.
+var lockWait = 30 * time.Second
+
+// lock takes the lock that aicoded holds while it changes the credentials file, or reads it to
+// decide on a change: credentials.lock, next to it, of mode 0600. It waits at most lockWait for
+// another aicoded to release it, and returns the function that releases it. A folder that others
+// can open is E-CLI-007.
+func lock(ctx context.Context) (unlock func(), err error) {
+	p, err := credentialsPath()
+	if err != nil {
+		return nil, err
+	}
+	dir := filepath.Dir(p)
+	if err := folder(dir); err != nil {
+		return nil, err
+	}
+	return lockFile(ctx, filepath.Join(dir, "credentials.lock"), lockWait)
 }
 
 // read reads the credentials file and returns it with its path. A missing file is empty.
@@ -106,9 +158,9 @@ func read() (file, string, error) {
 	return f, p, nil
 }
 
-// write writes f to p through a new file that replaces it, readable by the user only.
-func write(p string, f file) error {
-	dir := filepath.Dir(p)
+// folder makes dir, the folder of the credentials file, when it is missing, and refuses it with
+// E-CLI-007 when others can open it.
+func folder(dir string) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
@@ -119,6 +171,15 @@ func write(p string, f file) error {
 	if perm := fi.Mode().Perm(); perm&0o077 != 0 {
 		return errs.New("E-CLI-007", fmt.Sprintf("%s keeps your sign-in to the platform, but others can open it (mode %04o)", dir, perm),
 			"run chmod 700 "+dir)
+	}
+	return nil
+}
+
+// write writes f to p through a new file that replaces it, readable by the user only.
+func write(p string, f file) error {
+	dir := filepath.Dir(p)
+	if err := folder(dir); err != nil {
+		return err
 	}
 	b, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -154,6 +156,30 @@ func TestLoginRefused(t *testing.T) {
 	}
 }
 
+func TestLoginUnknownOrg(t *testing.T) {
+	for _, device := range []bool{false, true} {
+		p := platformtest.New(t)
+		c, _, _ := newClient(t, p)
+		_, err := c.Login(t.Context(), "nobody", device)
+		assert.Equal(t, "E-CLI-006", errs.Code(err), "device %v", device)
+		require.ErrorContains(t, err, "invalid_request: no organisation has that name")
+		require.ErrorContains(t, err, "fix: check the organisation's name with your administrator, then run aicoded login --org <organisation>")
+	}
+}
+
+func TestLoginCancelled(t *testing.T) {
+	for _, device := range []bool{false, true} {
+		p := platformtest.New(t)
+		c, _ := clientActing(t, p, func(string) {})
+		p.Pending(100)
+		ctx, cancel := context.WithCancel(t.Context())
+		time.AfterFunc(100*time.Millisecond, cancel)
+		_, err := c.Login(ctx, "acme", device)
+		require.ErrorIs(t, err, platform.ErrCancelled, "device %v", device)
+		assert.Equal(t, "sign-in cancelled", err.Error())
+	}
+}
+
 func TestLoginWithACode(t *testing.T) {
 	p := platformtest.New(t)
 	c, out, _ := newClient(t, p)
@@ -264,6 +290,64 @@ func TestRefreshRefused(t *testing.T) {
 	cr, err := platform.Load(p.URL)
 	require.NoError(t, err)
 	assert.Equal(t, platform.Credentials{Org: "acme"}, cr, "the tokens are gone, the organisation is remembered")
+}
+
+// saveExpired keeps a sign-in to the platform at address whose access token has expired, and
+// returns the credentials file.
+func saveExpired(t *testing.T, address string) []byte {
+	require.NoError(t, platform.Save(address, platform.Credentials{Org: "acme", AccessToken: "aicoded_at_old",
+		RefreshToken: "aicoded_rt_old", Expires: time.Now()}))
+	return credentialsFile(t)
+}
+
+func credentialsFile(t *testing.T) []byte {
+	dir, err := os.UserConfigDir()
+	require.NoError(t, err)
+	b, err := os.ReadFile(filepath.Join(dir, "aicoded", "credentials.json"))
+	require.NoError(t, err)
+	return b
+}
+
+func TestRefreshFails(t *testing.T) {
+	for name, tc := range map[string]struct {
+		fail func(*platformtest.Platform)
+		want string
+	}{
+		"temporarily_unavailable": {func(p *platformtest.Platform) {
+			p.RefreshError(http.StatusServiceUnavailable, "temporarily_unavailable")
+		}, "E-CLI-009"},
+		"server_error":           {func(p *platformtest.Platform) { p.RefreshError(http.StatusInternalServerError, "server_error") }, "E-CLI-009"},
+		"a 502 without an error": {func(p *platformtest.Platform) { p.RefreshError(http.StatusBadGateway, "") }, "E-CLI-009"},
+		"no connection":          {func(p *platformtest.Platform) { p.Close() }, "E-CLI-009"},
+		"invalid_client":         {func(p *platformtest.Platform) { p.RefreshError(http.StatusUnauthorized, "invalid_client") }, "E-CLI-006"},
+	} {
+		p := platformtest.New(t)
+		c, _, _ := newClient(t, p)
+		before := saveExpired(t, p.URL)
+		tc.fail(p)
+		_, err := c.Token(t.Context())
+		assert.Equal(t, tc.want, errs.Code(err), name)
+		if tc.want == "E-CLI-009" {
+			require.ErrorContains(t, err, "the platform could not refresh your sign-in right now: ", name)
+			require.ErrorContains(t, err, "fix: try again in a minute: your sign-in is kept", name)
+		}
+		assert.NotContains(t, err.Error(), "aicoded_rt_", name)
+		assert.Equal(t, string(before), string(credentialsFile(t)), "%s: the sign-in is kept", name)
+	}
+}
+
+func TestRefreshTimesOut(t *testing.T) {
+	testhome.Set(t)
+	stop := make(chan struct{})
+	slow := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { <-stop }))
+	t.Cleanup(slow.Close)
+	t.Cleanup(func() { close(stop) })
+	c := platform.New(slow.URL, &bytes.Buffer{})
+	c.HTTP.Timeout = 100 * time.Millisecond
+	before := saveExpired(t, slow.URL)
+	_, err := c.Token(t.Context())
+	assert.Equal(t, "E-CLI-009", errs.Code(err))
+	assert.Equal(t, string(before), string(credentialsFile(t)))
 }
 
 func TestWhoamiRefusedToken(t *testing.T) {

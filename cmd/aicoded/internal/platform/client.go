@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -31,6 +32,9 @@ const (
 
 // ErrNoOrg is Login's error when it has no organisation to sign in to: the first login needs one.
 var ErrNoOrg = errors.New("no organisation to sign in to")
+
+// ErrCancelled is Login's error when its context ends before the sign-in does.
+var ErrCancelled = errors.New("sign-in cancelled")
 
 // Whoami is who a sign-in is for.
 type Whoami struct {
@@ -66,7 +70,7 @@ func New(address string, out io.Writer) *Client {
 // Login signs in to the organisation org: in a browser on this computer, or, with device, with a
 // code entered in a browser on any device. An empty org is the organisation of the
 // last sign-in; without one, Login returns ErrNoOrg. It keeps the new sign-in, revokes the one it
-// replaces, and returns who it is for.
+// replaces, and returns who it is for. When ctx ends first, it returns ErrCancelled.
 func (c *Client) Login(ctx context.Context, org string, device bool) (Whoami, error) {
 	old, err := Load(c.address)
 	if err != nil {
@@ -87,6 +91,9 @@ func (c *Client) Login(ctx context.Context, org string, device bool) (Whoami, er
 	} else {
 		tok, err = c.browserLogin(ctx, org)
 	}
+	if err != nil && ctx.Err() != nil {
+		return Whoami{}, ErrCancelled
+	}
 	if err != nil {
 		return Whoami{}, err
 	}
@@ -94,11 +101,12 @@ func (c *Client) Login(ctx context.Context, org string, device bool) (Whoami, er
 	if err != nil {
 		return Whoami{}, err
 	}
-	if err := Save(c.address, cr); err != nil {
+	replaced, err := swap(c.address, cr)
+	if err != nil {
 		return Whoami{}, err
 	}
-	if old.RefreshToken != "" {
-		_ = c.revoke(ctx, old.RefreshToken)
+	if replaced.RefreshToken != "" {
+		_ = c.revoke(ctx, replaced.RefreshToken)
 	}
 	return c.whoami(ctx, cr.AccessToken)
 }
@@ -146,9 +154,17 @@ func credentials(org string, tok *oauth2.Token) (Credentials, error) {
 }
 
 // Token returns the access token of the sign-in to the platform, refreshed first when it expires
-// within 30 seconds. Without a sign-in it is E-CLI-004. When the platform no longer refreshes the
-// sign-in, Token deletes its tokens, keeps its organisation, and returns E-CLI-004 too.
+// within 30 seconds. It holds the lock on the credentials file meanwhile, so that of the aicoded
+// commands that run at once only one refreshes the sign-in, and the others use its new token.
+// Without a sign-in it is E-CLI-004. When the platform no longer refreshes the sign-in, Token
+// deletes its tokens, keeps its organisation, and returns E-CLI-004 too. When the platform cannot
+// refresh it right now, Token keeps it and returns E-CLI-009.
 func (c *Client) Token(ctx context.Context) (string, error) {
+	unlock, err := lock(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
 	cr, err := Load(c.address)
 	if err != nil {
 		return "", err
@@ -161,8 +177,9 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 	}
 	tok, err := c.config("").TokenSource(c.ctx(ctx), &oauth2.Token{RefreshToken: cr.RefreshToken}).Token()
 	var re *oauth2.RetrieveError
-	if errors.As(err, &re) && re.ErrorCode == "invalid_grant" {
-		if err := Save(c.address, Credentials{Org: cr.Org}); err != nil {
+	switch {
+	case errors.As(err, &re) && re.ErrorCode == "invalid_grant":
+		if err := save(c.address, Credentials{Org: cr.Org}); err != nil {
 			return "", err
 		}
 		msg := "your sign-in to the platform at " + c.address + " has ended"
@@ -170,18 +187,56 @@ func (c *Client) Token(ctx context.Context) (string, error) {
 			msg += ": " + clean(re.ErrorDescription, 300)
 		}
 		return "", signedOut(msg)
-	}
-	if err != nil {
+	case err != nil && ctx.Err() != nil:
+		return "", ctx.Err()
+	case err != nil && temporary(err):
+		return "", notRefreshed(err)
+	case err != nil:
 		return "", failed("refresh the sign-in", err)
 	}
 	next, err := credentials(cr.Org, tok)
 	if err != nil {
 		return "", err
 	}
-	if err := Save(c.address, next); err != nil {
+	if err := save(c.address, next); err != nil {
 		return "", err
 	}
 	return next.AccessToken, nil
+}
+
+// temporary reports whether err, of a request to the platform's OAuth endpoints, is a failure
+// that may pass: no connection, no answer in time, an answer with a 5xx status, or the error
+// server_error or temporarily_unavailable.
+func temporary(err error) bool {
+	var re *oauth2.RetrieveError
+	if errors.As(err, &re) {
+		return re.ErrorCode == "server_error" || re.ErrorCode == "temporarily_unavailable" ||
+			re.Response != nil && re.Response.StatusCode >= 500
+	}
+	var ue *url.Error
+	var oe *net.OpError
+	return errors.As(err, &ue) &&
+		(ue.Timeout() || errors.As(ue.Err, &oe) || errors.Is(ue.Err, io.EOF) || errors.Is(ue.Err, io.ErrUnexpectedEOF))
+}
+
+// notRefreshed is E-CLI-009 for err, a temporary failure of a refresh.
+func notRefreshed(err error) error {
+	msg := "the platform could not refresh your sign-in right now"
+	var re *oauth2.RetrieveError
+	var ue *url.Error
+	switch {
+	case errors.As(err, &re) && re.Response != nil:
+		msg += fmt.Sprintf(": it answered %d", re.Response.StatusCode)
+		if re.ErrorCode != "" {
+			msg += ": " + clean(re.ErrorCode, 64)
+		}
+		if re.ErrorDescription != "" {
+			msg += ": " + clean(re.ErrorDescription, 300)
+		}
+	case errors.As(err, &ue):
+		msg += ": " + clean(ue.Err.Error(), 300)
+	}
+	return errs.New("E-CLI-009", msg, "try again in a minute: your sign-in is kept")
 }
 
 func signedOut(msg string) error {
@@ -228,22 +283,26 @@ func (c *Client) whoami(ctx context.Context, token string) (Whoami, error) {
 	return w, nil
 }
 
-// Logout revokes the sign-in at the platform (RFC 7009), then deletes its tokens and keeps its
-// organisation for the next login. It deletes them even when the platform cannot revoke them, and
-// then returns revoked false. signedIn is false when there was no sign-in.
+// Logout deletes the tokens of the sign-in, keeping its organisation for the next login, and
+// revokes the sign-in at the platform (RFC 7009). It deletes them even when the platform cannot
+// revoke them, and then returns revoked false. signedIn is false when there was no sign-in.
 func (c *Client) Logout(ctx context.Context) (signedIn, revoked bool, err error) {
-	cr, err := Load(c.address)
+	unlock, err := lock(ctx)
 	if err != nil {
 		return false, false, err
 	}
+	cr, err := Load(c.address)
+	if err == nil && cr.Org == "" {
+		err = remove(c.address)
+	} else if err == nil {
+		err = save(c.address, Credentials{Org: cr.Org})
+	}
+	unlock()
 	if cr.RefreshToken != "" {
 		signedIn = true
 		revoked = c.revoke(ctx, cr.RefreshToken) == nil
 	}
-	if cr.Org == "" {
-		return signedIn, revoked, Delete(c.address)
-	}
-	return signedIn, revoked, Save(c.address, Credentials{Org: cr.Org})
+	return signedIn, revoked, err
 }
 
 // revoke asks the platform to revoke the refresh token and the sign-in it belongs to.
@@ -306,9 +365,12 @@ func failed(what string, err error) error {
 // refused is E-CLI-006, quoting the platform's error and its description.
 func refused(code, description string) error {
 	fix := "run aicoded login again; if the platform refuses you again, ask your administrator"
-	if code == "access_denied" &&
-		(strings.HasPrefix(description, "not in the builder group") || strings.HasPrefix(description, "not invited to")) {
+	switch {
+	case code == "access_denied" &&
+		(strings.HasPrefix(description, "not in the builder group") || strings.HasPrefix(description, "not invited to")):
 		fix = "ask your administrator to add you to the builder group"
+	case code == "invalid_request" && description == "no organisation has that name":
+		fix = "check the organisation's name with your administrator, then run aicoded login --org <organisation>"
 	}
 	msg := "the platform refused the sign-in: " + clean(code, 64)
 	if description != "" {

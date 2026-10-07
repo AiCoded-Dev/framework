@@ -16,10 +16,14 @@ import (
 
 func TestAddress(t *testing.T) {
 	for in, want := range map[string]string{
-		"":                          "https://api.aicoded.cloud",
-		"https://api.acme.example/": "https://api.acme.example",
-		"https://API.acme.example":  "https://api.acme.example",
-		"http://127.0.0.1:8080":     "http://127.0.0.1:8080",
+		"":                              "https://api.aicoded.cloud",
+		"https://api.acme.example/":     "https://api.acme.example",
+		"https://API.acme.example":      "https://api.acme.example",
+		"http://127.0.0.1:8080":         "http://127.0.0.1:8080",
+		"https://api.acme.example:443":  "https://api.acme.example",
+		"https://API.acme.example:443/": "https://api.acme.example",
+		"https://api.acme.example:8443": "https://api.acme.example:8443",
+		"https://[2001:db8::1]:443":     "https://[2001:db8::1]",
 	} {
 		t.Setenv("AICODED_PLATFORM", in)
 		got, err := platform.Address()
@@ -31,7 +35,7 @@ func TestAddress(t *testing.T) {
 func TestAddressRefused(t *testing.T) {
 	for _, in := range []string{"http://api.acme.example", "http://localhost:8080", "http://127.0.0.1", "http://127.0.0.1:0",
 		"http://127.0.0.1:080", "https://ana:secret@api.acme.example", "https://api.acme.example/v1", "https://api.acme.example?a=b",
-		"https://api.acme.example#a", "https://api.acme.example:", "ftp://api.acme.example", "api.acme.example", "https:secret"} {
+		"https://api.acme.example#a", "https://api.acme.example:", "https://api.acme.example:0443", "ftp://api.acme.example", "api.acme.example", "https:secret"} {
 		t.Setenv("AICODED_PLATFORM", in)
 		_, err := platform.Address()
 		assert.Equal(t, "E-CLI-005", errs.Code(err), in)
@@ -57,6 +61,7 @@ func TestCredentials(t *testing.T) {
 	path := filepath.Join(home, ".config", "aicoded", "credentials.json")
 	assertMode(t, 0o600, path)
 	assertMode(t, 0o700, filepath.Dir(path))
+	assertMode(t, 0o600, filepath.Join(filepath.Dir(path), "credentials.lock"))
 
 	require.NoError(t, platform.Delete("https://a.example"))
 	cr, err = platform.Load("https://a.example")

@@ -20,9 +20,9 @@ import (
 const DefaultAddress = "https://api.aicoded.cloud"
 
 // Address returns the platform's address from AICODED_PLATFORM, DefaultAddress when it is not
-// set, written scheme://host. It must be https, or http to 127.0.0.1 with a port, with no user,
-// path, query or fragment; anything else is E-CLI-005, which does not quote the value, since it
-// could hold a password.
+// set, written scheme://host, without the port of an https address when it is 443. It must be
+// https, or http to 127.0.0.1 with a port, with no user, path, query or fragment; anything else
+// is E-CLI-005, which does not quote the value, since it could hold a password.
 func Address() (string, error) {
 	s := os.Getenv("AICODED_PLATFORM")
 	if s == "" {
@@ -32,6 +32,8 @@ func Address() (string, error) {
 	if err == nil && u.Opaque == "" && u.User == nil && u.Host != "" && u.RawQuery == "" && !u.ForceQuery && u.Fragment == "" &&
 		(u.Path == "" || u.Path == "/") && (u.Port() != "" || !strings.HasSuffix(u.Host, ":")) {
 		switch {
+		case u.Scheme == "https" && u.Port() == "443":
+			return u.Scheme + "://" + strings.ToLower(strings.TrimSuffix(u.Host, ":443")), nil
 		case u.Scheme == "https" && (u.Port() == "" || validPort(u.Port())):
 			return u.Scheme + "://" + strings.ToLower(u.Host), nil
 		case u.Scheme == "http" && u.Hostname() == "127.0.0.1" && validPort(u.Port()):
