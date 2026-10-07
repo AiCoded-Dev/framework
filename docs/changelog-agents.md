@@ -4,6 +4,18 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `aicoded check --no-tests` runs every step of `check` but the tests, and does not probe
+  `-race`; the report has `"no_tests": true` in JSON, and its text ends with
+  `tests did not run (--no-tests)`. The `check` tool of `aicoded mcp` does not take it: run the
+  full check. Commands that use the sign-in to the platform at the same time now take turns
+  through `credentials.lock`, next to `credentials.json`, so that only one refreshes it. When
+  the platform cannot refresh the sign-in right now (no connection, no answer in time, a 5xx
+  status, `server_error` or `temporarily_unavailable`), the sign-in is kept and the command fails
+  with E-CLI-009: try again in a minute. `aicoded login` with an organisation the platform does
+  not know fails with E-CLI-006, whose fix says to check the name with your administrator; Ctrl-C
+  during `aicoded login` prints `sign-in cancelled`. `AICODED_PLATFORM` may end in `:443`, which
+  names the same platform as the address without it. New codes: E-CLI-009 (a sign-in the
+  platform could not refresh right now).
 - New commands sign a builder in to the platform: `aicoded login [--org <organisation>]
   [--device]` signs in, at an address it prints for a browser on this computer, or, with
   `--device` on a computer without a browser, with a code entered in a browser on any device,

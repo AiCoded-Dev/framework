@@ -9,7 +9,7 @@ and docs, connects apps that call each other, and signs you in to the platform. 
 ```text
 aicoded init <name>
 aicoded generate [dir]
-aicoded check [--frozen] [--json] [--app <name>] [dir]
+aicoded check [--frozen] [--no-tests] [--json] [--app <name>] [dir]
 aicoded describe [--json] [--app <name>] [dir]
 aicoded explain [topic]
 aicoded rpc add <app>
@@ -54,8 +54,8 @@ needs `go.mod` next to `aicoded.yaml` (E-GEN-037).
 
 ## aicoded check
 
-`aicoded check [--frozen] [--json] [--app <name>] [dir]` checks every app under the folder, or
-the one named.
+`aicoded check [--frozen] [--no-tests] [--json] [--app <name>] [dir]` checks every app under the
+folder, or the one named.
 
 - It first runs lint's precheck for every app, before any other go command: GOFLAGS and a
   `vendor` folder decide what the go command builds and runs, so an app whose GOFLAGS or
@@ -75,6 +75,9 @@ the one named.
 - The tests run with `-race` when cgo works (`go env CGO_ENABLED` is `1` and its C compiler is on
   `PATH`, as the first app that passes the precheck sees them); otherwise they run without it and
   `check` says so, since the delivery pipeline will run them with `-race`.
+- With `--no-tests` it skips the tests and does not probe `-race`; every other step runs. The
+  report says so: `no_tests` is `true` in JSON, and the text ends with
+  `tests did not run (--no-tests)`. The `check` tool of `aicoded mcp` always runs the tests.
 - `--json` prints the same report as JSON.
 - It exits with 1 on any problem.
 
@@ -147,6 +150,8 @@ later ones remember it.
   confirm. The code expires after 10 minutes (E-CLI-008).
 - When the platform refuses you, the error quotes its reason (E-CLI-006). When you are not in
   your organisation's builder group, or not invited, ask your administrator to add you to it.
+  When no organisation has the name you gave, check the name with your administrator.
+- Ctrl-C stops the sign-in, and `aicoded login` prints `sign-in cancelled`.
 - It prints `Signed in to <organisation> as <email>.` A new sign-in replaces and revokes the one
   before it.
 
@@ -161,14 +166,18 @@ Signed in to acme as ana@acme.example.
 The sign-in lives in `credentials.json` in your user configuration folder, next to `dev.yaml`,
 with one entry per platform address. It works like a password: the file must have mode 600 and
 its folder mode 700, and `aicoded` refuses to use them while others can read them (E-CLI-007).
+Commands that use the sign-in at the same time take turns through `credentials.lock`, a file
+next to it, so that only one of them refreshes the sign-in and the others use the result; a
+command waits at most 30 seconds for its turn, and then fails with an error that names the file.
 `AICODED_PLATFORM` names the platform, `https://api.aicoded.cloud` by default; it must be an
-`https` address, or `http://127.0.0.1:<port>` for a platform on this computer (E-CLI-005).
+`https` address, with or without `:443`, or `http://127.0.0.1:<port>` for a platform on this
+computer (E-CLI-005).
 
 There is no MCP tool for signing in: it needs a person and a browser.
 
 ## aicoded logout
 
-`aicoded logout` asks the platform to revoke your sign-in, then deletes it from this computer. It
+`aicoded logout` deletes your sign-in from this computer and asks the platform to revoke it. It
 deletes it even when the platform cannot be reached, and then says that the sign-in stays valid
 on the platform until it expires, within 30 days. It keeps the name of your organisation, so the
 next `aicoded login` needs no `--org`.
@@ -176,7 +185,8 @@ next `aicoded login` needs no `--org`.
 ## aicoded whoami
 
 `aicoded whoami [--json]` prints the organisation, the email address and the scopes of your
-sign-in, as the platform sees them. It refreshes the sign-in first when it is about to expire.
+sign-in, as the platform sees them. It refreshes the sign-in first when it is about to expire;
+when the platform cannot refresh it right now, it fails with E-CLI-009 and keeps the sign-in.
 Without a sign-in, or with one the platform no longer accepts, it fails with E-CLI-004.
 
 ```text

@@ -44,6 +44,7 @@ Signing in to the platform uses these codes:
 - E-CLI-006: a sign-in that the platform refused.
 - E-CLI-007: a credentials file or folder that others can read.
 - E-CLI-008: a sign-in that was not finished in time.
+- E-CLI-009: a sign-in that the platform could not refresh right now.
 
 `aicoded explain <CODE>` prints the page.
 
