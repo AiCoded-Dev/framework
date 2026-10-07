@@ -38,15 +38,17 @@ func TestCreatePublishRefused(t *testing.T) {
 		errorCode, code string
 		want            string
 	}{
-		{http.StatusForbidden, "access_denied", "E-PUB-005", "E-PUB-005: refused as the test asked"},
-		{http.StatusConflict, "invalid_request", "E-PUB-006", "E-PUB-006: refused as the test asked"},
-		{http.StatusConflict, "invalid_request", "E-PUB-007", "E-PUB-007: refused as the test asked"},
-		{http.StatusTooManyRequests, "invalid_request", "E-PUB-008", "E-PUB-008: refused as the test asked"},
-		{http.StatusRequestEntityTooLarge, "invalid_request", "", "E-PUB-009: refused as the test asked"},
+		{http.StatusForbidden, "access_denied", "", "E-PUB-005: refused as the test asked"},
+		{http.StatusForbidden, "access_denied", "E-PUB-006", "E-PUB-006: refused as the test asked"},
+		{http.StatusConflict, "conflict", "E-PUB-006", "E-PUB-006: refused as the test asked"},
+		{http.StatusConflict, "conflict", "E-PUB-007", "E-PUB-007: refused as the test asked"},
+		{http.StatusTooManyRequests, "too_many_requests", "E-PUB-008", "E-PUB-008: refused as the test asked"},
+		{http.StatusRequestEntityTooLarge, "too_large", "", "E-PUB-009: refused as the test asked"},
 		{http.StatusBadRequest, "invalid_request", "E-PUB-010", "E-PUB-010: refused as the test asked"},
 		{http.StatusConflict, "base_changed", "E-PUB-010", platform.ErrBaseChanged.Error()},
 		{http.StatusServiceUnavailable, "temporarily_unavailable", "", "the platform answered 503: temporarily_unavailable: refused as the test asked"},
-		{http.StatusConflict, "invalid_request", "E-PUB-999", "the platform answered 409: invalid_request: refused as the test asked"},
+		{http.StatusConflict, "conflict", "E-PUB-999", "E-PUB-999: refused as the test asked\n  fix: read the docs page below"},
+		{http.StatusConflict, "conflict", "E-NOPE-001", "the platform answered 409: conflict: refused as the test asked"},
 	} {
 		p, c := signedIn(t)
 		p.RefuseUpload(tc.status, tc.errorCode, tc.code)
@@ -90,6 +92,15 @@ func TestAppRefreshesForItsScopes(t *testing.T) {
 	_, _, err = c.App(t.Context(), "theirs")
 	assert.Equal(t, "E-PUB-005", errs.Code(err))
 	assert.Equal(t, 2, p.TokenRequests(), "refused after one more refresh")
+
+	p.Archive("demo")
+	p.SignIn(t)
+	_, _, err = c.App(t.Context(), "demo")
+	assert.Equal(t, "E-PUB-006", errs.Code(err), "an archived app drops out of the scopes")
+	require.ErrorContains(t, err, "the app is archived and takes no more publishes")
+	assert.Equal(t, 3, p.TokenRequests(), "refused after one more refresh")
+	_, err = c.Publish(t.Context(), app.Last.ID)
+	assert.Equal(t, "E-PUB-006", errs.Code(err))
 }
 
 func TestRefreshKeepsANewerToken(t *testing.T) {

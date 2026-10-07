@@ -57,7 +57,7 @@ Publishing uses these codes:
   archived app, a commit already published, too many new apps, a bundle too large, and a bundle
   not as claimed.
 - E-PUB-011 and E-PUB-014: a publish that ended in `error` or `refused`.
-- E-PUB-013: a publish id that the platform does not know among your apps.
+- E-PUB-013: a publish id that the platform does not know in your organisation.
 - E-GATE-001 to E-GATE-008: `go.mod`, `go.sum` and the modules an app uses.
 - E-GATE-009 to E-GATE-011: the files of the commit and the app it names.
 - E-GATE-012: a step that ran out of time, memory or disk.

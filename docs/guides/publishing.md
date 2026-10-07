@@ -86,8 +86,8 @@ prints the id and returns at once.
 
 `aicoded status <id>` prints what the end of the waiting prints, without waiting, and `--json`
 prints the publish as JSON. An id is `pub_` and 26 lowercase letters and digits. Another shape is
-a command line that is not valid, and an id that the platform does not know among your apps is
-E-PUB-013.
+a command line that is not valid. An id that the platform does not know in your organisation is
+E-PUB-013, and a publish of another builder's app is E-PUB-005.
 
 ## Reading the outcome
 
@@ -160,7 +160,7 @@ when it runs: see [the permission list](permission-list.md).
 - E-PUB-005 to E-PUB-010: a publish that the platform refuses; `aicoded publish` refuses
   E-PUB-006, E-PUB-007 and E-PUB-009 before sending when it can tell.
 - E-PUB-011 and E-PUB-014: a publish that ended in `error` or `refused`.
-- E-PUB-013: a publish id that the platform does not know among your apps.
+- E-PUB-013: a publish id that the platform does not know in your organisation.
 - E-GATE-001 to E-GATE-012: what the delivery pipeline finds in the commit, its modules and its
   steps.
 

@@ -227,7 +227,8 @@ record. [Publishing](publishing.md) tells the whole story.
 its steps, its problems and its status, `queued`, `running`, `passed`, `failed`, `refused` or
 `error`. `--json` prints the publish as JSON. It exits with 1 when the publish failed, was
 refused or ended in error. An id is `pub_` and 26 lowercase letters and digits; another shape
-exits with 2, and an id the platform does not know among your apps is E-PUB-013.
+exits with 2. An id the platform does not know in your organisation is E-PUB-013, a publish of
+another builder's app E-PUB-005, and one of an app of yours that was archived E-PUB-006.
 
 ## The control socket
 

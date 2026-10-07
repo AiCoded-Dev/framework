@@ -76,7 +76,7 @@ func Prepare(ctx context.Context, dir string, opts Options) (Commit, error) {
 	}
 	if opts.App != "" && opts.App != m.App {
 		return Commit{}, errs.New("E-PUB-003", fmt.Sprintf("--app %q is not the app in %s, which aicoded.yaml names %q", cut(opts.App, 64), dir, m.App),
-			"leave --app out, or run aicoded publish in the folder of the app it names")
+			platform.Fix("E-PUB-003"))
 	}
 	report, err := check.Run(ctx, dir, check.Options{Frozen: true, NoTests: true, App: m.App})
 	if err != nil {
@@ -84,8 +84,7 @@ func Prepare(ctx context.Context, dir string, opts Options) (Commit, error) {
 	}
 	if !report.OK() {
 		return Commit{}, &CheckError{Report: report, err: errs.New("E-PUB-004",
-			"aicoded check --frozen --no-tests found problems in "+m.App+", so nothing was sent",
-			"fix every problem it lists, commit, then run aicoded publish again")}
+			"aicoded check --frozen --no-tests found problems in "+m.App+", so nothing was sent", platform.Fix("E-PUB-004"))}
 	}
 	summary := summarize(opts.Summary)
 	if summary == "" {
@@ -142,11 +141,10 @@ func Send(ctx context.Context, c *platform.Client, cm Commit) (Sent, error) {
 		}
 		switch {
 		case app.Archived:
-			return Sent{}, errs.New("E-PUB-006", "the app "+cm.App+" is archived on the platform",
-				"publish under a new name: change app: in aicoded.yaml, or ask your administrator about the archived app")
+			return Sent{}, errs.New("E-PUB-006", "the app "+cm.App+" is archived on the platform", platform.Fix("E-PUB-006"))
 		case cm.SHA == app.Base || app.Last != nil && cm.SHA == app.Last.SHA:
 			return Sent{}, errs.New("E-PUB-007", fmt.Sprintf("%s already published the commit %s", cm.App, short(cm.SHA)),
-				"commit a change, then run aicoded publish again")
+				platform.Fix("E-PUB-007"))
 		}
 		b, err := makeBundle(ctx, cm.Dir, cm.App, cm.SHA, app.Base)
 		if err != nil {
@@ -215,10 +213,9 @@ func Outcome(p platform.Publish) error {
 	switch p.Status {
 	case "refused":
 		return errs.New("E-PUB-014", fmt.Sprintf("the platform could not read the commit %s of publish %s%s", short(p.SHA), p.ID, reason),
-			"make sure git fsck finds nothing wrong in the app's repository, commit again, then run aicoded publish")
+			platform.Fix("E-PUB-014"))
 	case "error":
-		return errs.New("E-PUB-011", fmt.Sprintf("the delivery pipeline could not finish publish %s%s", p.ID, reason),
-			"commit again, even with git commit --allow-empty, then run aicoded publish; if it fails again, give your administrator the publish's id")
+		return errs.New("E-PUB-011", fmt.Sprintf("the delivery pipeline could not finish publish %s%s", p.ID, reason), platform.Fix("E-PUB-011"))
 	}
 	return nil
 }

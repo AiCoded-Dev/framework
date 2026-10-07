@@ -277,8 +277,8 @@ func (p *Platform) getApp(w http.ResponseWriter, r *http.Request) {
 	case a == nil:
 		apiError(w, http.StatusNotFound, "not_found", "", "no app has that name")
 		return
-	case !slices.Contains(s.scopes, fmt.Sprintf("app:%d:status", a.id)):
-		apiError(w, http.StatusForbidden, "insufficient_scope", "E-PUB-005", "the app "+a.name+" belongs to another builder")
+	case !may(s, a, "status"):
+		notYours(w, a)
 		return
 	}
 	base := a.base
@@ -308,8 +308,8 @@ func (p *Platform) getPublish(w http.ResponseWriter, r *http.Request) {
 		if pub.id != in.ID {
 			continue
 		}
-		if !slices.Contains(s.scopes, fmt.Sprintf("app:%d:status", pub.app.id)) {
-			apiError(w, http.StatusForbidden, "insufficient_scope", "", "the token lacks the scope of the publish's app")
+		if !may(s, pub.app, "status") {
+			notYours(w, pub.app)
 			return
 		}
 		writeJSON(w, http.StatusOK, p.answer(pub, true))
@@ -318,10 +318,26 @@ func (p *Platform) getPublish(w http.ResponseWriter, r *http.Request) {
 	apiError(w, http.StatusNotFound, "not_found", "E-PUB-013", "no publish has that id")
 }
 
+// may reports whether the session may use the app with the scope app:<id>:<scope>: the person owns
+// it, and the token holds the scope.
+func may(s session, a *fakeApp, scope string) bool {
+	return a.owner == Email && slices.Contains(s.scopes, fmt.Sprintf("app:%d:%s", a.id, scope))
+}
+
+// notYours answers as the platform does for an app the token may not use: E-PUB-006 when the
+// person owns the app and it is archived, and E-PUB-005 otherwise.
+func notYours(w http.ResponseWriter, a *fakeApp) {
+	if a.owner == Email && a.archived {
+		apiError(w, http.StatusForbidden, "insufficient_scope", "E-PUB-006", "the app is archived and takes no more publishes")
+		return
+	}
+	apiError(w, http.StatusForbidden, "insufficient_scope", "E-PUB-005", "the app belongs to another builder, or your sign-in does not carry it yet")
+}
+
 // createPublish takes a publish as the platform does: the parts meta, then bundle, and nothing
 // else; a v2 bundle with one ref, the claimed commit, and no prerequisite or the app's base; and
-// the refusals of the builder API. The publish it takes is its app's base at once, as if the
-// worker had verified its bundle.
+// the refusals of the builder API, in the platform's order. The publish it takes is its app's
+// base at once, as if the worker had verified its bundle.
 func (p *Platform) createPublish(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -335,7 +351,7 @@ func (p *Platform) createPublish(w http.ResponseWriter, r *http.Request) {
 	var tooLarge *http.MaxBytesError
 	switch f := p.refused; {
 	case errors.As(err, &tooLarge) || len(bundle) > maxBundle:
-		apiError(w, http.StatusRequestEntityTooLarge, "invalid_request", "E-PUB-009", "the bundle is larger than 32 MiB")
+		apiError(w, http.StatusRequestEntityTooLarge, "too_large", "E-PUB-009", "the upload is larger than 32 MiB and 64 KiB")
 		return
 	case err != nil:
 		apiError(w, http.StatusBadRequest, "invalid_request", "", err.Error())
@@ -346,30 +362,33 @@ func (p *Platform) createPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prerequisites, refs, ok := bundleHeader(bundle)
-	if !ok || len(refs) != 1 || refs[0] != meta.SHA || len(prerequisites) > 1 {
-		apiError(w, http.StatusBadRequest, "invalid_request", "E-PUB-010", "the bundle's header is not as claimed")
+	if !ok {
+		apiError(w, http.StatusBadRequest, "invalid_request", "E-PUB-010", "the bundle's header is not a v2 git bundle's")
 		return
 	}
 	a := p.app(meta.App)
 	created := a == nil
 	switch {
+	case !created && a.owner == Email && a.archived:
+		apiError(w, http.StatusConflict, "conflict", "E-PUB-006", "the app is archived and takes no more publishes")
+		return
+	case !created && !may(s, a, "release:request"):
+		apiError(w, http.StatusForbidden, "insufficient_scope", "E-PUB-005", "the app belongs to another builder, or your sign-in does not carry it yet")
+		return
+	case len(refs) != 1 || refs[0] != meta.SHA || len(prerequisites) > 1:
+		apiError(w, http.StatusBadRequest, "invalid_request", "E-PUB-010", "the bundle must have exactly one ref, at the commit given in meta, and one prerequisite at most")
+		return
 	case created && p.createdToday() >= p.newApps:
-		apiError(w, http.StatusTooManyRequests, "invalid_request", "E-PUB-008", "you created too many apps today")
+		apiError(w, http.StatusTooManyRequests, "too_many_requests", "E-PUB-008", "you created 10 apps in the last 24 hours")
 		return
 	case created:
 		a = &fakeApp{id: len(p.apps) + 1, name: meta.App, owner: Email, created: time.Now()}
-	case a.owner != Email || !slices.Contains(s.scopes, fmt.Sprintf("app:%d:release:request", a.id)):
-		apiError(w, http.StatusForbidden, "insufficient_scope", "E-PUB-005", "the app "+a.name+" belongs to another builder")
-		return
-	case a.archived:
-		apiError(w, http.StatusConflict, "invalid_request", "E-PUB-006", "the app "+a.name+" is archived")
-		return
 	case slices.ContainsFunc(p.pubs, func(pub *fakePublish) bool { return pub.app == a && pub.sha == meta.SHA }):
-		apiError(w, http.StatusConflict, "invalid_request", "E-PUB-007", "the commit is already published")
+		apiError(w, http.StatusConflict, "conflict", "E-PUB-007", "this commit is already published to the app: publish a new commit")
 		return
 	}
 	if len(prerequisites) == 1 && prerequisites[0] != a.base {
-		apiError(w, http.StatusConflict, "base_changed", "E-PUB-010", "the bundle's prerequisite is not the app's base")
+		apiError(w, http.StatusConflict, "base_changed", "E-PUB-010", "the bundle's prerequisite is not the app's base: get the base again")
 		return
 	}
 	if created {

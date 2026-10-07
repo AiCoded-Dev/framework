@@ -31,8 +31,6 @@ var (
 // errTooLong is the error of run when git prints more than its caller takes.
 var errTooLong = errors.New("git printed more than aicoded takes")
 
-const fixGit = "install git 2.31 or later, and put it on PATH"
-
 // run runs cmd, a git command whose arguments are constants, in the folder dir, with in on its
 // standard input: revisions go there, never in the arguments. git runs without the GIT_
 // variables of the environment, which could point it at another repository or other history.
@@ -52,7 +50,7 @@ func run(cmd *exec.Cmd, dir, in string, limit int) ([]byte, error) {
 	}
 	if err := cmd.Start(); err != nil {
 		if errors.Is(err, exec.ErrNotFound) {
-			return nil, errs.New("E-PUB-012", "git is not on PATH", fixGit)
+			return nil, errs.New("E-PUB-012", "git is not on PATH", platform.Fix("E-PUB-012"))
 		}
 		return nil, err
 	}
@@ -120,7 +118,8 @@ func checkGit(ctx context.Context) error {
 	major, _ := strconv.Atoi(string(m[1]))
 	minor, _ := strconv.Atoi(string(m[2]))
 	if major < minMajor || major == minMajor && minor < minMinor {
-		return errs.New("E-PUB-012", fmt.Sprintf("git %d.%d is too old: aicoded publish needs git 2.31 or later", major, minor), fixGit)
+		return errs.New("E-PUB-012", fmt.Sprintf("git %d.%d is too old: aicoded publish needs git 2.31 or later", major, minor),
+			platform.Fix("E-PUB-012"))
 	}
 	return nil
 }
@@ -128,7 +127,7 @@ func checkGit(ctx context.Context) error {
 // head refuses, with E-PUB-001, a dir that is not the top level of a git repository whose HEAD
 // is a commit with its whole history, and returns that commit.
 func head(ctx context.Context, dir string) (string, error) {
-	const fix = "make the app's folder a git repository of its own, with git init and git commit in it"
+	fix := platform.Fix("E-PUB-001")
 	out, err := run(exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel"), dir, "", 4096)
 	var f *failure
 	switch {
@@ -189,7 +188,7 @@ func clean(ctx context.Context, dir string) error {
 	if len(lines) > len(shown) || errors.Is(err, errTooLong) {
 		msg += " and more"
 	}
-	return errs.New("E-PUB-002", msg, "commit them, or remove them, then run aicoded publish again")
+	return errs.New("E-PUB-002", msg, platform.Fix("E-PUB-002"))
 }
 
 // subject returns the subject of the commit HEAD.
@@ -230,8 +229,7 @@ func makeBundle(ctx context.Context, dir, app, sha, base string) ([]byte, error)
 func bundle(ctx context.Context, dir, app, sha, revs string) ([]byte, []string, error) {
 	b, err := run(exec.CommandContext(ctx, "git", "bundle", "create", "-", "--stdin"), dir, revs, platform.MaxBundle)
 	if errors.Is(err, errTooLong) {
-		return nil, nil, errs.New("E-PUB-009", "the history of "+app+" to send is larger than 32 MiB",
-			"remove large files from the repository and its history, or publish from a new repository that holds only the app")
+		return nil, nil, errs.New("E-PUB-009", "the history of "+app+" to send is larger than 32 MiB", platform.Fix("E-PUB-009"))
 	}
 	if err != nil {
 		return nil, nil, err
