@@ -4,6 +4,25 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- The permission list, `aicoded.yaml`, takes every field: besides `app`, `data`, `access`,
+  `services`, `email`, `settings`, `secrets` and `modules`, the optional `class` (the app type),
+  `owner` (`group:<name>`), `audience` (`internal`: `group:<name>` or `everyone`; `external`:
+  `idp:<name>` or `magic-link`), `egress` (host names, such as `api.partner.example`), `schedule`
+  (`{cron: "0 6 * * *", job: daily-summary}`, five numeric cron fields in UTC), `size` (`S`, `M`
+  or `L`), `resources` (`small`, `medium` or `large`) and `ttl` (`1d` to `3650d`). A field left
+  out or empty is not stated. Write `owner` and `audience` when the person says who owns and
+  uses the app; leave `class`, `size`, `resources` and `ttl` out unless the person or their
+  administrator gives them. The platform records these fields and shows their changes in the
+  change record; nothing holds the app to them yet. An unknown key, at the top level or in a
+  section with fixed keys, is now an error (E-MAN-014), and so are anchors, aliases and merge
+  keys, `&name`, `*name` and `<<` (E-MAN-003). Every command that reads the permission list
+  reports all its problems at once, in line order, instead of the first: fix them all, then run
+  `aicoded check` again. The guide `guides/permission-list` covers every field. The permission
+  list's schema is now the public package `aicoded.dev/framework/manifest`, with `Load` and
+  `Parse`, for runners and the platform; app code may not import it (E-LINT-001). New codes:
+  E-MAN-014 (an unknown key), E-MAN-015 (`class`), E-MAN-016 (`owner`), E-MAN-017 (`audience`),
+  E-MAN-018 (`egress`), E-MAN-019 (`schedule`), E-MAN-020 (`size`), E-MAN-021 (`resources`) and
+  E-MAN-022 (`ttl`).
 - New commands publish an app to the platform: `aicoded publish [--app <name>] [-m <summary>]
   [--no-wait] [dir]` sends the commit `HEAD` names, of an app folder that is the top level of its
   own git repository, to the platform's delivery pipeline, once nothing is left uncommitted and
