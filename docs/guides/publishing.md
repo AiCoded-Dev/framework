@@ -165,7 +165,8 @@ E-GATE-028. A finding of a check that has no code of its own is E-GATE-000.
 
 Each check runs with the platform's own configuration, so nothing in the app's repository, such
 as a `.golangci.yml`, a `.gitleaksignore`, a `.gitleaks.toml`, a `gitleaks:allow` comment, an
-`osv-scanner.toml` or a `.syft.yaml`, changes what it finds. The vulnerability databases are the
+`osv-scanner.toml` or a `.syft.yaml`, changes what it finds. The checks read generated files too,
+so a `Code generated ... DO NOT EDIT` line hides no file. The vulnerability databases are the
 platform's own copies; when they are more than a day old, the `vulnerabilities` step ends in
 `error`, and you publish a new commit later, as after any `error`.
 
