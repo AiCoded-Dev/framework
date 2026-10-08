@@ -16,6 +16,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/gittest"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform/platformtest"
+	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 )
 
 // signedIn starts a fake platform, signs in to it in a home of its own, makes aicoded publish
@@ -359,6 +360,41 @@ func TestRunStatus(t *testing.T) {
 	assert.Equal(t, 1, code)
 	assert.Empty(t, out)
 	assert.Equal(t, "the platform's answer is larger than 8 MiB, more than aicoded reads\n", errOut)
+}
+
+func TestRunStatusNotes(t *testing.T) {
+	p, aicoded := signedIn(t)
+	dir := gittest.NewApp(t, "demo")
+	code, out, errOut := aicoded("publish", "--no-wait", dir)
+	require.Equal(t, 0, code, errOut)
+	id := publishID(t, out)
+	p.Answers(platformtest.Publish{Status: "failed", Checks: "all-but-l7",
+		Steps:    []platformtest.Step{{Name: "lint", Outcome: "failed"}, {Name: "vulnerabilities", Outcome: "passed"}},
+		Problems: []platformtest.Problem{{Code: "E-GATE-015", Pos: "main.go:9", Message: "unchecked error", Fix: "handle it"}},
+		Notes: []platformtest.Problem{
+			{Code: "E-GATE-025", Pos: "main.go:12", Message: "//nolint silences a check", Fix: "remove it"},
+			{Code: "E-GATE-022", Pos: "go.mod:7", Message: "GO-2026-0001 is not called", Fix: "upgrade"},
+		}, Record: 3})
+
+	code, out, errOut = aicoded("status", id)
+	assert.Equal(t, 1, code, errOut)
+	assert.Equal(t, "publish "+id+" of demo at "+gittest.Head(t, dir)[:7]+": Add demo\n"+
+		"  lint            failed\n  vulnerabilities passed\n"+
+		"  demo: main.go:9: E-GATE-015: unchecked error\n    fix: handle it\n    docs: https://aicoded.dev/docs/errors/E-GATE-015\n"+
+		"  note: demo: main.go:12: E-GATE-025: //nolint silences a check\n    fix: remove it\n    docs: https://aicoded.dev/docs/errors/E-GATE-025\n"+
+		"  note: demo: go.mod:7: E-GATE-022: GO-2026-0001 is not called\n    fix: upgrade\n    docs: https://aicoded.dev/docs/errors/E-GATE-022\n"+
+		"  checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later\n"+
+		"  change record 3\nfailed: 1 problem\n", out, "notes follow the problems, and only problems are counted")
+
+	code, out, _ = aicoded("status", "--json", id)
+	assert.Equal(t, 1, code)
+	var got platform.Publish
+	require.NoError(t, json.Unmarshal([]byte(out), &got))
+	assert.Equal(t, []problem.Problem{
+		{Code: "E-GATE-025", Pos: "main.go:12", Message: "//nolint silences a check", Fix: "remove it", Docs: "https://aicoded.dev/docs/errors/E-GATE-025"},
+		{Code: "E-GATE-022", Pos: "go.mod:7", Message: "GO-2026-0001 is not called", Fix: "upgrade", Docs: "https://aicoded.dev/docs/errors/E-GATE-022"},
+	}, got.Notes)
+	assert.Less(t, strings.Index(out, `"problems"`), strings.Index(out, `"notes"`), "notes follow the problems")
 }
 
 func TestRunStatusUsage(t *testing.T) {

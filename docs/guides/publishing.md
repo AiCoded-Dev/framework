@@ -2,8 +2,8 @@
 
 `aicoded publish` sends a commit of an app to the platform's delivery pipeline, which checks it
 and writes a change record for it, and `aicoded status` shows the outcome. This guide covers
-signing in, the clean commit, what is sent, the waiting, reading the outcome, the partial checks
-of today and the codes.
+signing in, the clean commit, what is sent, the waiting, reading the outcome, what the delivery
+pipeline checks and the codes.
 
 ## Signing in
 
@@ -96,19 +96,30 @@ Published rooms at 1a2b3c4 as pub_hoskmcer6l2grf5cxrfq3ilioe.
 queued ...
 running ...
 publish pub_hoskmcer6l2grf5cxrfq3ilioe of rooms at 1a2b3c4: Add the list of rooms
-  checkout  passed
-  modules   passed
-  check     passed
-  tests     failed
-  rooms: rooms_test.go:14: E-CHK-004: TestList failed: rooms_test.go:14: got 2 rooms, want 3
-    fix: fix the code or the test until go test passes
-    docs: https://aicoded.dev/docs/errors/E-CHK-004
-  partial checks: only aicoded check and the tests run; the full security checks come later
+  checkout        passed
+  modules         passed
+  check           passed
+  lint            failed
+  secrets         passed
+  vulnerabilities passed
+  licences        passed
+  sbom            passed
+  capabilities    passed
+  build           skipped
+  tests           skipped
+  rooms: deps/rooms.go:14: E-GATE-015: Error return value of `db.ExecContext` is not checked
+    fix: handle the error the call returns, or return it
+    docs: https://aicoded.dev/docs/errors/E-GATE-015
+  note: rooms: deps/rooms.go:31: E-GATE-025: //nolint:errcheck silences a check
+    fix: remove the directive and fix what the check reports
+    docs: https://aicoded.dev/docs/errors/E-GATE-025
+  checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later
   change record 7
 failed: 1 problem
 ```
 
-The last line is the status: `queued`, `running`, or how the publish ended.
+The last line is the status: `queued`, `running`, or how the publish ended. For a failed publish
+it counts the problems; notes do not count.
 
 | Status | What it means | Exit code |
 |---|---|---|
@@ -117,27 +128,72 @@ The last line is the status: `queued`, `running`, or how the publish ended.
 | `refused` | the platform could not read the commit from what was sent (E-PUB-014) | 1 |
 | `error` | the delivery pipeline could not finish, through a fault of its own (E-PUB-011) | 1 |
 
-The steps run in this order, and a step that fails skips the steps after it:
-
-- `checkout` verifies the bundle and takes the commit out of it;
-- `modules` checks `go.mod` and `go.sum` and fetches the modules the app may use;
-- `check` runs `aicoded check --frozen --no-tests` of the framework version the app requires;
-- `tests` runs the tests with `-race`.
-
 Each problem has its code, `file:line`, fix and docs link, as in `aicoded check`: fix it as you
-would a problem of `aicoded check`, commit, and publish again. After `refused` or `error`,
-publish a new commit, even an empty one made with `git commit --allow-empty`. A step that runs
-out of time, memory or disk is E-GATE-012.
+would a problem of `aicoded check`, commit, and publish again. Each note follows the problems, on
+a line that starts with `note:`, with the same parts. After `refused` or `error`, publish a new
+commit, even an empty one made with `git commit --allow-empty`.
 
 Every publish gets a change record when it ends, whatever its outcome: who asked, with the
-summary, what changed, and which checks ran with their outcome. Its number is on the line
-`change record`.
+summary, what changed, and which checks ran, each with its layers, its outcome and how many
+problems and notes it found. Its number is on the line `change record`.
 
-## The partial checks of today
+## What the delivery pipeline checks
 
-Today the delivery pipeline runs the checks of `aicoded check` and the tests, and no other: the
-publish says `partial checks`. The other security checks, approvals and releases to production
-come later, so a publish that passes is checked and recorded, but runs nowhere yet.
+The delivery pipeline runs these steps in this order. Each scanner, the build and the tests run
+in a sandbox of their own, with no network. The layers are those of the security checks, which
+the change record names too.
+
+| Step | Layers | What it does | Stops the publish on |
+|---|---|---|---|
+| `checkout` | none | verifies the bundle and takes the commit out of it | a bundle it cannot read (`refused`), a symbolic link (E-GATE-009), a commit too large (E-GATE-010) |
+| `modules` | L1 Approved parts only | checks `go.mod`, `go.sum` and the permission list, and fetches the modules the app may use | E-GATE-001 to E-GATE-008, E-GATE-011, E-GATE-026 and E-GATE-027 |
+| `check` | L1 Approved parts only, L5 Every page locked | runs `aicoded check --frozen --no-tests` of the framework version the app requires | its problems |
+| `lint` | L1 Approved parts only | runs golangci-lint with staticcheck, gosec, errcheck, bodyclose and sqlclosecheck | any finding (E-GATE-013 to E-GATE-017) |
+| `secrets` | L4 Leaked passwords | runs gitleaks over the commit and its history | any secret (E-GATE-018 and E-GATE-019) |
+| `vulnerabilities` | L3 Known weaknesses | runs OSV-Scanner, then govulncheck, over the modules the app uses | a critical weakness the app calls (E-GATE-020) |
+| `licences` | L3 Known weaknesses | reads the licence of each module with go-licenses | nothing |
+| `sbom` | L3 Known weaknesses | lists the app's modules with Syft, as an SBOM | nothing |
+| `capabilities` | L2 Stays in its limits | follows the app's calls to the network, files and other capabilities with capslock | nothing |
+| `build` | L1 Approved parts only | builds the app's program | a build that fails |
+| `tests` | L1 Approved parts only | runs the tests with `-race` | a failing test (E-CHK-004) |
+
+`checkout` and `modules` come first, and a problem in either skips the rest. The steps from
+`check` to `capabilities` run no code of the app, and all of them run whatever one finds, so one
+publish shows every problem they find. `build` and `tests` run only when all of them passed. A
+step that runs out of time, memory or disk is E-GATE-012, and tests that stop the checks are
+E-GATE-028. A finding of a check that has no code of its own is E-GATE-000.
+
+Each check runs with the platform's own configuration, so nothing in the app's repository, such
+as a `.golangci.yml`, a `.gitleaksignore`, a `.gitleaks.toml`, a `gitleaks:allow` comment, an
+`osv-scanner.toml` or a `.syft.yaml`, changes what it finds. The vulnerability databases are the
+platform's own copies; when they are more than a day old, the `vulnerabilities` step ends in
+`error`, and you publish a new commit later, as after any `error`.
+
+A step reports problems, which fail the publish, and notes, which do not stop a publish. The
+change record counts the notes, and security sees them, so fix them when you can:
+
+- E-GATE-021: the app calls code with a known weakness whose score is below 9.0, or that has no
+  score yet;
+- E-GATE-022: a module has a known weakness that the app does not call;
+- E-GATE-023: a module's licence is forbidden or not recognised. Licences stop nothing: the
+  list of every module's licence and the SBOM are kept with the change record;
+- E-GATE-024: the app reaches a capability, such as the network or files, without a building
+  block;
+- E-GATE-025: a directive silences a check.
+
+A known weakness that the app calls stops the publish when its score is 9.0 or more: the highest
+CVSS score of the weakness and its aliases, such as its CVE id, in the OSV database (E-GATE-020).
+
+`//nolint` and `#nosec` are honoured for now: golangci-lint skips the finding that a `//nolint`
+comment silences, and gosec the one that `#nosec` or `//gosec:disable` silences. But each such
+directive is a note (E-GATE-025) at its `file:line`, which the change record counts, and
+security sees them. Fix what the check reports instead of silencing it.
+
+The simulated attacks (L7) do not run yet, so a publish that ran every step says
+`checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later`. A
+platform that runs only `aicoded check` and the tests says `partial checks` instead. Approvals
+and releases to production come later too, so a publish that passes is checked and recorded, but
+runs nowhere yet.
 
 ## What security sees
 
@@ -165,8 +221,11 @@ says which sections are enforced today, and which the platform only records for 
   E-PUB-006, E-PUB-007 and E-PUB-009 before sending when it can tell.
 - E-PUB-011 and E-PUB-014: a publish that ended in `error` or `refused`.
 - E-PUB-013: a publish id that the platform does not know in your organisation.
-- E-GATE-001 to E-GATE-012: what the delivery pipeline finds in the commit, its modules and its
-  steps.
+- E-GATE-001 to E-GATE-012 and E-GATE-026 to E-GATE-028: what the delivery pipeline finds in
+  the commit, its modules, its permission list and its steps.
+- E-GATE-000 and E-GATE-013 to E-GATE-020: what the security checks find in the code, its
+  history and its modules.
+- E-GATE-021 to E-GATE-025: notes, which do not stop a publish.
 
 `aicoded explain <code>` prints the page of each, as does the `howto` tool of `aicoded mcp`.
 

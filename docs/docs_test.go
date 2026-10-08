@@ -3,6 +3,7 @@ package docs
 import (
 	"flag"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,6 +94,19 @@ func TestReadRefuses(t *testing.T) {
 	} {
 		_, err := Read(path)
 		assert.Equal(t, "E-CLI-001", errs.Code(err), path)
+	}
+}
+
+func TestErrorPages(t *testing.T) {
+	pages, err := fs.Glob(FS, "errors/E-*.md")
+	require.NoError(t, err)
+	require.NotEmpty(t, pages)
+	for _, name := range pages {
+		data, err := fs.ReadFile(FS, name)
+		require.NoError(t, err)
+		code := strings.TrimSuffix(strings.TrimPrefix(name, "errors/"), ".md")
+		assert.True(t, strings.HasPrefix(string(data), "# "+code+": "), "%s starts with # %s: <title>", name, code)
+		assert.Contains(t, string(data), "\n**Fix:** ", "%s has a Fix line", name)
 	}
 }
 

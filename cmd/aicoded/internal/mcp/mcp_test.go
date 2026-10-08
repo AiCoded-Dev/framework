@@ -26,6 +26,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/gittest"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform/platformtest"
+	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/scaffold"
 	"aicoded.dev/framework/cmd/aicoded/internal/testhome"
 	"aicoded.dev/framework/docs"
@@ -534,6 +535,12 @@ func TestPublishTools(t *testing.T) {
 	p.Answers(platformtest.Failed(400, 4000))
 	got = result[platform.Publish](t, callTool("release_status", map[string]any{"id": out.ID}))
 	assert.Len(t, got.Problems, 400, "an answer above 1 MiB")
+	p.Answers(platformtest.Publish{Status: "passed", Checks: "all-but-l7",
+		Notes: []platformtest.Problem{{Code: "E-GATE-025", Pos: "main.go:3", Message: "//nolint silences a check", Fix: "remove it"}}})
+	got = result[platform.Publish](t, callTool("release_status", map[string]any{"id": out.ID}))
+	assert.Equal(t, "all-but-l7", got.Checks)
+	assert.Equal(t, []problem.Problem{{Code: "E-GATE-025", Pos: "main.go:3", Message: "//nolint silences a check", Fix: "remove it",
+		Docs: "https://aicoded.dev/docs/errors/E-GATE-025"}}, got.Notes, "in the shape of problems")
 	p.Answers(platformtest.Passed())
 
 	res := callTool("publish", map[string]any{"app": "demo", "summary": "Again"})

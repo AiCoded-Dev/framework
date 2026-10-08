@@ -42,7 +42,9 @@ type Publish struct {
 	Checks           string    `json:"checks"`
 	Steps            []Step    `json:"steps"`
 	Problems         []Problem `json:"problems"`
-	Record           int       `json:"record,omitempty"`
+	// Notes are left out when empty, as an older platform does.
+	Notes  []Problem `json:"notes,omitempty"`
+	Record int       `json:"record,omitempty"`
 }
 
 // Parent is the publish before another.

@@ -15,7 +15,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | LINT | the rules for app code that `aicoded check` applies after `go vet`, listed in [the rules guide](../guides/rules.md) |
 | CLI | `aicoded init`, `aicoded explain`, `aicoded login`, `logout` and `whoami`, the sign-in that `aicoded publish` and `status` use, and the `app_create` and `howto` tools of `aicoded mcp` |
 | PUB | `aicoded publish` and `aicoded status`, and the `publish` and `release_status` tools of `aicoded mcp` |
-| GATE | the platform's delivery pipeline, in the problems of a publish |
+| GATE | the security checks of the platform's delivery pipeline, in the problems and notes of a publish |
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
 | MAIL | mail rules |
@@ -58,10 +58,19 @@ Publishing uses these codes:
   not as claimed.
 - E-PUB-011 and E-PUB-014: a publish that ended in `error` or `refused`.
 - E-PUB-013: a publish id that the platform does not know in your organisation.
-- E-GATE-001 to E-GATE-008: `go.mod`, `go.sum` and the modules an app uses.
-- E-GATE-009 to E-GATE-011: the files of the commit, and its permission list, which must be
-  readable and name the app.
-- E-GATE-012: a step that ran out of time, memory or disk.
+- E-GATE-001 to E-GATE-008 and E-GATE-026: `go.mod`, `go.sum` and the modules an app uses.
+- E-GATE-009 and E-GATE-010: the files of the commit.
+- E-GATE-011 and E-GATE-027: the commit's permission list, which must name the app and be
+  readable.
+- E-GATE-012 and E-GATE-028: a step that ran out of time, memory or disk, and tests that stopped
+  the checks.
+- E-GATE-000: a finding of a check that has no code of its own.
+- E-GATE-013 to E-GATE-017: what staticcheck, gosec, errcheck, bodyclose and sqlclosecheck find.
+- E-GATE-018 and E-GATE-019: a secret in the commit or in its history.
+- E-GATE-020: a critical known weakness that the app calls.
+- E-GATE-021 to E-GATE-025 are notes, which do not stop a publish: known weaknesses that are not
+  critical or that the app does not call, licences, capabilities reached without a building
+  block, and directives that silence a check.
 
 `aicoded explain <CODE>` prints the page.
 

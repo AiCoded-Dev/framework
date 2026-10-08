@@ -111,10 +111,14 @@ type Publish struct {
 	// Parent is the publish whose history this one's bundle continues.
 	Parent           *Parent `json:"parent,omitempty"`
 	HistoryRewritten bool    `json:"history_rewritten"`
-	// Checks is "partial" while only the checks of aicoded check and the tests run.
+	// Checks is "all-but-l7" when every security check but the simulated attacks (L7) ran, and
+	// "partial" when only the checks of aicoded check and the tests ran.
 	Checks   string            `json:"checks"`
 	Steps    []Step            `json:"steps"`
 	Problems []problem.Problem `json:"problems"`
+	// Notes are findings in the shape of problems that do not stop the publish. A platform that
+	// sends none leaves them empty.
+	Notes []problem.Problem `json:"notes"`
 	// Record is the number of the publish's change record, once it is written.
 	Record int64 `json:"record,omitempty"`
 }
@@ -280,7 +284,8 @@ func (p *Publish) valid() bool {
 		(p.Parent == nil || PublishID.MatchString(p.Parent.ID) && commitSHA.MatchString(p.Parent.SHA))
 }
 
-// clean makes every text of p fit to print, and gives every problem the docs link of its code.
+// clean makes every text of p fit to print, and gives every problem and note the docs link of
+// its code.
 func (p *Publish) clean() {
 	p.App, p.Summary, p.Reason, p.Checks = clean(p.App, 63), clean(p.Summary, 1000), clean(p.Reason, 500), clean(p.Checks, 64)
 	steps := make([]Step, 0, len(p.Steps))
@@ -288,16 +293,21 @@ func (p *Publish) clean() {
 		steps = append(steps, Step{Name: clean(s.Name, 32), Outcome: clean(s.Outcome, 32)})
 	}
 	p.Steps = steps
-	problems := make([]problem.Problem, 0, len(p.Problems))
-	for _, q := range p.Problems {
-		out := problem.Problem{Pos: clean(q.Pos, 300), Message: cleanLines(q.Message, 4000), Fix: clean(q.Fix, 500)}
-		if codeName.MatchString(q.Code) {
-			out.Code, out.Docs = q.Code, errs.DocsBase+q.Code
-		}
-		problems = append(problems, out)
-	}
-	p.Problems = problems
+	p.Problems, p.Notes = cleanProblems(p.Problems), cleanProblems(p.Notes)
 	p.Record = max(p.Record, 0)
+}
+
+// cleanProblems returns the problems with every text fit to print and the docs link of each code.
+func cleanProblems(qs []problem.Problem) []problem.Problem {
+	out := make([]problem.Problem, 0, len(qs))
+	for _, q := range qs {
+		c := problem.Problem{Pos: clean(q.Pos, 300), Message: cleanLines(q.Message, 4000), Fix: clean(q.Fix, 500)}
+		if codeName.MatchString(q.Code) {
+			c.Code, c.Docs = q.Code, errs.DocsBase+q.Code
+		}
+		out = append(out, c)
+	}
+	return out
 }
 
 // call posts body, of type contentType, to the builder API at path with hc and the access token

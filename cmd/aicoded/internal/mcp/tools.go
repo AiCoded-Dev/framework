@@ -252,7 +252,7 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 		s.publish)
 	tool(srv, &mcpsdk.Tool{Name: "release_status", Annotations: &mcpsdk.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &yes},
 		InputSchema: releaseStatusSchema,
-		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, and the problems with their code, file:line and fix."},
+		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, the problems with their code, file:line and fix, and the notes, in the same shape, which do not stop the publish."},
 		s.releaseStatus)
 }
 

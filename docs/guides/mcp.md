@@ -34,7 +34,7 @@ The MCP setup page of the dev UI shows the commands for Claude Code and Codex, a
 | `mail_get` | one message from `mail_list` |
 | `mail_receive` | delivers a test message to an app's inbox, as if it had arrived by mail |
 | `publish` | does what `aicoded publish --no-wait` does for an app, with a summary of the change, and returns the publish's id, app and commit, whether it created the app, and what to do next |
-| `release_status` | shows a publish by its id, as `aicoded status --json` does: its status, steps and problems |
+| `release_status` | shows a publish by its id, as `aicoded status --json` does: its status, steps, problems and notes |
 
 All but `app_create`, `check`, `preview`, `mail_receive` and `publish` only read. `publish` and
 `release_status` reach the platform, with your sign-in; the other tools stay on this computer.

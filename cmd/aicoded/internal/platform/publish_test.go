@@ -155,7 +155,9 @@ func TestPublishIsCleaned(t *testing.T) {
 		Problems: []platformtest.Problem{
 			{Code: "E-GATE-012", Pos: "go.mod:1\r", Message: "first\x07\nsecond", Fix: "try again", Docs: "https://evil.example/"},
 			{Code: "rm -rf", Message: "no code"},
-		}, Record: -1})
+		},
+		Notes:  []platformtest.Problem{{Code: "E-GATE-025", Pos: "main.go:3\x1b", Message: "a directive\u202e", Fix: "remove it", Docs: "https://evil.example/"}},
+		Record: -1})
 
 	got, err := c.Publish(t.Context(), created.ID)
 	require.NoError(t, err)
@@ -167,6 +169,9 @@ func TestPublishIsCleaned(t *testing.T) {
 		{Code: "E-GATE-012", Pos: "go.mod:1?", Message: "first?\nsecond", Fix: "try again", Docs: "https://aicoded.dev/docs/errors/E-GATE-012"},
 		{Message: "no code"},
 	}, got.Problems)
+	assert.Equal(t, []problem.Problem{
+		{Code: "E-GATE-025", Pos: "main.go:3?", Message: "a directive?", Fix: "remove it", Docs: "https://aicoded.dev/docs/errors/E-GATE-025"},
+	}, got.Notes, "notes are cleaned as problems are")
 	assert.Zero(t, got.Record)
 	assert.True(t, got.Done())
 }
@@ -179,6 +184,7 @@ func TestPublishOfManyProblems(t *testing.T) {
 	got, err := c.Publish(t.Context(), created.ID)
 	require.NoError(t, err, "an answer of 1.6 MB")
 	assert.Len(t, got.Problems, 400)
+	assert.Equal(t, []problem.Problem{}, got.Notes, "an answer without notes, as an older platform sends")
 
 	p.Answers(platformtest.Failed(2200, 4000))
 	_, err = c.Publish(t.Context(), created.ID)
