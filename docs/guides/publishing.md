@@ -184,6 +184,8 @@ change record counts the notes, and security sees them, so fix them when you can
 
 A known weakness that the app calls stops the publish when its score is 9.0 or more: the highest
 CVSS score of the weakness and its aliases, such as its CVE id, in the OSV database (E-GATE-020).
+A weakness of the Go standard library never stops it, since the platform chooses the Go that apps
+build with: it is a note, and your administrator updates Go.
 
 `//nolint` and `#nosec` are honoured for now: golangci-lint skips the finding that a `//nolint`
 comment silences, and gosec the one that `#nosec` or `//gosec:disable` silences. But each such
