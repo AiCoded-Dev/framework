@@ -36,7 +36,8 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      - run: make test
+      # setup-go sets GOTOOLCHAIN=local; auto lets cmd/aicoded fetch the Go its go.mod names on 1.25.x.
+      - run: GOTOOLCHAIN=auto make test
 
   lint:
     runs-on: ubuntu-24.04
@@ -44,7 +45,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           check-latest: true
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
