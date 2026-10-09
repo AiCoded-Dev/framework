@@ -5,10 +5,9 @@ Changes to the API that AI assistants build apps with. Newest first.
 ## Unreleased
 
 - `aicoded generate` writes each `ssr:else-if` as an `if` inside the `else` block of the branch
-  before it, not as `else if`: the security checks' staticcheck reports an `else if` chain that
-  compares one value (QF1003), and nobody can change generated code. The page shows the same
-  branch as before. A page with `ssr:else-if` needs its code generated again: run
-  `aicoded generate`, or `aicoded check`, which does.
+  before it, not as `else if`, which staticcheck would offer to turn into a `switch` (QF1003) in
+  code nobody can change. The page shows the same branch as before. A page with `ssr:else-if`
+  needs its code generated again: run `aicoded generate`, or `aicoded check`, which does.
 - A go command that a signal stops while `aicoded check` or `aicoded dev` runs it, such as the
   `go test` that a test kills, is the new E-CHK-008, which names the command and the signal,
   rather than E-CHK-002: its output is cut short, so it reports nothing else. In the delivery
@@ -24,7 +23,8 @@ Changes to the API that AI assistants build apps with. Newest first.
   that sends no notes shows none. `checks` gains the value `all-but-l7`, printed as
   `checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later`, when the
   delivery pipeline ran every step: `checkout`, `modules`, `check`, `lint` (golangci-lint with
-  staticcheck, gosec, errcheck, bodyclose and sqlclosecheck), `secrets` (gitleaks over the commit
+  staticcheck's checks of bugs and style but not its simplifications or quick fixes, gosec,
+  errcheck, bodyclose and sqlclosecheck), `secrets` (gitleaks over the commit
   and its history), `vulnerabilities` (OSV-Scanner and govulncheck), `licences` (go-licenses),
   `sbom` (Syft), `capabilities` (capslock), `build` and `tests`; `partial` keeps its text. The steps
   from `check` to `capabilities` all run, whatever one finds. `//nolint`, `#nosec` and
