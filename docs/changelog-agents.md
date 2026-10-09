@@ -4,6 +4,12 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `aicoded generate` ends the code that it writes from a page's template with a comment
+  `//line route_gen.go:<n>`, so the go command, `aicoded check` and the delivery pipeline's checks
+  report a problem in the code after it at its own line of `route_gen.go`, not at a line of the
+  page that it does not come from, which could be past the page's end. Every page needs its code
+  generated again: run `aicoded generate`, or `aicoded check`, which does; until then
+  `aicoded check --frozen` and `aicoded publish` report the old file (E-CHK-001).
 - `aicoded generate` writes each `ssr:else-if` as an `if` inside the `else` block of the branch
   before it, not as `else if`, which staticcheck would offer to turn into a `switch` (QF1003) in
   code nobody can change. The page shows the same branch as before. A page with `ssr:else-if`

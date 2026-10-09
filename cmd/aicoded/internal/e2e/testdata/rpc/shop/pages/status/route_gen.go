@@ -82,6 +82,7 @@ func (s *state) Write(w io.Writer) error {
 	if err := render.Text(w, secret); err != nil {
 		return err
 	}
+//line route_gen.go:86
 	if _, err := io.WriteString(w, _html2); err != nil {
 		return err
 	}

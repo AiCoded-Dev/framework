@@ -330,6 +330,7 @@ func (s *state) Write(w io.Writer) error {
 			return err
 		}
 	}
+//line route_gen.go:334
 	if _, err := io.WriteString(w, _html22); err != nil {
 		return err
 	}
@@ -357,6 +358,7 @@ func renderBlock_10504f08610e7f96(ctx context.Context, data *RouteData) reactive
 		if err := render.Text(w, visitorsOnline); err != nil {
 			return err
 		}
+//line route_gen.go:362
 		if _, err := io.WriteString(w, _html24); err != nil {
 			return err
 		}

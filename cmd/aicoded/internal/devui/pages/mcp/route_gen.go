@@ -104,6 +104,7 @@ func (s *state) Write(w io.Writer) error {
 	if err := render.Text(w, cursor); err != nil {
 		return err
 	}
+//line route_gen.go:108
 	if _, err := io.WriteString(w, _html4); err != nil {
 		return err
 	}

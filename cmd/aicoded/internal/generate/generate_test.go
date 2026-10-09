@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -307,6 +308,41 @@ func TestRouteImports(t *testing.T) {
 			got = append(got, imp.Path.Value)
 		}
 		assert.Equal(t, want, got, tpl)
+	}
+}
+
+// After the code that //line directives map to the page, a //line directive maps route_gen.go
+// back to its own lines: the end of Write and of each live block, and the constants, so the go
+// command and the checks never point past the page's end.
+func TestRouteLinesAfterThePage(t *testing.T) {
+	code := routeCode(t, `<ssr:access role="*"/><ssr:assets/>
+<ssr:var name="n" type="int" reactive="true"/><ssr:var name="items" type="[]string" reactive="true"/>
+<p>{{ n + 1 }}</p>
+<ul ssr:if="len(items) > 0"><li ssr:for="it in items">{{ it }}</li></ul>
+<p>end</p>`)
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "route_gen.go", code, parser.ParseComments)
+	require.NoError(t, err)
+	at := func(p token.Position) string { return p.Filename + ":" + strconv.Itoa(p.Line) }
+	file := fset.File(f.Pos())
+	page, resets := false, 0
+	for i, line := range strings.Split(strings.TrimSuffix(code, "\n"), "\n") {
+		n := i + 1
+		switch {
+		case strings.HasPrefix(line, "//line index.html:"):
+			page = true
+		case strings.HasPrefix(line, "//line "):
+			assert.Equal(t, "//line route_gen.go:"+strconv.Itoa(n+1), line)
+			page, resets = false, resets+1
+		case !page:
+			assert.Equal(t, "route_gen.go:"+strconv.Itoa(n), at(fset.Position(file.LineStart(n))))
+		}
+	}
+	assert.Equal(t, 3, resets, "in Write and in the two live blocks with page code")
+	for _, d := range f.Decls {
+		for _, pos := range []token.Pos{d.Pos(), d.End() - 1} {
+			assert.Equal(t, at(fset.PositionFor(pos, false)), at(fset.Position(pos)))
+		}
 	}
 }
 

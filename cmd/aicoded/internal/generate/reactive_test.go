@@ -74,7 +74,7 @@ func TestRawSite(t *testing.T) {
 	code := liveCode(t, `<ssr:var name="note" type="HTML" reactive="true"/><div>{{$ note }}</div>`)
 	assert.Contains(t, code, `"<span data-ssr-bind=\"8a5edab2.`)
 	assert.NotContains(t, code, "renderBlock_note(", "the raw site does not share the key of a text site")
-	assert.Regexp(t, `if err := render\.HTML\(w, note\); err != nil \{\n\s+return err\n\s+\}\n\s+return nil\n\s+\}\(&b\); err != nil \{`, code,
+	assert.Regexp(t, `if err := render\.HTML\(w, note\); err != nil \{\n\s+return err\n\s+\}\n//line route_gen\.go:\d+\n\s+return nil\n\s+\}\(&b\); err != nil \{`, code,
 		"the value goes through render.HTML, which takes only web.SafeHTML")
 }
 

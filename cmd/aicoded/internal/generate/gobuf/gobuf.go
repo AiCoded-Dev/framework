@@ -3,7 +3,10 @@ package gobuf
 
 import (
 	"bytes"
+	"fmt"
 	"go/format"
+	"go/parser"
+	"go/token"
 	"strconv"
 	"strings"
 )
@@ -69,10 +72,44 @@ func (b *GoBuf) WriteConsts() {
 	b.out.WriteString(")\n")
 }
 
-// Formatted returns the source formatted by go/format.
+// lineReset starts the comment that WriteLineReset writes, before the file name.
+const lineReset = "//line aicoded-reset "
+
+// WriteLineReset ends code that //line directives map to a template, on a line of its own: in
+// the source Formatted returns, the lines that follow are those of the generated file name
+// itself. Literal output not yet written comes after it.
+func (b *GoBuf) WriteLineReset(name string) {
+	b.out.WriteString(lineReset + name + "\n")
+}
+
+// Formatted returns the source formatted by go/format, with each comment of WriteLineReset made
+// the //line directive that names the line after it.
 func (b *GoBuf) Formatted() ([]byte, error) {
 	b.flush()
-	return format.Source(b.out.Bytes())
+	code, err := format.Source(b.out.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, "", code, parser.ParseComments|parser.SkipObjectResolution)
+	if err != nil {
+		return nil, err
+	}
+	lines := bytes.SplitAfter(code, []byte("\n"))
+	for _, g := range f.Comments {
+		for _, c := range g.List {
+			name, ok := strings.CutPrefix(c.Text, lineReset)
+			if !ok {
+				continue
+			}
+			p := fset.PositionFor(c.Pos(), false)
+			if p.Column != 1 {
+				return nil, fmt.Errorf("line %d: a line reset must start its line", p.Line)
+			}
+			lines[p.Line-1] = fmt.Appendf(nil, "//line %s:%d\n", name, p.Line+1)
+		}
+	}
+	return bytes.Join(lines, nil), nil
 }
 
 func (b *GoBuf) String() string {

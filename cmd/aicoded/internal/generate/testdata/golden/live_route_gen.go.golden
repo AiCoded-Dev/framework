@@ -198,6 +198,7 @@ func (s *state) Write(w io.Writer) error {
 			return err
 		}
 	}
+//line route_gen.go:202
 	if _, err := io.WriteString(w, _html10); err != nil {
 		return err
 	}
@@ -215,6 +216,7 @@ func renderBlock_0fe026a3beb7c95d(ctx context.Context, data *RouteData) reactive
 				return err
 			}
 		}
+//line route_gen.go:220
 		return nil
 	}(&b); err != nil {
 		web.LogError(ctx, "live block not rendered", err, "route", routeKey, "block", "0fe026a3beb7c95d")
@@ -241,6 +243,7 @@ func renderBlock_3f7cdfb64c837106(ctx context.Context, data *RouteData) reactive
 				return err
 			}
 		}
+//line route_gen.go:247
 		return nil
 	}(&b); err != nil {
 		web.LogError(ctx, "live block not rendered", err, "route", routeKey, "block", "3f7cdfb64c837106")
@@ -265,6 +268,7 @@ func renderBlock_ee402021b1198e18(ctx context.Context, data *RouteData) reactive
 		if err := render.Attr(w, count); err != nil {
 			return err
 		}
+//line route_gen.go:272
 		if _, err := io.WriteString(w, _html12); err != nil {
 			return err
 		}

@@ -195,6 +195,7 @@ func (s *state) Write(w io.Writer) error {
 			return err
 		}
 	}
+//line route_gen.go:199
 	if _, err := io.WriteString(w, _html14); err != nil {
 		return err
 	}
@@ -291,6 +292,7 @@ func renderBlock_2e99b33e8bf4bb86(ctx context.Context, data *RouteData) reactive
 				return err
 			}
 		}
+//line route_gen.go:296
 		return nil
 	}(&b); err != nil {
 		web.LogError(ctx, "live block not rendered", err, "route", routeKey, "block", "2e99b33e8bf4bb86")

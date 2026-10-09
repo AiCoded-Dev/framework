@@ -75,6 +75,7 @@ func (s *state) Call(ctx context.Context, r *web.Request, name string, args json
 }
 
 func (s *state) Write(w io.Writer) error {
+//line route_gen.go:79
 	if _, err := io.WriteString(w, _html0); err != nil {
 		return err
 	}

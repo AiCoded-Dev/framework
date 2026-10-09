@@ -55,8 +55,7 @@ func (n *SsrCondition) WriteInnerGoCode(buf *gobuf.GoBuf) {
 }
 
 // writeInner writes each ssr:else-if as an if statement inside the else block of the one before,
-// never as an else-if chain: staticcheck reports a chain that compares one value as QF1003, and
-// a builder cannot change generated code.
+// never as an else-if chain.
 func (n *SsrCondition) writeInner(buf *gobuf.GoBuf) {
 	for i, c := range n.Conditions {
 		if i > 0 {

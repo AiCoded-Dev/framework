@@ -179,7 +179,7 @@ func (g *gen) build(routes []*Route) error {
 		if err != nil {
 			return err
 		}
-		g.files[path.Join(folder(r.Path), "route_gen.go")] = code
+		g.files[path.Join(folder(r.Path), routeFile)] = code
 		stub, err := g.stub(r)
 		if err != nil {
 			return err
@@ -200,7 +200,7 @@ func (g *gen) build(routes []*Route) error {
 }
 
 // generatedNames are the per-route files write removes when their route is gone.
-var generatedNames = map[string]bool{"route_gen.go": true, "reactive_gen.ts": true}
+var generatedNames = map[string]bool{routeFile: true, "reactive_gen.ts": true}
 
 // write removes the generated files of routes that are gone, the other stale generated files and
 // the folders they leave empty, writes the generated files, replaces pages/assets_gen with the

@@ -58,6 +58,7 @@ func (s *state) Data(ctx context.Context, r *web.Request, w web.ResponseWriter) 
 func (s *state) DefaultRoute(context.Context, *web.Request) (string, error) { return "", nil }
 
 func (s *state) Write(w io.Writer) error {
+//line route_gen.go:62
 	if _, err := io.WriteString(w, _html0); err != nil {
 		return err
 	}

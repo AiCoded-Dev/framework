@@ -18,6 +18,9 @@ import (
 // header starts every generated Go file.
 const header = gobuf.Header
 
+// routeFile is the name of the Go file of a page's route.
+const routeFile = "route_gen.go"
+
 // Import paths of the framework packages generated code uses.
 const (
 	webPkg    = "aicoded.dev/framework/web"
@@ -213,6 +216,7 @@ func (g *gen) route(r *Route) ([]byte, error) {
 		b.WriteStringLn("_ = " + v.Name)
 	}
 	t.WriteGoCode(b)
+	b.WriteLineReset(routeFile)
 	b.WriteStringLn("return nil")
 	b.WriteStringLn("}")
 	b.WriteStringLn("")

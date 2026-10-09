@@ -121,6 +121,7 @@ func (s *state) Write(w io.Writer) error {
 			return err
 		}
 	}
+//line route_gen.go:125
 	if _, err := io.WriteString(w, _html8); err != nil {
 		return err
 	}
