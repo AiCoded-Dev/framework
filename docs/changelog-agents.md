@@ -29,11 +29,12 @@ Changes to the API that AI assistants build apps with. Newest first.
   steps and their layers. New codes: E-GATE-000 (a finding with no code of its own), E-GATE-013 to
   E-GATE-017 (staticcheck, gosec, errcheck, bodyclose and sqlclosecheck), E-GATE-018 and
   E-GATE-019 (a secret in the code or in its history), E-GATE-020 (a critical known weakness the
-  app calls), E-GATE-026 (a `godebug` line in `go.mod`), E-GATE-027 (an `aicoded.yaml` that is
-  missing, cannot be read or names no app), E-GATE-028 (tests that stopped the checks), and the
-  notes E-GATE-021 to E-GATE-025 (a known weakness that is not critical or that the app does not
-  call, a licence that is forbidden or not recognised, a capability reached without a building
-  block, and a directive that silences a check).
+  app calls), E-GATE-026 (a `godebug` line in `go.mod` or a `//go:debug` comment in a Go file,
+  which change Go's security defaults), E-GATE-027 (an `aicoded.yaml` that is missing, cannot be
+  read or names no app), E-GATE-028 (tests that stopped the checks), and the notes E-GATE-021 to
+  E-GATE-025 (a known weakness that is not critical or that the app does not call, a licence that
+  is forbidden or not recognised, a capability reached without a building block, and a directive
+  that silences a check).
 - `aicoded describe` and the `describe` tool of `aicoded mcp` show the new fields of the
   permission list, each only when the app has it. The text gains the lines `class`, `owner`,
   `audience` and `external audience` after the `app` line, `connectors` after `files`, `egress`

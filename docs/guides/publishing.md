@@ -148,7 +148,7 @@ the change record names too.
 | `checkout` | none | verifies the bundle and takes the commit out of it | a bundle it cannot read (`refused`), a symbolic link (E-GATE-009), a commit too large (E-GATE-010) |
 | `modules` | L1 Approved parts only | checks `go.mod`, `go.sum` and the permission list, and fetches the modules the app may use | E-GATE-001 to E-GATE-008, E-GATE-011, E-GATE-026 and E-GATE-027 |
 | `check` | L1 Approved parts only, L5 Every page locked | runs `aicoded check --frozen --no-tests` of the framework version the app requires | its problems |
-| `lint` | L1 Approved parts only | runs golangci-lint with staticcheck, gosec, errcheck, bodyclose and sqlclosecheck | any finding (E-GATE-013 to E-GATE-017) |
+| `lint` | L1 Approved parts only | runs golangci-lint with staticcheck, gosec, errcheck, bodyclose and sqlclosecheck, and reads every Go file for directives | any finding (E-GATE-013 to E-GATE-017), a `//go:debug` comment (E-GATE-026) |
 | `secrets` | L4 Leaked passwords | runs gitleaks over the commit and its history | any secret (E-GATE-018 and E-GATE-019) |
 | `vulnerabilities` | L3 Known weaknesses | runs OSV-Scanner, then govulncheck, over the modules the app uses | a critical weakness the app calls (E-GATE-020) |
 | `licences` | L3 Known weaknesses | reads the licence of each module with go-licenses | nothing |
@@ -191,6 +191,10 @@ build with: it is a note, and your administrator updates Go.
 comment silences, and gosec the one that `#nosec` or `//gosec:disable` silences. But each such
 directive is a note (E-GATE-025) at its `file:line`, which the change record counts, and
 security sees them. Fix what the check reports instead of silencing it.
+
+A `godebug` setting in `go.mod` and a `//go:debug` comment in a Go file change how Go behaves at
+run time, and some turn off its security defaults, so the delivery pipeline refuses both
+(E-GATE-026). Leave Go's defaults as they are.
 
 The simulated attacks (L7) do not run yet, so a publish that ran every step says
 `checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later`. A
