@@ -20,16 +20,22 @@ Changes to the API that AI assistants build apps with. Newest first.
   `aicoded status` print each after the problems, on a line that starts with `note:`;
   `aicoded status --json` and the `release_status` tool of `aicoded mcp` return them as `notes`,
   after `problems`. The last line of a failed publish still counts the problems only. A platform
-  that sends no notes shows none. `checks` gains the value `all-but-l7`, printed as
-  `checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later`, when the
-  delivery pipeline ran every step: `checkout`, `modules`, `check`, `lint` (golangci-lint with
-  staticcheck's checks of bugs and style but not its simplifications or quick fixes, gosec,
-  errcheck, bodyclose and sqlclosecheck), `secrets` (gitleaks over the commit
-  and its history), `vulnerabilities` (OSV-Scanner and govulncheck), `licences` (go-licenses),
-  `sbom` (Syft), `capabilities` (capslock), `build` and `tests`; `partial` keeps its text. The steps
-  from `check` to `capabilities` all run, whatever one finds. `//nolint`, `#nosec` and
-  `//gosec:disable` are honoured for now, but each is a note that security sees: fix what the check
-  reports instead. E-GATE-011 now means only an `aicoded.yaml` that names another app; one that is
+  that sends no notes shows none. The delivery pipeline's steps are `checkout`, `modules`,
+  `check`, `lint` (golangci-lint with staticcheck's checks of bugs and style but not its
+  simplifications or quick fixes, gosec, errcheck, bodyclose and sqlclosecheck), `secrets`
+  (gitleaks over the commit and its history), `vulnerabilities` (OSV-Scanner and govulncheck),
+  `licences` (go-licenses), `sbom` (Syft), `capabilities` (capslock), `build` and `tests`.
+  `checks` gains the value `all-but-l7`, printed as
+  `checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later`, for a
+  publish whose `lint` step ran. `partial` is now printed as
+  `partial checks: not every security check ran; the steps above say which`: a publish whose
+  `lint` step did not run has it, and so has every publish to an older platform that runs only
+  `aicoded check` and the tests. The steps from `check` to `capabilities` run whatever one of
+  them finds, except that when `check` finds Go that does not compile (E-CHK-002) or
+  `go mod tidy` fails (E-CHK-006), `lint`, `vulnerabilities`, `licences` and `capabilities` are
+  `skipped`, while `secrets` and `sbom` still run. `//nolint`, `#nosec` and `//gosec:disable`
+  are honoured for now, but each is a note that security sees: fix what the check reports
+  instead. E-GATE-011 now means only an `aicoded.yaml` that names another app; one that is
   missing, cannot be read or names no app is E-GATE-027. The guide `guides/publishing` lists the
   steps and their layers. New codes: E-GATE-000 (a finding with no code of its own), E-GATE-013 to
   E-GATE-017 (staticcheck, gosec, errcheck, bodyclose and sqlclosecheck), E-GATE-018 and

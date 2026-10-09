@@ -146,7 +146,10 @@ func TestTestStoppedBySignal(t *testing.T) {
 	ps, err := Test(t.Context(), module(t, "stopped"), false)
 	require.NoError(t, err)
 	assert.Equal(t, []brief{{"E-CHK-008", "", "go test was stopped by signal 9 (killed)"}}, briefs(ps))
-	assert.Equal(t, "do not signal, kill or wait on other processes in tests; when no test does, give the go command more memory and run the check again", ps[0].Fix)
+	assert.Equal(t, "do not signal, kill or wait on other processes in tests; when no test does, or no test ran, give the go command more memory, then run the command again", ps[0].Fix)
+	page, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "docs", "errors", "E-CHK-008.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(page), "\n**Fix:** "+ps[0].Fix+".\n")
 }
 
 func TestTestRace(t *testing.T) {

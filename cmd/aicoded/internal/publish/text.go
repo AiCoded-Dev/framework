@@ -42,7 +42,7 @@ func WriteText(w io.Writer, p platform.Publish) error {
 	case "all-but-l7":
 		b.WriteString("  checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later\n")
 	case "partial":
-		b.WriteString("  partial checks: only aicoded check and the tests run; the full security checks come later\n")
+		b.WriteString("  partial checks: not every security check ran; the steps above say which\n")
 	default:
 		fmt.Fprintf(&b, "  checks: %s\n", p.Checks)
 	}

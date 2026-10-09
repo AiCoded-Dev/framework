@@ -27,7 +27,7 @@ const (
 	fixGo      = "fix what the go command reports in this message"
 	fixVet     = "fix the code as the message says; go vet will run in the security checks too"
 	fixTest    = "fix the code or the test until go test passes"
-	fixStopped = "do not signal, kill or wait on other processes in tests; when no test does, give the go command more memory and run the check again"
+	fixStopped = "do not signal, kill or wait on other processes in tests; when no test does, or no test ran, give the go command more memory, then run the command again"
 
 	// maxOutput is how much of the go command's output one problem carries.
 	maxOutput = 4 << 10

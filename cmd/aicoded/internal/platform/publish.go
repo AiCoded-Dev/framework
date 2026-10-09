@@ -112,7 +112,7 @@ type Publish struct {
 	Parent           *Parent `json:"parent,omitempty"`
 	HistoryRewritten bool    `json:"history_rewritten"`
 	// Checks is "all-but-l7" when every security check but the simulated attacks (L7) ran, and
-	// "partial" when only the checks of aicoded check and the tests ran.
+	// "partial" when some of them did not.
 	Checks   string            `json:"checks"`
 	Steps    []Step            `json:"steps"`
 	Problems []problem.Problem `json:"problems"`

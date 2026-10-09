@@ -65,8 +65,8 @@ folder, or the one named.
   `vendor` folder lint refuses (E-LINT-011) gets no other step.
 - For each app it runs `aicoded generate` and lists the files it wrote, checks the snapshots the
   app holds, and runs `go build`, `go vet`, lint and `go test`; a step that fails skips the later
-  steps of that app. Every problem has its code, `file:line`, fix and docs link (E-CHK-002 to
-  E-CHK-006, and the E-LINT codes of lint). A go command that a signal stops, such as the
+  steps of that app. Every problem has its code, `file:line`, fix and docs link (E-CHK-001 to
+  E-CHK-008, and the E-LINT codes of lint). A go command that a signal stops, such as the
   `go test` that a test kills, is E-CHK-008, with no position.
 - Lint applies the rules for app code to every file but the tests, and nothing in the code can
   turn a finding off. [Rules for app code](rules.md) lists each rule, what to do instead and its

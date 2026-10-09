@@ -158,10 +158,14 @@ the change record names too.
 | `tests` | L1 Approved parts only | runs the tests with `-race` | a failing test (E-CHK-004) |
 
 `checkout` and `modules` come first, and a problem in either skips the rest. The steps from
-`check` to `capabilities` run no code of the app, and all of them run whatever one finds, so one
-publish shows every problem they find. `build` and `tests` run only when all of them passed. A
-step that runs out of time, memory or disk is E-GATE-012, and tests that stop the checks, or
-the go command that runs them (E-CHK-008), are E-GATE-028. A finding of a check that has no code of its own is E-GATE-000.
+`check` to `capabilities` run no code of the app, and they run whatever one of them finds, so one
+publish shows every problem they find, with one exception: when `check` finds Go that does not
+compile (E-CHK-002) or `go mod tidy` fails (E-CHK-006), the steps that read the app's packages,
+`lint`, `vulnerabilities`, `licences` and `capabilities`, are `skipped`, while `secrets` and
+`sbom` still run. `build` and `tests` run only when all of them passed. A step that runs out
+of time, memory or disk is E-GATE-012, and tests that stop the checks, or the go command that
+runs them (E-CHK-008), are E-GATE-028. A finding of a check that has no code of its own is
+E-GATE-000.
 
 Each check runs with the platform's own configuration, so nothing in the app's repository, such
 as a `.golangci.yml`, a `.gitleaksignore`, a `.gitleaks.toml`, a `gitleaks:allow` comment, an
@@ -196,11 +200,13 @@ A `godebug` setting in `go.mod` and a `//go:debug` comment in a Go file change h
 run time, and some turn off its security defaults, so the delivery pipeline refuses both
 (E-GATE-026). Leave Go's defaults as they are.
 
-The simulated attacks (L7) do not run yet, so a publish that ran every step says
-`checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later`. A
-platform that runs only `aicoded check` and the tests says `partial checks` instead. Approvals
-and releases to production come later too, so a publish that passes is checked and recorded, but
-runs nowhere yet.
+The simulated attacks (L7) do not run yet, so a publish whose `lint` step ran says
+`checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later`. Any
+other publish says `partial checks: not every security check ran; the steps above say which`,
+such as one that has not ended, one that a step before `lint` stopped, or one whose `check` found
+Go that does not compile; an older platform that runs only `aicoded check` and the tests says it
+of every publish. Approvals and releases to production come later too, so a publish that passes
+is checked and recorded, but runs nowhere yet.
 
 ## What security sees
 

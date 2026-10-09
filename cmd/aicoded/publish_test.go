@@ -111,7 +111,7 @@ func TestRunPublishWaits(t *testing.T) {
 	id := publishID(t, out)
 	assert.Contains(t, out, "\nqueued ...\nrunning ...\npublish "+id+" of demo at "+sha[:7]+": Add demo\n"+
 		"  checkout  passed\n  modules   passed\n  check     passed\n  tests     passed\n"+
-		"  partial checks: only aicoded check and the tests run; the full security checks come later\n"+
+		"  partial checks: not every security check ran; the steps above say which\n"+
 		"  change record 1\npassed\n")
 }
 
@@ -348,8 +348,8 @@ func TestRunStatus(t *testing.T) {
 	p.Answers(platformtest.Failed(400, 4000))
 	code, out, errOut = aicoded("status", id)
 	assert.Equal(t, 1, code, errOut)
-	assert.True(t, strings.HasSuffix(out, "    docs: https://aicoded.dev/docs/errors/E-CHK-004\n  partial checks: only aicoded check "+
-		"and the tests run; the full security checks come later\nfailed: 400 problems\n"), "an answer above 1 MiB")
+	assert.True(t, strings.HasSuffix(out, "    docs: https://aicoded.dev/docs/errors/E-CHK-004\n"+
+		"  partial checks: not every security check ran; the steps above say which\nfailed: 400 problems\n"), "an answer above 1 MiB")
 	code, out, _ = aicoded("status", "--json", id)
 	assert.Equal(t, 1, code)
 	require.NoError(t, json.Unmarshal([]byte(out), &got))

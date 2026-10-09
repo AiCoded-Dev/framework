@@ -59,8 +59,6 @@ Publishing uses these codes:
 - E-PUB-011 and E-PUB-014: a publish that ended in `error` or `refused`.
 - E-PUB-013: a publish id that the platform does not know in your organisation.
 - E-GATE-001 to E-GATE-008: `go.mod`, `go.sum` and the modules an app uses.
-- E-GATE-026: a `godebug` setting in `go.mod` or a `//go:debug` comment in a Go file, which
-  change Go's security defaults.
 - E-GATE-009 and E-GATE-010: the files of the commit.
 - E-GATE-011 and E-GATE-027: the commit's permission list, which must name the app and be
   readable.
@@ -74,6 +72,8 @@ Publishing uses these codes:
   calls but that are not critical or are in the Go standard library, known weaknesses that the app
   does not call, licences, capabilities reached without a building block, and directives that
   silence a check.
+- E-GATE-026: a `godebug` setting in `go.mod` or a `//go:debug` comment in a Go file, which
+  change Go's security defaults.
 
 `aicoded explain <CODE>` prints the page.
 

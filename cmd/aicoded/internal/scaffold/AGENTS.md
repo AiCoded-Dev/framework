@@ -125,11 +125,11 @@ With MCP, the same loop is a set of tools that take app names, never paths. Add 
 
 Publish only when the developer asks, and commit everything first: a publish sends the commit
 `HEAD` names, never what is not committed. Run `aicoded publish` in the app's folder, or call the
-MCP tool `publish` with the app and a summary of the change: it runs `aicoded check --frozen`
-without the tests, sends the commit to the platform's delivery pipeline and gives a publish id.
-`aicoded status <id>`, or `release_status`, shows the steps, the problems and the outcome. Tell
-the developer the outcome, and fix its problems as you fix those of `aicoded check`. On E-CLI-004,
-ask the developer to run `aicoded login`: signing in needs a person.
+MCP tool `publish` with the app and a summary: it runs `aicoded check --frozen` without the tests,
+sends the commit to the platform's delivery pipeline and gives a publish id. `aicoded status <id>`,
+or `release_status`, shows the steps, the problems, the notes (which never stop a publish) and the
+outcome. Tell the developer the outcome, and fix its problems as those of `aicoded check`. On
+E-CLI-004, ask the developer to run `aicoded login`: signing in needs a person.
 
 ## Where to read
 
