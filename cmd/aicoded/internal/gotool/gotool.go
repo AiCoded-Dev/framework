@@ -52,11 +52,11 @@ func Vet(ctx context.Context, dir string) ([]*errs.Error, error) {
 }
 
 // Test runs the tests of every package of the module in dir, with the race detector when race
-// is set.
+// is set. It takes no result from the test cache, where a test could have written one.
 func Test(ctx context.Context, dir string, race bool) ([]*errs.Error, error) {
-	args := []string{"test", "-json", "./..."}
+	args := []string{"test", "-json", "-count=1", "./..."}
 	if race {
-		args = []string{"test", "-json", "-race", "./..."}
+		args = []string{"test", "-json", "-count=1", "-race", "./..."}
 	}
 	r, err := run(ctx, dir, args...)
 	if err != nil {

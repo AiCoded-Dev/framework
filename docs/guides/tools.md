@@ -78,7 +78,8 @@ folder, or the one named.
   (E-CHK-001), as the security checks will.
 - The tests run with `-race` when cgo works (`go env CGO_ENABLED` is `1` and its C compiler is on
   `PATH`, as the first app that passes the precheck sees them); otherwise they run without it and
-  `check` says so, since the delivery pipeline will run them with `-race`.
+  `check` says so, since the delivery pipeline will run them with `-race`. They always run with
+  `-count=1`: a result in the go command's test cache never stands for a run.
 - With `--no-tests` it skips the tests and does not probe `-race`; every other step runs. The
   report says so: `no_tests` is `true` in JSON, and the text ends with
   `tests did not run (--no-tests)`. The `check` tool of `aicoded mcp` always runs the tests.

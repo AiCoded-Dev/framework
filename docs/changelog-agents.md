@@ -10,6 +10,8 @@ Changes to the API that AI assistants build apps with. Newest first.
   page that it does not come from, which could be past the page's end. Every page needs its code
   generated again: run `aicoded generate`, or `aicoded check`, which does; until then
   `aicoded check --frozen` and `aicoded publish` report the old file (E-CHK-001).
+- `aicoded check` runs the tests with `-count=1`, as the delivery pipeline does, so a result in
+  the go command's test cache never stands for a run: every test runs each time.
 - `aicoded generate` writes each `ssr:else-if` as an `if` inside the `else` block of the branch
   before it, not as `else if`, which staticcheck would offer to turn into a `switch` (QF1003) in
   code nobody can change. The page shows the same branch as before. A page with `ssr:else-if`

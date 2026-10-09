@@ -143,6 +143,7 @@ func TestTestFailures(t *testing.T) {
 // A go command that a signal ends, here go test, which a test kills, gives E-CHK-008 alone.
 func TestTestStoppedBySignal(t *testing.T) {
 	requireGo(t)
+	t.Setenv("GOTMPDIR", t.TempDir())
 	ps, err := Test(t.Context(), module(t, "stopped"), false)
 	require.NoError(t, err)
 	assert.Equal(t, []brief{{"E-CHK-008", "", "go test was stopped by signal 9 (killed)"}}, briefs(ps))
@@ -150,6 +151,24 @@ func TestTestStoppedBySignal(t *testing.T) {
 	page, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "docs", "errors", "E-CHK-008.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(page), "\n**Fix:** "+ps[0].Fix+".\n")
+}
+
+// go test runs with -count=1, so it takes no result from the test cache.
+func TestTestTakesNothingFromTheCache(t *testing.T) {
+	requireGo(t)
+	goPath, err := exec.LookPath("go")
+	require.NoError(t, err)
+	bin, log := t.TempDir(), filepath.Join(t.TempDir(), "args")
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho \"$*\" >>"+log+"\nexec "+goPath+" \"$@\"\n"), 0o700))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	dir := module(t, "ok")
+	for _, race := range []bool{false, true} {
+		_, err := Test(t.Context(), dir, race)
+		require.NoError(t, err)
+	}
+	args, err := os.ReadFile(log)
+	require.NoError(t, err)
+	assert.Equal(t, "test -json -count=1 ./...\ntest -json -count=1 -race ./...\n", string(args))
 }
 
 func TestTestRace(t *testing.T) {
