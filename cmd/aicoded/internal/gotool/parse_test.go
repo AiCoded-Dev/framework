@@ -88,6 +88,12 @@ vet: pages/p.go:10:12: undefined: undefinedY
 		{"E-CHK-002", "pages/p.go:10", "undefined: undefinedY"},
 	}, briefs(vetProblems(ran("go vet", "", stderr, true))))
 
+	assert.Equal(t, []brief{
+		{"E-CHK-003", "main.go:6", "printf: wrong"},
+		{"E-CHK-002", "pages/p.go:10", "undefined: undefinedY"},
+	}, briefs(vetProblems(ran("go vet", "{\n\t\"app\": {\"printf\": [{\"posn\": \"/work/app/main.go:6:14\", \"message\": \"wrong\"}]}\n}\n",
+		"# app/pages\nvet: pages/p.go:10:12: undefined: undefinedY\n", true))), "findings on stdout, as Go 1.26 prints them")
+
 	assert.Empty(t, vetProblems(ran("go vet", "", "# app\n# [app]\n{}\n", false)))
 	assert.Equal(t, []brief{{"E-CHK-002", "main.go:3", "package app/nope is not in std"}},
 		briefs(vetProblems(ran("go vet", "", "main.go:3:8: package app/nope is not in std\n", true))), "a package that does not load")

@@ -211,18 +211,27 @@ func buildProblems(r result) []*errs.Error {
 }
 
 // vetProblems turns what go vet -json printed into problems: an E-CHK-003 for each finding and an
-// E-CHK-002 for each compile error.
+// E-CHK-002 for each compile error. The go command prints the findings on stdout from Go 1.26 on,
+// and on stderr before; it prints compile errors on stderr.
 func vetProblems(r result) []*errs.Error {
+	ps, text := vetOutput(r.dir, r.stdout)
+	found, rest := vetOutput(r.dir, r.stderr)
+	return finish(r, append(ps, found...), text+rest)
+}
+
+// vetOutput returns the findings in the JSON objects that go vet -json printed in out, and the
+// other lines.
+func vetOutput(dir string, out []byte) ([]*errs.Error, string) {
 	var ps []*errs.Error
 	var text strings.Builder
 	var block []string
-	for line := range strings.Lines(string(r.stderr)) {
+	for line := range strings.Lines(string(out)) {
 		trimmed := strings.TrimRight(line, "\r\n")
 		switch {
 		case block != nil:
 			block = append(block, line)
 			if trimmed == "}" {
-				found, ok := vetFindings(r.dir, strings.Join(block, ""))
+				found, ok := vetFindings(dir, strings.Join(block, ""))
 				if !ok {
 					text.WriteString(strings.Join(block, ""))
 				}
@@ -232,7 +241,7 @@ func vetProblems(r result) []*errs.Error {
 		case trimmed == "{":
 			block = []string{line}
 		case strings.HasPrefix(trimmed, "{"):
-			found, ok := vetFindings(r.dir, trimmed)
+			found, ok := vetFindings(dir, trimmed)
 			if !ok {
 				text.WriteString(line)
 			}
@@ -241,7 +250,7 @@ func vetProblems(r result) []*errs.Error {
 			text.WriteString(line)
 		}
 	}
-	return finish(r, ps, text.String())
+	return ps, text.String()
 }
 
 // vetFindings returns the findings in one JSON object go vet -json printed, and false when data

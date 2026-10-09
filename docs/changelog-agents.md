@@ -4,6 +4,8 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `aicoded check` reports what `go vet` finds (E-CHK-003) with Go 1.26 too, which prints it on
+  stdout; with Go 1.26 it used to pass over those findings.
 - A publish has notes: findings in the shape of problems that do not stop it. `aicoded publish` and
   `aicoded status` print each after the problems, on a line that starts with `note:`;
   `aicoded status --json` and the `release_status` tool of `aicoded mcp` return them as `notes`,
