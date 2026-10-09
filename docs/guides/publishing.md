@@ -160,8 +160,8 @@ the change record names too.
 `checkout` and `modules` come first, and a problem in either skips the rest. The steps from
 `check` to `capabilities` run no code of the app, and all of them run whatever one finds, so one
 publish shows every problem they find. `build` and `tests` run only when all of them passed. A
-step that runs out of time, memory or disk is E-GATE-012, and tests that stop the checks are
-E-GATE-028. A finding of a check that has no code of its own is E-GATE-000.
+step that runs out of time, memory or disk is E-GATE-012, and tests that stop the checks, or
+the go command that runs them (E-CHK-008), are E-GATE-028. A finding of a check that has no code of its own is E-GATE-000.
 
 Each check runs with the platform's own configuration, so nothing in the app's repository, such
 as a `.golangci.yml`, a `.gitleaksignore`, a `.gitleaks.toml`, a `gitleaks:allow` comment, an

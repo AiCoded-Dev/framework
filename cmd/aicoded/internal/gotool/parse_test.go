@@ -3,6 +3,7 @@ package gotool
 import (
 	"fmt"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,6 +15,24 @@ import (
 // ran is a run of the go command in /work/app that printed stdout and stderr.
 func ran(cmd, stdout, stderr string, failed bool) result {
 	return result{cmd: cmd, dir: "/work/app", stdout: []byte(stdout), stderr: []byte(stderr), failed: failed}
+}
+
+// What a run that a signal ended printed is cut short: its one problem is E-CHK-008, whatever
+// else it printed.
+func TestStoppedRunProblems(t *testing.T) {
+	failure := `{"Action":"fail","Package":"app","Test":"TestX"}` + "\n"
+	for _, c := range []struct {
+		cmd      string
+		problems func(result) []*errs.Error
+	}{
+		{"go build", buildProblems},
+		{"go vet", vetProblems},
+		{"go test", func(r result) []*errs.Error { return testProblems(r, "app") }},
+	} {
+		r := ran(c.cmd, failure, "main.go:3:1: undefined: x\n", true)
+		r.signal = syscall.SIGTERM
+		assert.Equal(t, []brief{{"E-CHK-008", "", c.cmd + " was stopped by signal 15 (terminated)"}}, briefs(c.problems(r)), c.cmd)
+	}
 }
 
 func TestBuildProblems(t *testing.T) {

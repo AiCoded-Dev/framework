@@ -18,14 +18,16 @@ import (
 )
 
 const (
-	codeBuild = "E-CHK-002"
-	codeVet   = "E-CHK-003"
-	codeTest  = "E-CHK-004"
+	codeBuild   = "E-CHK-002"
+	codeVet     = "E-CHK-003"
+	codeTest    = "E-CHK-004"
+	codeStopped = "E-CHK-008"
 
-	fixBuild = "fix the Go code at this line"
-	fixGo    = "fix what the go command reports in this message"
-	fixVet   = "fix the code as the message says; go vet will run in the security checks too"
-	fixTest  = "fix the code or the test until go test passes"
+	fixBuild   = "fix the Go code at this line"
+	fixGo      = "fix what the go command reports in this message"
+	fixVet     = "fix the code as the message says; go vet will run in the security checks too"
+	fixTest    = "fix the code or the test until go test passes"
+	fixStopped = "do not signal, kill or wait on other processes in tests; when no test does, give the go command more memory and run the check again"
 
 	// maxOutput is how much of the go command's output one problem carries.
 	maxOutput = 4 << 10
@@ -183,8 +185,12 @@ func unexplained(what, text string) *errs.Error {
 }
 
 // finish adds the compile errors in text, what r printed outside its JSON, when r failed, and one
-// problem for a failed run that nothing else explains. It sorts the problems by position.
+// problem for a failed run that nothing else explains. It sorts the problems by position. A run
+// that a signal ended has the one problem E-CHK-008 instead, since what it printed is cut short.
 func finish(r result, ps []*errs.Error, text string) []*errs.Error {
+	if e := r.stopped(); e != nil {
+		return []*errs.Error{e}
+	}
 	if r.failed {
 		found, rest := compileErrors(r.dir, text)
 		ps = append(ps, found...)

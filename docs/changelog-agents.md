@@ -4,6 +4,10 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- A go command that a signal stops while `aicoded check` or `aicoded dev` runs it, such as the
+  `go test` that a test kills, is the new E-CHK-008, which names the command and the signal,
+  rather than E-CHK-002: its output is cut short, so it reports nothing else. In the delivery
+  pipeline the tests step reports it as E-GATE-028.
 - `aicoded check` reports what `go vet` finds (E-CHK-003) with Go 1.26 too, which prints it on
   stdout; with Go 1.26 it used to pass over those findings. When `go vet` prints anything else it
   cannot read, the check fails with E-CHK-002, which quotes what `go vet` printed. It runs `go vet`

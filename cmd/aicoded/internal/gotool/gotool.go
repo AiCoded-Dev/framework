@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"aicoded.dev/framework/internal/errs"
@@ -70,6 +71,9 @@ func Race(ctx context.Context, dir string) (ok bool, why string, err error) {
 	if err != nil {
 		return false, "", err
 	}
+	if e := r.stopped(); e != nil {
+		return false, "", e
+	}
 	if r.failed {
 		return false, "", fmt.Errorf("go env failed: %s", limit(string(r.stderr)))
 	}
@@ -93,11 +97,15 @@ func Race(ctx context.Context, dir string) (ok bool, why string, err error) {
 	return true, "", nil
 }
 
-// Tidy runs go mod tidy in dir. It fails with E-CHK-006 when go mod tidy does.
+// Tidy runs go mod tidy in dir. It fails with E-CHK-006 when go mod tidy does, and with E-CHK-008
+// when a signal ends it.
 func Tidy(ctx context.Context, dir string) error {
 	r, err := run(ctx, dir, "mod", "tidy")
 	if err != nil {
 		return err
+	}
+	if e := r.stopped(); e != nil {
+		return e
 	}
 	if r.failed {
 		return errs.New("E-CHK-006", "go mod tidy failed: "+limit(string(r.stderr)),
@@ -124,7 +132,18 @@ type result struct {
 	cmd            string // "go <subcommand>"
 	dir            string // the absolute folder it ran in
 	stdout, stderr []byte
-	failed         bool // it exited with a status other than 0
+	failed         bool // it exited with a status other than 0, or a signal ended it
+	// signal is the signal that ended it, or 0.
+	signal syscall.Signal
+}
+
+// stopped returns E-CHK-008 when a signal ended the run, which then printed less than it would
+// have, and nil otherwise.
+func (r result) stopped() *errs.Error {
+	if r.signal == 0 {
+		return nil
+	}
+	return errs.New(codeStopped, fmt.Sprintf("%s was stopped by signal %d (%s)", r.cmd, int(r.signal), r.signal), fixStopped)
 }
 
 // run runs go with args in dir. An exit status other than 0 is not an error; the error is a
@@ -151,7 +170,11 @@ func run(ctx context.Context, dir string, args ...string) (result, error) {
 	default:
 		return result{}, err
 	}
-	return result{cmd: "go " + args[0], dir: dir, stdout: stdout.Bytes(), stderr: stderr.Bytes(), failed: err != nil}, nil
+	r := result{cmd: "go " + args[0], dir: dir, stdout: stdout.Bytes(), stderr: stderr.Bytes(), failed: err != nil}
+	if ws, ok := cmd.ProcessState.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
+		r.signal = ws.Signal()
+	}
+	return r, nil
 }
 
 // modulePath returns the module path in the go.mod of dir, or "" when there is none.

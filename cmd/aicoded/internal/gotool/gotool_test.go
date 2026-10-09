@@ -140,6 +140,15 @@ func TestTestFailures(t *testing.T) {
 	}, briefs(ps))
 }
 
+// A go command that a signal ends, here go test, which a test kills, gives E-CHK-008 alone.
+func TestTestStoppedBySignal(t *testing.T) {
+	requireGo(t)
+	ps, err := Test(t.Context(), module(t, "stopped"), false)
+	require.NoError(t, err)
+	assert.Equal(t, []brief{{"E-CHK-008", "", "go test was stopped by signal 9 (killed)"}}, briefs(ps))
+	assert.Equal(t, "do not signal, kill or wait on other processes in tests; when no test does, give the go command more memory and run the check again", ps[0].Fix)
+}
+
 func TestTestRace(t *testing.T) {
 	requireGo(t)
 	dir := module(t, "ok")
