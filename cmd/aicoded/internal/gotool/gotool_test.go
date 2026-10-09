@@ -115,6 +115,15 @@ func TestVet(t *testing.T) {
 	assert.Empty(t, ps)
 }
 
+// Vet reads go vet's findings when GOFLAGS asks the go command to print more.
+func TestVetVerbose(t *testing.T) {
+	requireGo(t)
+	t.Setenv("GOFLAGS", "-v -x")
+	ps, err := Vet(t.Context(), module(t, "vet"))
+	require.NoError(t, err)
+	assert.Equal(t, []brief{{"E-CHK-003", "main.go:6", `printf: fmt.Printf format %d has arg "text" of wrong type string`}}, briefs(ps))
+}
+
 func TestTestFailures(t *testing.T) {
 	requireGo(t)
 	ps, err := Test(t.Context(), module(t, "failing"), false)

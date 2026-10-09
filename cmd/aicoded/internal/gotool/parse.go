@@ -212,15 +212,36 @@ func buildProblems(r result) []*errs.Error {
 
 // vetProblems turns what go vet -json printed into problems: an E-CHK-003 for each finding and an
 // E-CHK-002 for each compile error. The go command prints the findings on stdout from Go 1.26 on,
-// and on stderr before; it prints compile errors on stderr.
+// and on stderr before; it prints compile errors on stderr. A run that passes but printed anything
+// besides findings, package headers and download notices is an E-CHK-002 too, since findings it
+// printed in another form would go unread.
 func vetProblems(r result) []*errs.Error {
 	ps, text := vetOutput(r.dir, r.stdout)
 	found, rest := vetOutput(r.dir, r.stderr)
-	return finish(r, append(ps, found...), text+rest)
+	ps, text = append(ps, found...), text+rest
+	if unread := unreadVet(text); !r.failed && unread != "" {
+		msg := "go vet printed what aicoded check cannot read, so its findings are unknown: " + limit(unread)
+		ps = append(ps, errs.New(codeBuild, msg, fixGo))
+	}
+	return finish(r, ps, text)
+}
+
+// unreadVet returns the lines of text, what go vet -json printed outside its findings, that are
+// not blank, package headers or download notices.
+func unreadVet(text string) string {
+	var unread strings.Builder
+	for line := range strings.Lines(text) {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(line, "# ") || strings.HasPrefix(trimmed, "go: downloading ") {
+			continue
+		}
+		unread.WriteString(line)
+	}
+	return unread.String()
 }
 
 // vetOutput returns the findings in the JSON objects that go vet -json printed in out, and the
-// other lines.
+// other lines, an object left open included.
 func vetOutput(dir string, out []byte) ([]*errs.Error, string) {
 	var ps []*errs.Error
 	var text strings.Builder
@@ -250,6 +271,7 @@ func vetOutput(dir string, out []byte) ([]*errs.Error, string) {
 			text.WriteString(line)
 		}
 	}
+	text.WriteString(strings.Join(block, ""))
 	return ps, text.String()
 }
 

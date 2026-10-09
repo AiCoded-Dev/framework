@@ -95,6 +95,17 @@ vet: pages/p.go:10:12: undefined: undefinedY
 		"# app/pages\nvet: pages/p.go:10:12: undefined: undefinedY\n", true))), "findings on stdout, as Go 1.26 prints them")
 
 	assert.Empty(t, vetProblems(ran("go vet", "", "# app\n# [app]\n{}\n", false)))
+	assert.Empty(t, vetProblems(ran("go vet", "{}\n", "go: downloading example.com/x v1.0.0\n", false)), "a download notice")
+	const unread = "go vet printed what aicoded check cannot read, so its findings are unknown: "
+	for _, c := range []struct{ stdout, stderr, unread string }{
+		{"main.go:6:14: a finding in a form of its own\n", "", "main.go:6:14: a finding in a form of its own"},
+		{"{\n\t\"app\": {\"printf\": [\n", "", "{\n\t\"app\": {\"printf\": ["},
+		{`{"app": ["x"]}` + "\n", "", `{"app": ["x"]}`},
+		{"", "# app\n# [app]\n[]\n", "[]"},
+	} {
+		assert.Equal(t, []brief{{"E-CHK-002", "", unread + c.unread}}, briefs(vetProblems(ran("go vet", c.stdout, c.stderr, false))),
+			"vet printed %q and %q and passed", c.stdout, c.stderr)
+	}
 	assert.Equal(t, []brief{{"E-CHK-002", "main.go:3", "package app/nope is not in std"}},
 		briefs(vetProblems(ran("go vet", "", "main.go:3:8: package app/nope is not in std\n", true))), "a package that does not load")
 }

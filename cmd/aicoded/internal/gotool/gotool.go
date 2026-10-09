@@ -40,9 +40,10 @@ func BuildBinary(ctx context.Context, dir, out string) ([]*errs.Error, error) {
 	return buildProblems(r), nil
 }
 
-// Vet runs go vet on every package of the module in dir.
+// Vet runs go vet on every package of the module in dir. It turns off -v and -x, which GOFLAGS
+// may set, so that the go command prints nothing but what vetProblems reads.
 func Vet(ctx context.Context, dir string) ([]*errs.Error, error) {
-	r, err := run(ctx, dir, "vet", "-json", "./...")
+	r, err := run(ctx, dir, "vet", "-json", "-v=false", "-x=false", "./...")
 	if err != nil {
 		return nil, err
 	}
