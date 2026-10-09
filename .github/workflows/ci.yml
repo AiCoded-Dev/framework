@@ -29,15 +29,14 @@ jobs:
       AICODED_TEST_MYSQL_DSN: root:root@tcp(127.0.0.1:3306)/
     strategy:
       matrix:
-        go: ["1.25.x", "1.26.x"]
+        go: ["1.26.x"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      # setup-go sets GOTOOLCHAIN=local; auto lets cmd/aicoded fetch the Go its go.mod names on 1.25.x.
-      - run: GOTOOLCHAIN=auto make test
+      - run: make test
 
   lint:
     runs-on: ubuntu-24.04

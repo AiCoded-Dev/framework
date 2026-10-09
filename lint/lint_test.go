@@ -327,7 +327,7 @@ func proxyApp(t *testing.T, framework bool, mod string, files map[string]string,
 	}
 	downloads := filepath.Join(goEnv(t, "GOMODCACHE"), "cache", "download")
 	proxy := filepath.Join(t.TempDir(), "proxy")
-	files["go.mod"] = "module " + mod + "\n\ngo 1.25.0\n"
+	files["go.mod"] = "module " + mod + "\n\ngo 1.26.0\n"
 	publishModule(t, proxy, mod, "v1.0.0", files)
 	t.Setenv("GOFLAGS", "-modcacherw")
 	t.Setenv("GOWORK", "off")
@@ -336,7 +336,7 @@ func proxyApp(t *testing.T, framework bool, mod string, files map[string]string,
 	t.Setenv("GOSUMDB", "off")
 	t.Setenv("GOTOOLCHAIN", "local")
 	app := t.TempDir()
-	gomod := "module app\n\ngo 1.25.0\n"
+	gomod := "module app\n\ngo 1.26.0\n"
 	if framework {
 		gomod += "\nrequire aicoded.dev/framework v0.0.0-00010101000000-000000000000\n\nreplace aicoded.dev/framework => " + checkout(t) + "\n"
 	}
@@ -511,19 +511,19 @@ func TestReplace(t *testing.T) {
 	}, only("E-LINT-011", runWith(t, "names", lint.Config{})), "a released aicoded accepts no replace")
 
 	app := t.TempDir()
-	write(t, app, "go.mod", "module app\n\ngo 1.25.0\n\n"+
+	write(t, app, "go.mod", "module app\n\ngo 1.26.0\n\n"+
 		"replace aicoded.dev/framework => ./framework\n\n"+
 		"replace aicoded.dev/framework v0.1.0 => example.com/fork v0.1.0\n\n"+
 		"replace aicoded.dev/framework v0.2.0 => "+link+"\n")
 	write(t, app, "main.go", "package main\n\nfunc main() {}\n")
-	write(t, app, "framework/go.mod", "module aicoded.dev/framework\n\ngo 1.25.0\n")
+	write(t, app, "framework/go.mod", "module aicoded.dev/framework\n\ngo 1.26.0\n")
 	other := []string{
 		`go.mod:5: E-LINT-011: go.mod replaces aicoded.dev/framework with ./framework, which is not the framework checkout this aicoded was installed from`,
 		`go.mod:7: E-LINT-011: go.mod replaces aicoded.dev/framework with example.com/fork v0.1.0, which is not the framework checkout this aicoded was installed from`,
 	}
 	assert.Equal(t, other, runIn(t, app, lint.Config{FrameworkDir: checkout(t)}), "the framework replaced with another folder or module")
 
-	write(t, app, "go.work", "go 1.25.0\n\nuse .\n")
+	write(t, app, "go.work", "go 1.26.0\n\nuse .\n")
 	assert.Equal(t, append(other,
 		`go.work:1: E-LINT-011: the go command builds the app with the workspace file go.work, whose use and replace lines stand in for modules`,
 	), runIn(t, app, lint.Config{FrameworkDir: checkout(t)}), "a workspace file")
@@ -532,7 +532,7 @@ func TestReplace(t *testing.T) {
 func TestVendor(t *testing.T) {
 	t.Setenv("GOFLAGS", "")
 	app := t.TempDir()
-	write(t, app, "go.mod", "module app\n\ngo 1.25.0\n")
+	write(t, app, "go.mod", "module app\n\ngo 1.26.0\n")
 	write(t, app, "main.go", "package main\n\nfunc main() {}\n")
 	write(t, app, "vendor/modules.txt", "")
 	assert.Equal(t, []string{"vendor/modules.txt:1: E-LINT-011: the go command builds the app from its vendor folder, which can hold a changed copy of any module"},
@@ -550,7 +550,7 @@ func TestPrecheck(t *testing.T) {
 	}
 	t.Setenv("GOFLAGS", "")
 	app := t.TempDir()
-	write(t, app, "go.mod", "module app\n\ngo 1.25.0\n")
+	write(t, app, "go.mod", "module app\n\ngo 1.26.0\n")
 	write(t, app, "main.go", "package main\n\nfunc main() {}\n")
 	ps, err := lint.Precheck(t.Context(), app)
 	require.NoError(t, err)
@@ -576,7 +576,7 @@ func TestPrecheck(t *testing.T) {
 
 func TestGoflags(t *testing.T) {
 	app := t.TempDir()
-	write(t, app, "go.mod", "module app\n\ngo 1.25.0\n")
+	write(t, app, "go.mod", "module app\n\ngo 1.26.0\n")
 	write(t, app, "main.go", "package main\n\nfunc main() {}\n")
 	for _, fl := range []string{
 		"-overlay=/x/overlay.json",
@@ -635,7 +635,7 @@ const allowedGoflags = "only -mod=mod, -mod=readonly, -modcacherw, -trimpath, -b
 
 func TestGoflagsGoEnv(t *testing.T) {
 	app := t.TempDir()
-	write(t, app, "go.mod", "module app\n\ngo 1.25.0\n")
+	write(t, app, "go.mod", "module app\n\ngo 1.26.0\n")
 	write(t, app, "main.go", "package main\n\nfunc main() {}\n")
 	goenv := filepath.Join(t.TempDir(), "env")
 	t.Setenv("GOENV", goenv)
@@ -694,7 +694,7 @@ func TestEditedCache(t *testing.T) {
 	cache := filepath.Join(home, "modcache")
 	proxy := filepath.Join(home, "proxy")
 	publishModule(t, proxy, "example.com/dep", "v1.0.0", map[string]string{
-		"go.mod":    "module example.com/dep\n\ngo 1.25.0\n",
+		"go.mod":    "module example.com/dep\n\ngo 1.26.0\n",
 		"dep.go":    "// Package dep is a plain module.\npackage dep\n\n// N is a number.\nconst N = 1\n",
 		"README.md": "dep\n",
 	})
@@ -709,7 +709,7 @@ func TestEditedCache(t *testing.T) {
 		_ = filepath.WalkDir(cache, func(p string, _ os.DirEntry, _ error) error { _ = os.Chmod(p, 0o700); return nil })
 	})
 	app := t.TempDir()
-	write(t, app, "go.mod", "module app\n\ngo 1.25.0\n\nrequire example.com/dep v1.0.0\n")
+	write(t, app, "go.mod", "module app\n\ngo 1.26.0\n\nrequire example.com/dep v1.0.0\n")
 	write(t, app, "main.go", "package main\n\nimport \"example.com/dep\"\n\nfunc main() { _ = dep.N }\n")
 	goRun(t, app, "mod", "download")
 	goRun(t, app, "mod", "tidy")
@@ -765,9 +765,9 @@ func goRun(t *testing.T, dir string, args ...string) {
 func TestWorkAbove(t *testing.T) {
 	parent := t.TempDir()
 	app := filepath.Join(parent, "app")
-	write(t, app, "go.mod", "module app\n\ngo 1.25.0\n")
+	write(t, app, "go.mod", "module app\n\ngo 1.26.0\n")
 	write(t, app, "main.go", "package main\n\nfunc main() {}\n")
-	write(t, parent, "go.work", "go 1.25.0\n\nuse ./app\n")
+	write(t, parent, "go.work", "go 1.26.0\n\nuse ./app\n")
 	lines := only("E-LINT-011", runIn(t, app, lint.Config{FrameworkDir: checkout(t)}))
 	require.Len(t, lines, 1, "a go.work above the app is found and refused")
 	assert.Equal(t, filepath.Join(parent, "go.work")+":1: E-LINT-011: the go command builds the app with the workspace file "+filepath.Join(parent, "go.work")+", whose use and replace lines stand in for modules", lines[0])

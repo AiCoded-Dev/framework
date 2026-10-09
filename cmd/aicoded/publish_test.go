@@ -203,7 +203,7 @@ func TestRunPublishBaseChanged(t *testing.T) {
 
 func TestRunPublishRefusesTheRepository(t *testing.T) {
 	p, aicoded := signedIn(t)
-	app := map[string]string{"aicoded.yaml": "app: demo\n", "go.mod": "module demo\n\ngo 1.25.0\n", "main.go": "package main\n\nfunc main() {}\n"}
+	app := map[string]string{"aicoded.yaml": "app: demo\n", "go.mod": "module demo\n\ngo 1.26.0\n", "main.go": "package main\n\nfunc main() {}\n"}
 
 	outside := t.TempDir()
 	gittest.Write(t, outside, app)
@@ -251,7 +251,7 @@ func TestRunPublishRefusesBeforeSending(t *testing.T) {
 	assert.Contains(t, errOut, "E-PUB-004: aicoded check --frozen --no-tests found problems in demo, so nothing was sent\n")
 
 	replaced := gittest.NewApp(t, "demo")
-	gittest.Write(t, replaced, map[string]string{"go.mod": "module demo\n\ngo 1.25.0\n\nreplace example.com/x => ../x\n"})
+	gittest.Write(t, replaced, map[string]string{"go.mod": "module demo\n\ngo 1.26.0\n\nreplace example.com/x => ../x\n"})
 	gittest.Commit(t, replaced, "Replace a module")
 	code, out, errOut = aicoded("publish", replaced)
 	assert.Equal(t, 1, code)

@@ -96,9 +96,9 @@ func fill(ctx context.Context, dir, name string, fw Framework) error {
 // goMod returns the go.mod of the app name, which requires the framework fw.
 func goMod(name string, fw Framework) string {
 	if fw.Dir == "" {
-		return fmt.Sprintf("module %s\n\ngo 1.25.0\n\nrequire %s %s\n", name, lint.Framework, fw.Version)
+		return fmt.Sprintf("module %s\n\ngo 1.26.0\n\nrequire %s %s\n", name, lint.Framework, fw.Version)
 	}
-	return fmt.Sprintf("module %s\n\ngo 1.25.0\n\nrequire %s %s\n\nreplace %s => %s\n",
+	return fmt.Sprintf("module %s\n\ngo 1.26.0\n\nrequire %s %s\n\nreplace %s => %s\n",
 		name, lint.Framework, unreleased, lint.Framework, strconv.Quote(fw.Dir))
 }
 

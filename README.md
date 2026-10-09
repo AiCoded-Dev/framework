@@ -13,8 +13,10 @@ Module: `aicoded.dev/framework`
 
 ## Quick start
 
-You need Go 1.25 or later and Chrome. `make install` puts `aicoded` in `$(go env GOPATH)/bin`,
-which must be on your `PATH`. In a checkout of this repository:
+You need Go 1.26 or later and Chrome. `make install` puts `aicoded` in `$(go env GOPATH)/bin`,
+which must be on your `PATH`. `aicoded` from v0.3.0 on, and every app, need Go 1.26: with the
+default `GOTOOLCHAIN=auto` an older go command downloads it, and with `GOTOOLCHAIN=local` it
+refuses. In a checkout of this repository:
 
 ```sh
 make install          # installs aicoded from this checkout
@@ -50,7 +52,7 @@ offline, and the `howto` tool of `aicoded mcp` gives the same pages to your AI a
 
 ## Requirements
 
-Go 1.25 or later. An app that keeps data in its SQL database needs a MySQL 8 server on your
+Go 1.26 or later. An app that keeps data in its SQL database needs a MySQL 8 server on your
 computer to run under `aicoded dev`.
 
 ## Checks

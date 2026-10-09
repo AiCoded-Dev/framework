@@ -187,7 +187,7 @@ func testApp(t *testing.T, test string) string {
 	dir := t.TempDir()
 	for name, data := range map[string]string{
 		"aicoded.yaml": "app: calc\n# access is written by aicoded generate from <ssr:access>; do not edit it\naccess: {}\n",
-		"go.mod":       "module calc\n\ngo 1.25.0\n",
+		"go.mod":       "module calc\n\ngo 1.26.0\n",
 		"main.go":      "package main\n\nfunc main() {}\n",
 		"main_test.go": "package main\n\nimport \"testing\"\n\nfunc TestCalc(t *testing.T) {\n\t" + test + "\n}\n",
 	} {

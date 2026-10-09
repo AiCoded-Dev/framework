@@ -1,6 +1,6 @@
 module modules
 
-go 1.25.0
+go 1.26.0
 
 require (
 	example.com/caps v0.1.0

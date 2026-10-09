@@ -198,7 +198,10 @@ security sees them. Fix what the check reports instead of silencing it.
 
 A `godebug` setting in `go.mod` and a `//go:debug` comment in a Go file change how Go behaves at
 run time, and some turn off its security defaults, so the delivery pipeline refuses both
-(E-GATE-026). Leave Go's defaults as they are.
+(E-GATE-026). Leave Go's defaults as they are. The `go` line of `go.mod` selects Go's defaults
+too, so the delivery pipeline also refuses a `go` line older than the release of the Go it builds
+with, such as `go 1.25.0` when it builds with Go 1.26 (E-GATE-026): `go mod edit -go=1.26.0`
+raises it.
 
 The simulated attacks (L7) do not run yet, so a publish whose `lint` step ran says
 `checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later`. Any

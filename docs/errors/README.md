@@ -72,8 +72,8 @@ Publishing uses these codes:
   calls but that are not critical or are in the Go standard library, known weaknesses that the app
   does not call, licences, capabilities reached without a building block, and directives that
   silence a check.
-- E-GATE-026: a `godebug` setting in `go.mod` or a `//go:debug` comment in a Go file, which
-  change Go's security defaults.
+- E-GATE-026: a `godebug` setting in `go.mod`, a `//go:debug` comment in a Go file, or a `go`
+  line older than the Go of the delivery pipeline, which change Go's security defaults.
 
 `aicoded explain <CODE>` prints the page.
 

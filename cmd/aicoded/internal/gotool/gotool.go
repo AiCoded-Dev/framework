@@ -124,7 +124,7 @@ func Find() error {
 
 // noGo is the error of a go command that is not on PATH.
 func noGo() error {
-	return errs.New("E-CHK-005", "the go command is not on PATH", "install Go 1.25 or newer and put go on PATH")
+	return errs.New("E-CHK-005", "the go command is not on PATH", "install Go 1.26 or newer and put go on PATH")
 }
 
 // result is what one run of the go command printed.

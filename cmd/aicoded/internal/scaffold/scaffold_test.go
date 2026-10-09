@@ -51,7 +51,7 @@ func TestCreate(t *testing.T) {
 		"; the delivery pipeline will refuse a replace line, so require a released version before you publish\n", out.String())
 
 	gomod := read(t, dir, "go.mod")
-	assert.Contains(t, gomod, "module notes\n\ngo 1.25.0\n")
+	assert.Contains(t, gomod, "module notes\n\ngo 1.26.0\n")
 	assert.Contains(t, gomod, "require aicoded.dev/framework v0.0.0-00010101000000-000000000000\n")
 	assert.Contains(t, gomod, "\nreplace aicoded.dev/framework => "+checkout+"\n")
 	assert.FileExists(t, filepath.Join(dir, "go.sum"))

@@ -5,7 +5,9 @@ change the page. You need Go and Chrome; there is no Node.js or npm to install.
 
 ## What you need
 
-- Go 1.25 or later, with `go` on `PATH`.
+- Go 1.26 or later, with `go` on `PATH`. `aicoded` from v0.3.0 on, and every app, need Go 1.26:
+  with the default `GOTOOLCHAIN=auto` an older go command downloads it, and with
+  `GOTOOLCHAIN=local` it refuses.
 - Chrome. Firefox should work but is not tested. Safari does not work: it drops the persona
   cookie on plain http, and macOS does not resolve `*.localhost`.
 - A MySQL 8 server on your computer, once the app keeps data in its SQL database.

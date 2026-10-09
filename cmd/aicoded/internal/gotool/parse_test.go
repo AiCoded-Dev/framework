@@ -228,9 +228,9 @@ func TestTestProblemsWithoutEvents(t *testing.T) {
 
 func TestParseModule(t *testing.T) {
 	for data, want := range map[string]string{
-		"module shop\n\ngo 1.25.0\n":                 "shop",
+		"module shop\n\ngo 1.26.0\n":                 "shop",
 		"// a comment\nmodule \"ex.com/a b\" // x\n": "ex.com/a b",
-		"go 1.25.0\n": "",
+		"go 1.26.0\n": "",
 		"modules x\n": "",
 	} {
 		assert.Equal(t, want, parseModule([]byte(data)), data)

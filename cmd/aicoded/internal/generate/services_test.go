@@ -35,7 +35,7 @@ func Get(ctx context.Context, in GetIn) (GetOut, error) { return GetOut{}, nil }
 func rpcApp(t *testing.T, src string) string {
 	t.Helper()
 	dir := t.TempDir()
-	write(t, dir, "go.mod", "module example.com/billing\n\ngo 1.25.0\n")
+	write(t, dir, "go.mod", "module example.com/billing\n\ngo 1.26.0\n")
 	write(t, dir, "aicoded.yaml", "# billing app\napp: billing\n")
 	write(t, dir, "rpc/billing.go", src)
 	return dir
@@ -224,7 +224,7 @@ var heldBilling = rpcschema.Schema{
 func shopApp(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	write(t, dir, "go.mod", "module example.com/shop\n\ngo 1.25.0\n")
+	write(t, dir, "go.mod", "module example.com/shop\n\ngo 1.26.0\n")
 	write(t, dir, "aicoded.yaml", "app: shop\n")
 	write(t, dir, ".aicoded/services/billing.json", string(heldBilling.Marshal()))
 	write(t, dir, "main.go", `package main

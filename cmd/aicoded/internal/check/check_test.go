@@ -86,7 +86,7 @@ func calc(t *testing.T, root, name string, fails bool) string {
 	}
 	write(t, filepath.Join(dir, "aicoded.yaml"), "app: "+name+"\n"+
 		"# access is written by aicoded generate from <ssr:access>; do not edit it\naccess: {}\n")
-	write(t, filepath.Join(dir, "go.mod"), "module "+name+"\n\ngo 1.25.0\n")
+	write(t, filepath.Join(dir, "go.mod"), "module "+name+"\n\ngo 1.26.0\n")
 	write(t, filepath.Join(dir, "main.go"), "package main\n\nfunc main() {}\n")
 	write(t, filepath.Join(dir, "calc", "calc.go"), "// Package calc adds.\npackage calc\n\n// Add returns a plus b.\nfunc Add(a, b int) int { return a + b }\n")
 	write(t, filepath.Join(dir, "calc", "calc_test.go"), `package calc
@@ -319,7 +319,7 @@ func TestCheckFrozenDrift(t *testing.T) {
 	root := tempRoot(t)
 	dir := filepath.Join(root, "shop")
 	write(t, filepath.Join(dir, "aicoded.yaml"), "app: shop\n")
-	write(t, filepath.Join(dir, "go.mod"), "module shop\n\ngo 1.25.0\n")
+	write(t, filepath.Join(dir, "go.mod"), "module shop\n\ngo 1.26.0\n")
 	write(t, filepath.Join(dir, "pages", "index.html"), `<!doctype html><html><head><ssr:access role="*"/><title>Shop</title></head><body></body></html>`)
 	require.NoError(t, generate.Generate(dir))
 	route := filepath.Join(dir, "pages", "route_gen.go")

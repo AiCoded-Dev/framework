@@ -4,6 +4,14 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- Apps are on Go 1.26: the framework's `go.mod` says `go 1.26.0`, and so does the `go.mod` of an
+  app that `aicoded init` creates. An app's `go` line selects Go's security defaults, and the
+  delivery pipeline refuses a `go` line older than the release of the Go it builds with, such as
+  `go 1.25.0` when it builds with Go 1.26 (E-GATE-026). When an app moves to framework v0.3.0,
+  `go get aicoded.dev/framework@v0.3.0` raises its `go` line; otherwise run
+  `go mod edit -go=1.26.0`, then `go mod tidy`. `aicoded` from v0.3.0 on, and every app, need
+  Go 1.26: with the default `GOTOOLCHAIN=auto` an older go command downloads it, and with
+  `GOTOOLCHAIN=local` it refuses. The fix of E-CHK-005 now asks for Go 1.26 or newer.
 - `aicoded generate` ends the code that it writes from a page's template with a comment
   `//line route_gen.go:<n>`, so the go command, `aicoded check` and the delivery pipeline's checks
   report a problem in the code after it at its own line of `route_gen.go`, not at a line of the
@@ -48,12 +56,13 @@ Changes to the API that AI assistants build apps with. Newest first.
   steps and their layers. New codes: E-GATE-000 (a finding with no code of its own), E-GATE-013 to
   E-GATE-017 (staticcheck, gosec, errcheck, bodyclose and sqlclosecheck), E-GATE-018 and
   E-GATE-019 (a secret in the code or in its history), E-GATE-020 (a critical known weakness the
-  app calls), E-GATE-026 (a `godebug` line in `go.mod` or a `//go:debug` comment in a Go file,
-  which change Go's security defaults), E-GATE-027 (an `aicoded.yaml` that is missing, cannot be
-  read or names no app), E-GATE-028 (tests that stopped the checks), and the notes E-GATE-021 to
-  E-GATE-025 (a known weakness that the app calls but that is not critical or is in the Go
-  standard library, one that the app does not call, a licence that is forbidden or not recognised,
-  a capability reached without a building block, and a directive that silences a check).
+  app calls), E-GATE-026 (a `godebug` line in `go.mod`, a `//go:debug` comment in a Go file, or
+  a `go` line older than the Go of the delivery pipeline, which change Go's security defaults),
+  E-GATE-027 (an `aicoded.yaml` that is missing, cannot be read or names no app), E-GATE-028
+  (tests that stopped the checks), and the notes E-GATE-021 to E-GATE-025 (a known weakness that
+  the app calls but that is not critical or is in the Go standard library, one that the app does
+  not call, a licence that is forbidden or not recognised, a capability reached without a building
+  block, and a directive that silences a check).
 - `aicoded describe` and the `describe` tool of `aicoded mcp` show the new fields of the
   permission list, each only when the app has it. The text gains the lines `class`, `owner`,
   `audience` and `external audience` after the `app` line, `connectors` after `files`, `egress`

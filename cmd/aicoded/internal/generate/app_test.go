@@ -19,7 +19,7 @@ func TestLoadApp(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, App{Dir: dir, Module: "example.com/m/ui"}, app, "a module path given needs no go.mod")
 
-	write(t, dir, "go.mod", "// comment\nmodule \"example.com/notes\"\n\ngo 1.25.0\n")
+	write(t, dir, "go.mod", "// comment\nmodule \"example.com/notes\"\n\ngo 1.26.0\n")
 	app, err = loadApp(dir, "")
 	require.NoError(t, err)
 	assert.Equal(t, App{Dir: dir, Module: "example.com/notes"}, app)
@@ -32,7 +32,7 @@ func TestLoadApp(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, app.Deps)
 
-	write(t, dir, "go.mod", "go 1.25.0\n")
+	write(t, dir, "go.mod", "go 1.26.0\n")
 	_, err = loadApp(dir, "")
 	assert.Equal(t, "E-GEN-037", errs.Code(err))
 }

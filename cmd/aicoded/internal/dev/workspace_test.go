@@ -167,7 +167,7 @@ func TestBrokenHeldSnapshotFailsOnlyItsApps(t *testing.T) {
 	root := t.TempDir()
 	for _, app := range []string{"billing", "shop"} {
 		writeFile(t, filepath.Join(root, app, manifest.FileName), "app: "+app+"\n")
-		writeFile(t, filepath.Join(root, app, "go.mod"), "module "+app+"\n\ngo 1.25.0\n")
+		writeFile(t, filepath.Join(root, app, "go.mod"), "module "+app+"\n\ngo 1.26.0\n")
 	}
 	held := filepath.Join(root, "shop", ".aicoded", "services")
 	writeFile(t, filepath.Join(held, "ledger.json"), ledgerSnapshot)
@@ -258,7 +258,7 @@ func TestValuesReadBeforeGenerate(t *testing.T) {
 func TestRenamedAppFails(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, manifest.FileName), "app: shop\nsettings: [greeting]\n")
-	writeFile(t, filepath.Join(root, "go.mod"), "module shop\n\ngo 1.25.0\n")
+	writeFile(t, filepath.Join(root, "go.mod"), "module shop\n\ngo 1.26.0\n")
 	w := openWorkspace(t, root, nil, io.Discard)
 	writeFile(t, filepath.Join(root, manifest.FileName), "app: store\nsettings: [greeting]\n")
 
@@ -281,7 +281,7 @@ func TestOpenStartsCalleesFirst(t *testing.T) {
 		"b": "app: billing\nsettings: [greeting]\n",
 	} {
 		writeFile(t, filepath.Join(root, dir, manifest.FileName), lines)
-		writeFile(t, filepath.Join(root, dir, "go.mod"), "module "+dir+"\n\ngo 1.25.0\n")
+		writeFile(t, filepath.Join(root, dir, "go.mod"), "module "+dir+"\n\ngo 1.26.0\n")
 	}
 	var out syncBuffer
 	openWorkspace(t, root, nil, &out)
@@ -543,7 +543,7 @@ func pageWhileStopping(t *testing.T, w *Workspace, ask func() error, text string
 func TestCloseEndsRequests(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, manifest.FileName), "app: shop\n")
-	writeFile(t, filepath.Join(root, "go.mod"), "module shop\n\ngo 1.25.0\n")
+	writeFile(t, filepath.Join(root, "go.mod"), "module shop\n\ngo 1.26.0\n")
 	w := openWorkspace(t, root, nil, io.Discard)
 	s, err := w.slot("shop")
 	require.NoError(t, err)

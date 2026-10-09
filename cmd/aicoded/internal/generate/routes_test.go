@@ -22,7 +22,7 @@ func write(t *testing.T, dir, rel, content string) {
 
 func newApp(t *testing.T, files map[string]string) App {
 	dir := t.TempDir()
-	write(t, dir, "go.mod", "module example.com/site\n\ngo 1.25.0\n")
+	write(t, dir, "go.mod", "module example.com/site\n\ngo 1.26.0\n")
 	for p, c := range files {
 		write(t, dir, p, c)
 	}
