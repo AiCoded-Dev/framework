@@ -70,9 +70,10 @@ Publishing uses these codes:
 - E-GATE-013 to E-GATE-017: what staticcheck, gosec, errcheck, bodyclose and sqlclosecheck find.
 - E-GATE-018 and E-GATE-019: a secret in the commit or in its history.
 - E-GATE-020: a critical known weakness that the app calls.
-- E-GATE-021 to E-GATE-025 are notes, which do not stop a publish: known weaknesses that are not
-  critical or that the app does not call, licences, capabilities reached without a building
-  block, and directives that silence a check.
+- E-GATE-021 to E-GATE-025 are notes, which do not stop a publish: known weaknesses that the app
+  calls but that are not critical or are in the Go standard library, known weaknesses that the app
+  does not call, licences, capabilities reached without a building block, and directives that
+  silence a check.
 
 `aicoded explain <CODE>` prints the page.
 

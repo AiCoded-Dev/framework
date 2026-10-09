@@ -1,6 +1,8 @@
 package node
 
 import (
+	"strings"
+
 	"aicoded.dev/framework/cmd/aicoded/internal/generate/gobuf"
 )
 
@@ -52,11 +54,14 @@ func (n *SsrCondition) WriteInnerGoCode(buf *gobuf.GoBuf) {
 	n.writeInner(buf)
 }
 
+// writeInner writes each ssr:else-if as an if statement inside the else block of the one before,
+// never as an else-if chain: staticcheck reports a chain that compares one value as QF1003, and
+// a builder cannot change generated code.
 func (n *SsrCondition) writeInner(buf *gobuf.GoBuf) {
 	for i, c := range n.Conditions {
 		if i > 0 {
+			buf.WriteStringLn("} else {")
 			buf.WriteStringLn(c.FilePos())
-			buf.WriteString("} else ")
 		}
 		buf.WriteString("if ")
 		c.Condition.WriteGoCode(buf)
@@ -70,5 +75,5 @@ func (n *SsrCondition) writeInner(buf *gobuf.GoBuf) {
 		n.ElseBody.WriteGoCode(buf)
 	}
 
-	buf.WriteString("}\n")
+	buf.WriteString(strings.Repeat("}\n", len(n.Conditions)))
 }

@@ -115,20 +115,24 @@ func (s *state) Write(w io.Writer) error {
 		if _, err := io.WriteString(w, _html1); err != nil {
 			return err
 		}
-//line index.html:5
-	} else if user.Age <= 30 {
-		if _, err := io.WriteString(w, _html2); err != nil {
-			return err
-		}
-//line index.html:7
-	} else if user.Age <= 60 {
-		if _, err := io.WriteString(w, _html3); err != nil {
-			return err
-		}
-//line index.html:8
 	} else {
-		if _, err := io.WriteString(w, _html4); err != nil {
-			return err
+//line index.html:5
+		if user.Age <= 30 {
+			if _, err := io.WriteString(w, _html2); err != nil {
+				return err
+			}
+		} else {
+//line index.html:7
+			if user.Age <= 60 {
+				if _, err := io.WriteString(w, _html3); err != nil {
+					return err
+				}
+//line index.html:8
+			} else {
+				if _, err := io.WriteString(w, _html4); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	if _, err := io.WriteString(w, _html5); err != nil {
@@ -153,15 +157,17 @@ func (s *state) Write(w io.Writer) error {
 		if _, err := io.WriteString(w, _html8); err != nil {
 			return err
 		}
-//line index.html:18
-	} else if user.Remote {
-		if _, err := io.WriteString(w, _html9); err != nil {
-			return err
-		}
-//line index.html:19
 	} else {
-		if _, err := io.WriteString(w, _html10); err != nil {
-			return err
+//line index.html:18
+		if user.Remote {
+			if _, err := io.WriteString(w, _html9); err != nil {
+				return err
+			}
+//line index.html:19
+		} else {
+			if _, err := io.WriteString(w, _html10); err != nil {
+				return err
+			}
 		}
 	}
 	if _, err := io.WriteString(w, _html11); err != nil {

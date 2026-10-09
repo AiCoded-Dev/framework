@@ -3,6 +3,10 @@
 <h1>{{ note.Title }}</h1>
 <a href="/notes/{{ note.ID }}/print">Print</a>
 <a href="/{{ note.Slug }}">Short link</a>
+<p ssr:if="note.Status == 'open'">Open</p>
+<p ssr:else-if="note.Status == 'done'">Done</p>
+<p ssr:else-if="note.Status == 'held'">Held</p>
+<p ssr:else>Archived</p>
 <ssr:form name="rename">
     <ssr:input name="title" type="text" required/>
     <button type="submit">Save</button>

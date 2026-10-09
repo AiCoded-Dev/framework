@@ -337,10 +337,12 @@ func (s *state) Write(w io.Writer) error {
 			if _, err := io.WriteString(w, _html30); err != nil {
 				return err
 			}
+		} else {
 //line index.html:20
-		} else if form.HasError() {
-			if _, err := io.WriteString(w, _html31); err != nil {
-				return err
+			if form.HasError() {
+				if _, err := io.WriteString(w, _html31); err != nil {
+					return err
+				}
 			}
 		}
 		if _, err := io.WriteString(w, _html32); err != nil {

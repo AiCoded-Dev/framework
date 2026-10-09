@@ -278,15 +278,17 @@ func (s *state) Write(w io.Writer) error {
 		if _, err := io.WriteString(w, _html13); err != nil {
 			return err
 		}
-//line index.html:48
-	} else if status == "pending" {
-		if _, err := io.WriteString(w, _html14); err != nil {
-			return err
-		}
-//line index.html:49
 	} else {
-		if _, err := io.WriteString(w, _html15); err != nil {
-			return err
+//line index.html:48
+		if status == "pending" {
+			if _, err := io.WriteString(w, _html14); err != nil {
+				return err
+			}
+//line index.html:49
+		} else {
+			if _, err := io.WriteString(w, _html15); err != nil {
+				return err
+			}
 		}
 	}
 	if _, err := io.WriteString(w, _html16); err != nil {

@@ -173,8 +173,8 @@ platform's own copies; when they are more than a day old, the `vulnerabilities` 
 A step reports problems, which fail the publish, and notes, which do not stop a publish. The
 change record counts the notes, and security sees them, so fix them when you can:
 
-- E-GATE-021: the app calls code with a known weakness whose score is below 9.0, or that has no
-  score yet;
+- E-GATE-021: the app calls code with a known weakness that is not critical, with a score below
+  9.0 or no score yet, or that is in the Go standard library;
 - E-GATE-022: a module has a known weakness that the app does not call;
 - E-GATE-023: a module's licence is forbidden or not recognised. Licences stop nothing: the
   list of every module's licence and the SBOM are kept with the change record;

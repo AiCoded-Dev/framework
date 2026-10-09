@@ -4,6 +4,11 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `aicoded generate` writes each `ssr:else-if` as an `if` inside the `else` block of the branch
+  before it, not as `else if`: the security checks' staticcheck reports an `else if` chain that
+  compares one value (QF1003), and nobody can change generated code. The page shows the same
+  branch as before. A page with `ssr:else-if` needs its code generated again: run
+  `aicoded generate`, or `aicoded check`, which does.
 - A go command that a signal stops while `aicoded check` or `aicoded dev` runs it, such as the
   `go test` that a test kills, is the new E-CHK-008, which names the command and the signal,
   rather than E-CHK-002: its output is cut short, so it reports nothing else. In the delivery
@@ -32,9 +37,9 @@ Changes to the API that AI assistants build apps with. Newest first.
   app calls), E-GATE-026 (a `godebug` line in `go.mod` or a `//go:debug` comment in a Go file,
   which change Go's security defaults), E-GATE-027 (an `aicoded.yaml` that is missing, cannot be
   read or names no app), E-GATE-028 (tests that stopped the checks), and the notes E-GATE-021 to
-  E-GATE-025 (a known weakness that is not critical or that the app does not call, a licence that
-  is forbidden or not recognised, a capability reached without a building block, and a directive
-  that silences a check).
+  E-GATE-025 (a known weakness that the app calls but that is not critical or is in the Go
+  standard library, one that the app does not call, a licence that is forbidden or not recognised,
+  a capability reached without a building block, and a directive that silences a check).
 - `aicoded describe` and the `describe` tool of `aicoded mcp` show the new fields of the
   permission list, each only when the app has it. The text gains the lines `class`, `owner`,
   `audience` and `external audience` after the `app` line, `connectors` after `files`, `egress`

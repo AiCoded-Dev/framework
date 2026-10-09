@@ -116,33 +116,61 @@ func (s *state) Write(w io.Writer) error {
 	if _, err := io.WriteString(w, _html3); err != nil {
 		return err
 	}
+//line index.html:6
+	if note.Status == "open" {
+		if _, err := io.WriteString(w, _html4); err != nil {
+			return err
+		}
+	} else {
+//line index.html:7
+		if note.Status == "done" {
+			if _, err := io.WriteString(w, _html5); err != nil {
+				return err
+			}
+		} else {
+//line index.html:8
+			if note.Status == "held" {
+				if _, err := io.WriteString(w, _html6); err != nil {
+					return err
+				}
+//line index.html:9
+			} else {
+				if _, err := io.WriteString(w, _html7); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if _, err := io.WriteString(w, _html8); err != nil {
+		return err
+	}
 	{
 		form := s.FormRename
 		_ = form
-		if _, err := io.WriteString(w, _html4); err != nil {
+		if _, err := io.WriteString(w, _html9); err != nil {
 			return err
 		}
 		if err := render.Attr(w, form.ID()); err != nil {
 			return err
 		}
-		if _, err := io.WriteString(w, _html5); err != nil {
+		if _, err := io.WriteString(w, _html10); err != nil {
 			return err
 		}
 		if err := render.Attr(w, form.Token()); err != nil {
 			return err
 		}
-		if _, err := io.WriteString(w, _html6); err != nil {
+		if _, err := io.WriteString(w, _html11); err != nil {
 			return err
 		}
 		{
-//line index.html:7
+//line index.html:11
 			input := form.Title
 			_ = input
-			if _, err := io.WriteString(w, _html7); err != nil {
+			if _, err := io.WriteString(w, _html12); err != nil {
 				return err
 			}
 			if input.IsNotNull() {
-				if _, err := io.WriteString(w, _html8); err != nil {
+				if _, err := io.WriteString(w, _html13); err != nil {
 					return err
 				}
 				v := any(input.GetValue())
@@ -152,15 +180,15 @@ func (s *state) Write(w io.Writer) error {
 				if err := render.Attr(w, v); err != nil {
 					return err
 				}
-				if _, err := io.WriteString(w, _html9); err != nil {
+				if _, err := io.WriteString(w, _html14); err != nil {
 					return err
 				}
 			}
-			if _, err := io.WriteString(w, _html10); err != nil {
+			if _, err := io.WriteString(w, _html15); err != nil {
 				return err
 			}
 		}
-		if _, err := io.WriteString(w, _html11); err != nil {
+		if _, err := io.WriteString(w, _html16); err != nil {
 			return err
 		}
 	}
@@ -172,12 +200,17 @@ const (
 	_html1  = "</h1> <a href=\"/notes/"
 	_html2  = "/print\">Print</a> <a href=\"/"
 	_html3  = "\">Short link</a> "
-	_html4  = "<form method=\"post\" enctype=\"application/x-www-form-urlencoded\"><input type=\"hidden\" name=\"_aicoded_form\" value=\""
-	_html5  = "\"><input type=\"hidden\" name=\"_aicoded_csrf\" value=\""
-	_html6  = "\"> "
-	_html7  = "<input name=\"title\" type=\"text\""
-	_html8  = " value=\""
-	_html9  = "\""
-	_html10 = " required>"
-	_html11 = " <button type=\"submit\">Save</button> </form>"
+	_html4  = "<p>Open</p>"
+	_html5  = "<p>Done</p>"
+	_html6  = "<p>Held</p>"
+	_html7  = "<p>Archived</p>"
+	_html8  = " "
+	_html9  = "<form method=\"post\" enctype=\"application/x-www-form-urlencoded\"><input type=\"hidden\" name=\"_aicoded_form\" value=\""
+	_html10 = "\"><input type=\"hidden\" name=\"_aicoded_csrf\" value=\""
+	_html11 = "\"> "
+	_html12 = "<input name=\"title\" type=\"text\""
+	_html13 = " value=\""
+	_html14 = "\""
+	_html15 = " required>"
+	_html16 = " <button type=\"submit\">Save</button> </form>"
 )

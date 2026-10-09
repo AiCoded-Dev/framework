@@ -72,3 +72,14 @@ func TestShortLinkStaysOnSite(t *testing.T) {
 		assert.Contains(t, b.String(), want, slug)
 	}
 }
+
+// A chain of conditions shows the first branch whose condition holds, or else its ssr:else.
+func TestConditionChainShowsOneBranch(t *testing.T) {
+	for status, want := range map[string]string{"open": "Open", "done": "Done", "held": "Held", "": "Archived"} {
+		s := NewRoute(&DP{}).NewState().(*state)
+		s.RouteData.Note = Note{Status: status}
+		var b strings.Builder
+		require.NoError(t, s.Write(&b))
+		assert.Regexp(t, `</a>\s*<p>`+want+`</p>\s*<form`, b.String(), status)
+	}
+}
