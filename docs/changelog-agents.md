@@ -4,6 +4,10 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `aicoded dev` reports an app as `failed`, with its problems, or as `stopped` as soon as its
+  address shows that, and prints the failure then. It used to wait until the app's old process
+  had ended, which takes seconds while that process still serves a request; until then
+  `what_broke` and the dev UI said `starting` or `running`.
 - Apps are on Go 1.26: the framework's `go.mod` says `go 1.26.0`, and so does the `go.mod` of an
   app that `aicoded init` creates. An app's `go` line selects Go's security defaults, and the
   delivery pipeline refuses a `go` line older than the release of the Go it builds with, such as

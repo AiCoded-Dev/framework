@@ -492,14 +492,14 @@ func TestStoppingAppGetsItsPage(t *testing.T) {
 	}
 	starting := "<title>hello is starting</title>"
 
-	pageWhileStopping(t, w, start, starting, devapi.Running)
-	pageWhileStopping(t, w, func() error { return w.Stop("hello") }, "hello is stopped.", devapi.Stopped)
+	pageWhileStopping(t, w, start, starting, devapi.Starting, devapi.Running)
+	pageWhileStopping(t, w, func() error { return w.Stop("hello") }, "hello is stopped.", devapi.Stopped, devapi.Stopped)
 	run()
 	rewrite(t, mainGo, `func main\(\) \{`, "func main() { broken()")
-	pageWhileStopping(t, w, start, "could not build or start the app", devapi.Failed)
+	pageWhileStopping(t, w, start, "could not build or start the app", devapi.Failed, devapi.Failed)
 	rewrite(t, mainGo, `broken\(\)`, "")
 	run()
-	pageWhileStopping(t, w, func() error { return w.SetManual("hello", true) }, starting, devapi.Manual)
+	pageWhileStopping(t, w, func() error { return w.SetManual("hello", true) }, starting, devapi.Starting, devapi.Manual)
 
 	unanswered, err := w.Logs(t.Context(), devapi.LogQuery{App: "hello", Contains: "did not answer"})
 	require.NoError(t, err)
@@ -508,9 +508,9 @@ func TestStoppingAppGetsItsPage(t *testing.T) {
 
 // pageWhileStopping keeps a request to the running app hello of w open and asks for a change
 // with ask. Once the app has closed its socket, while it still serves that request, it checks
-// that the gateway answers 503 with a page that holds text. Then it ends the request and checks
-// that the app ends in state.
-func pageWhileStopping(t *testing.T, w *Workspace, ask func() error, text string, state devapi.State) {
+// that the gateway answers 503 with a page that holds text and that the app is in state while.
+// Then it ends the request and checks that the app ends in state.
+func pageWhileStopping(t *testing.T, w *Workspace, ask func() error, text string, while, state devapi.State) {
 	t.Helper()
 	s, err := w.slot("hello")
 	require.NoError(t, err)
@@ -533,10 +533,12 @@ func pageWhileStopping(t *testing.T, w *Workspace, ask func() error, text string
 		return errors.Is(err, fs.ErrNotExist)
 	}, 30*time.Second, 10*time.Millisecond, "the app did not begin to stop")
 	code, body := fetch(t, w.port, "hello", "/")
+	during := appState(t, w, "hello").State
 	release()
 	settle(t, w)
 	assert.Equal(t, http.StatusServiceUnavailable, code)
 	assert.Contains(t, body, text)
+	assert.Equal(t, while, during, "the state matches the page while the app stops")
 	assert.Equal(t, state, appState(t, w, "hello").State)
 }
 

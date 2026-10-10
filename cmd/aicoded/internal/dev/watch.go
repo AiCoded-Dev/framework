@@ -309,11 +309,12 @@ func (w *Workspace) taken(s *slot) *slot {
 func (w *Workspace) remove(s *slot) {
 	s.cycling.Lock()
 	s.removed = true
-	if !s.dup.Load() {
-		w.gateway.Remove(s.name)
-	}
+	s.show(func() {
+		if !s.dup.Load() {
+			w.gateway.Remove(s.name)
+		}
+	}, devapi.Stopped, nil)
 	w.stopInstance(s)
-	s.set(devapi.Stopped, nil)
 	s.cycling.Unlock()
 	w.mu.Lock()
 	w.slots = slices.DeleteFunc(w.slots, func(o *slot) bool { return o == s })

@@ -61,8 +61,15 @@ func newSlot(name, dir string, m manifest.Manifest, out io.Writer, ch *changes) 
 }
 
 // set puts the slot in state with problems. Since changes only with the state.
-func (s *slot) set(state devapi.State, problems []problem.Problem) {
+func (s *slot) set(state devapi.State, problems []problem.Problem) { s.show(nil, state, problems) }
+
+// show is set, and makes host, a change of what the gateway serves at the app's host, in the same
+// step: whoever sees the new page at the host sees the new state, and the other way round.
+func (s *slot) show(host func(), state devapi.State, problems []problem.Problem) {
 	s.mu.Lock()
+	if host != nil {
+		host()
+	}
 	if state != s.state {
 		s.since = time.Now()
 	}
@@ -119,12 +126,13 @@ func (w *Workspace) runCycle(ctx context.Context, s *slot, renew bool) {
 	s.inst, s.callsOnly = inst, callsOnly(m)
 	s.mu.Unlock()
 	w.svc.Router.Add(m, inst.AppSocket())
-	if callsOnly(m) {
-		w.gateway.Remove(s.name)
-	} else {
-		w.gateway.Add(s.name, inst.AppSocket(), s.store)
-	}
-	s.set(devapi.Running, nil)
+	s.show(func() {
+		if callsOnly(m) {
+			w.gateway.Remove(s.name)
+		} else {
+			w.gateway.Add(s.name, inst.AppSocket(), s.store)
+		}
+	}, devapi.Running, nil)
 	if s.announced {
 		fmt.Fprintf(w.out, "aicoded dev: %s restarted\n", s.name)
 	} else {
@@ -202,10 +210,9 @@ func (w *Workspace) fail(s *slot, source string, ps []problem.Problem) {
 	for i, p := range ps {
 		ps[i].Pos, ps[i].Message, ps[i].Fix = hide.String(p.Pos), hide.String(p.Message), hide.String(p.Fix)
 	}
-	w.gateway.Fail(s.name, ps)
-	w.stopInstance(s)
-	s.set(devapi.Failed, ps)
 	w.report(s, source, ps)
+	s.show(func() { w.gateway.Fail(s.name, ps) }, devapi.Failed, ps)
+	w.stopInstance(s)
 }
 
 // report keeps ps as ERROR entries of s from source and prints them.
@@ -235,8 +242,7 @@ func (w *Workspace) runByHand(ctx context.Context, s *slot, m manifest.Manifest,
 		s.set(devapi.Manual, nil)
 		return
 	}
-	w.gateway.Starting(s.name)
-	s.set(devapi.Starting, nil)
+	s.show(func() { w.gateway.Starting(s.name) }, devapi.Starting, nil)
 	w.stopInstance(s)
 	s.mu.Lock()
 	manual, dir := s.manual, s.runDir
@@ -268,12 +274,13 @@ func (w *Workspace) runByHand(ctx context.Context, s *slot, m manifest.Manifest,
 	s.mu.Unlock()
 	w.svc.Router.Add(m, inst.AppSocket())
 	command := manualCommand(s.dir, dir)
-	if callsOnly(m) {
-		w.gateway.Remove(s.name)
-	} else {
-		w.gateway.AddManual(s.name, inst.AppSocket(), command)
-	}
-	s.set(devapi.Manual, nil)
+	s.show(func() {
+		if callsOnly(m) {
+			w.gateway.Remove(s.name)
+		} else {
+			w.gateway.AddManual(s.name, inst.AppSocket(), command)
+		}
+	}, devapi.Manual, nil)
 	if !s.announced {
 		fmt.Fprintln(w.out, readyLine(s.name, callsOnly(m), w.port))
 		s.announced = true
@@ -327,9 +334,8 @@ func (w *Workspace) halt(s *slot) {
 		w.stopInstance(s)
 		return
 	}
-	w.gateway.Stopped(s.name)
+	s.show(func() { w.gateway.Stopped(s.name) }, devapi.Stopped, nil)
 	w.stopInstance(s)
-	s.set(devapi.Stopped, nil)
 	fmt.Fprintf(w.out, "aicoded dev: %s stopped\n", s.name)
 }
 
