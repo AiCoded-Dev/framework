@@ -4,6 +4,12 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- The runner protocol's `HelloResponse` gains `app_socket_open`, for a runner that reaches
+  `app.sock` as another user, such as the one the delivery pipeline runs the simulated attacks
+  with. When it is set, the app makes `app.sock` mode 0666 right after it listens; otherwise
+  `app.sock` stays 0600. `runnerproto/socket` adds `Share`, which makes a socket usable by every
+  user. The protocol stays 3: an app built with an older framework ignores the field, so the
+  delivery pipeline needs framework v0.4.0 or newer to attack it.
 - `aicoded describe --json` and the MCP tool `describe` give each app `routes`: every page and
   layout, sorted by path, with its `template`, `layout`, URL `params` and their kinds, `require`,
   `guard`, `guard_at` (the path of the route whose template declares the nearest `Guard`),

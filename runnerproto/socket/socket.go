@@ -35,6 +35,23 @@ func Listen(ctx context.Context, path string) (net.Listener, error) {
 	return l, nil
 }
 
+// sharedMode is the mode Share gives a socket.
+const sharedMode fs.FileMode = 0o666
+
+// Share makes the socket at path, which Listen made, usable by every user: for a peer that runs
+// as another user. The folder the socket is in then decides who reaches it. It refuses anything
+// at path but a socket.
+func Share(path string) error {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if fi.Mode().Type() != fs.ModeSocket {
+		return errors.New("socket: " + path + " is not a socket")
+	}
+	return os.Chmod(path, sharedMode)
+}
+
 // NewServer returns a server for h that speaks HTTP/1.1 and HTTP/2 without TLS and has timeouts set.
 // A stream that moves in neither direction for 60 seconds is cut; one that keeps moving may run
 // as long as it needs.

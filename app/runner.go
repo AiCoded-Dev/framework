@@ -25,6 +25,8 @@ type conn struct {
 	telemetry runnerv1connect.TelemetryServiceClient
 	session   *runner.Session
 	keys      []ed25519.PublicKey
+	// shareSocket is set when the runner reaches app.sock as another user.
+	shareSocket bool
 }
 
 // connectRunner performs the handshake with the runner whose sockets are in dir.
@@ -68,6 +70,7 @@ func connectRunner(ctx context.Context, dir string) (*conn, error) {
 		Mail:     runnerv1connect.NewMailServiceClient(hc, socket.BaseURL, opts...),
 		Rpc:      runnerv1connect.NewRpcServiceClient(hc, socket.BaseURL, opts...),
 	}
+	c.shareSocket = h.GetAppSocketOpen()
 	return c, nil
 }
 

@@ -57,6 +57,27 @@ func TestListenReplacesStaleSocket(t *testing.T) {
 	require.NoError(t, l.Close())
 }
 
+func TestShare(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, runnerproto.AppSocket)
+	l, err := socket.Listen(t.Context(), path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = l.Close() })
+	require.NoError(t, socket.Share(path))
+	st, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o666), st.Mode().Perm())
+
+	file := filepath.Join(dir, "file")
+	require.NoError(t, os.WriteFile(file, nil, 0o600))
+	require.ErrorContains(t, socket.Share(file), "is not a socket")
+	require.NoError(t, os.Symlink(path, filepath.Join(dir, "link")))
+	require.ErrorContains(t, socket.Share(filepath.Join(dir, "link")), "is not a socket")
+	st, err = os.Stat(file)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), st.Mode().Perm(), "nothing but a socket is shared")
+}
+
 const timeout = 400 * time.Millisecond
 
 // serve serves h with the stream timeout shortened to timeout and returns an HTTP/2 and an

@@ -99,7 +99,7 @@ func run(ctx context.Context, opts Options) (context.Context, error) {
 		<-exported
 	}()
 
-	l, err := socket.Listen(ctx, filepath.Join(dir, runnerproto.AppSocket))
+	l, err := listen(ctx, filepath.Join(dir, runnerproto.AppSocket), c.shareSocket)
 	if err != nil {
 		return base, fmt.Errorf("app: listen: %w", err)
 	}
@@ -125,6 +125,20 @@ func run(ctx context.Context, opts Options) (context.Context, error) {
 		return base, fmt.Errorf("app: shutdown: %w", err)
 	}
 	return base, nil
+}
+
+// listen listens on the Unix socket at path, which only the app's own user can use, or, with
+// share, every user: for a runner that runs as another user.
+func listen(ctx context.Context, path string, share bool) (net.Listener, error) {
+	l, err := socket.Listen(ctx, path)
+	if err != nil || !share {
+		return l, err
+	}
+	if err := socket.Share(path); err != nil {
+		_ = l.Close()
+		return nil, err
+	}
+	return l, nil
 }
 
 // routes returns the path of calls from other apps and a handler that serves them with

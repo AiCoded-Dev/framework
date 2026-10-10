@@ -83,7 +83,10 @@ type HelloResponse struct {
 	// Ed25519 public keys that verify viewer tokens.
 	ViewerKeys [][]byte `protobuf:"bytes,5,rep,name=viewer_keys,json=viewerKeys,proto3" json:"viewer_keys,omitempty"`
 	// Values of the settings declared in aicoded.yaml.
-	Settings      map[string]string `protobuf:"bytes,6,rep,name=settings,proto3" json:"settings,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Settings map[string]string `protobuf:"bytes,6,rep,name=settings,proto3" json:"settings,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Set by a runner that reaches app.sock as another user: the app then makes app.sock mode
+	// 0666 right after it listens. Otherwise app.sock stays 0600.
+	AppSocketOpen bool `protobuf:"varint,7,opt,name=app_socket_open,json=appSocketOpen,proto3" json:"app_socket_open,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -158,6 +161,13 @@ func (x *HelloResponse) GetSettings() map[string]string {
 		return x.Settings
 	}
 	return nil
+}
+
+func (x *HelloResponse) GetAppSocketOpen() bool {
+	if x != nil {
+		return x.AppSocketOpen
+	}
+	return false
 }
 
 type ReadyRequest struct {
@@ -239,7 +249,7 @@ const file_aicoded_runner_v1_lifecycle_proto_rawDesc = "" +
 	"!aicoded/runner/v1/lifecycle.proto\x12\x11aicoded.runner.v1\"f\n" +
 	"\fHelloRequest\x12)\n" +
 	"\x10protocol_version\x18\x01 \x01(\rR\x0fprotocolVersion\x12+\n" +
-	"\x11framework_version\x18\x02 \x01(\tR\x10frameworkVersion\"\x92\x02\n" +
+	"\x11framework_version\x18\x02 \x01(\tR\x10frameworkVersion\"\xba\x02\n" +
 	"\rHelloResponse\x12\x10\n" +
 	"\x03app\x18\x01 \x01(\tR\x03app\x12\x10\n" +
 	"\x03env\x18\x02 \x01(\tR\x03env\x12\x18\n" +
@@ -247,7 +257,8 @@ const file_aicoded_runner_v1_lifecycle_proto_rawDesc = "" +
 	"\bcsrf_key\x18\x04 \x01(\fR\acsrfKey\x12\x1f\n" +
 	"\vviewer_keys\x18\x05 \x03(\fR\n" +
 	"viewerKeys\x12J\n" +
-	"\bsettings\x18\x06 \x03(\v2..aicoded.runner.v1.HelloResponse.SettingsEntryR\bsettings\x1a;\n" +
+	"\bsettings\x18\x06 \x03(\v2..aicoded.runner.v1.HelloResponse.SettingsEntryR\bsettings\x12&\n" +
+	"\x0fapp_socket_open\x18\a \x01(\bR\rappSocketOpen\x1a;\n" +
 	"\rSettingsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x0e\n" +

@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"slices"
 	"sync/atomic"
@@ -40,8 +41,12 @@ type testApp struct {
 	stop   func() error
 }
 
-func startApp(t *testing.T, opts Options) *testApp {
+// startApp runs an app with opts under a fake runner, which each of setup changes first.
+func startApp(t *testing.T, opts Options, setup ...func(*fakeRunner)) *testApp {
 	f, key := newFakeRunner(t)
+	for _, s := range setup {
+		s(f)
+	}
 	dir := f.serve(t)
 	t.Setenv(runnerproto.EnvRunnerDir, dir)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -113,6 +118,16 @@ func TestRunServesViewers(t *testing.T) {
 }
 
 // A malformed traceparent must not make the handler run twice (defect 5).
+func TestRunSharesTheAppSocketWhenTheRunnerAsks(t *testing.T) {
+	for share, want := range map[bool]fs.FileMode{false: 0o600, true: 0o666} {
+		a := startApp(t, Options{Handler: http.NotFoundHandler()}, func(f *fakeRunner) { f.hello.AppSocketOpen = share })
+		st, err := os.Stat(a.sock)
+		require.NoError(t, err)
+		assert.Equal(t, want, st.Mode().Perm(), "app_socket_open %v", share)
+		require.NoError(t, a.stop())
+	}
+}
+
 func TestRunTraceparent(t *testing.T) {
 	var calls atomic.Int32
 	a := startApp(t, Options{Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) { calls.Add(1) })})

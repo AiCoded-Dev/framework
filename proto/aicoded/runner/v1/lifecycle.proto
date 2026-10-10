@@ -27,6 +27,9 @@ message HelloResponse {
   repeated bytes viewer_keys = 5;
   // Values of the settings declared in aicoded.yaml.
   map<string, string> settings = 6;
+  // Set by a runner that reaches app.sock as another user: the app then makes app.sock mode
+  // 0666 right after it listens. Otherwise app.sock stays 0600.
+  bool app_socket_open = 7;
 }
 
 message ReadyRequest {}
