@@ -1,5 +1,6 @@
 // Package dev is the local runner behind aicoded dev: it builds an app, serves the runner
-// protocol to it, and fronts it with a gateway that stands in for the company login.
+// protocol to it, and fronts it with a gateway that stands in for the company login. Its Runner
+// serves the runner protocol alone, to one app that another program starts.
 package dev
 
 import (
@@ -38,7 +39,10 @@ type runnerService struct {
 	files      *fileService
 	mail       *mailService
 	router     *Router
-	byHand     bool // the developer runs the app by hand; every Ready is printed
+	byHand     bool   // the developer runs the app by hand; every Ready is printed
+	version    string // the version Hello reports
+	// shareAppSocket has Hello tell the app to make app.sock usable by every user.
+	shareAppSocket bool
 }
 
 func newRunnerService(m manifest.Manifest, values devconfig.AppValues, env devconfig.Env, csrfKey []byte, viewerKeys [][]byte, st *store) *runnerService {
@@ -57,6 +61,7 @@ func newRunnerService(m manifest.Manifest, values devconfig.AppValues, env devco
 		viewerKeys: viewerKeys,
 		ready:      make(chan struct{}),
 		store:      st,
+		version:    "dev",
 	}
 }
 
@@ -83,12 +88,13 @@ func (s *runnerService) Hello(_ context.Context, req *connect.Request[runnerv1.H
 			"build the app with the framework version that matches aicoded"))
 	}
 	return connect.NewResponse(&runnerv1.HelloResponse{
-		App:        s.app,
-		Env:        string(s.env),
-		Version:    "dev",
-		CsrfKey:    s.csrfKey,
-		ViewerKeys: s.viewerKeys,
-		Settings:   s.settings,
+		App:           s.app,
+		Env:           string(s.env),
+		Version:       s.version,
+		CsrfKey:       s.csrfKey,
+		ViewerKeys:    s.viewerKeys,
+		Settings:      s.settings,
+		AppSocketOpen: s.shareAppSocket,
 	}), nil
 }
 

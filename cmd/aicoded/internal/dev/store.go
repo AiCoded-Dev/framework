@@ -45,12 +45,65 @@ type store struct {
 	mu      sync.Mutex
 	hidden  map[string]string // secret value → name, of every start of the app
 	hide    *redactor
+	limit   *spanLimit // nil: the ring of spans drops its oldest
+}
+
+// spanLimit bounds the spans a store keeps: at most count spans, of at most size bytes of text
+// in all. The store counts every span past either bound as dropped.
+type spanLimit struct {
+	count, size int
+	kept, bytes int
+	dropped     uint64
 }
 
 func newStore(app string, out io.Writer) *store {
 	s := &store{app: app, out: out, logs: NewRing[devapi.LogEntry](logCount), spans: NewRing[devapi.Span](spanCount), hidden: map[string]string{}}
 	s.mail = newMailService(nil, s.redactor)
 	return s
+}
+
+// limitSpans makes s keep the first spans it gets, at most count spans of at most size bytes of
+// text in all, and count the rest as dropped, instead of keeping the last spanCount spans.
+func (s *store) limitSpans(count, size int) {
+	s.spans = NewRing[devapi.Span](count)
+	s.limit = &spanLimit{count: count, size: size}
+}
+
+// keepSpan reports whether s keeps sp, and counts it as dropped when not.
+func (s *store) keepSpan(sp devapi.Span) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	l := s.limit
+	if l == nil {
+		return true
+	}
+	n := spanSize(sp)
+	if l.kept == l.count || n > l.size-l.bytes {
+		l.dropped++
+		return false
+	}
+	l.kept++
+	l.bytes += n
+	return true
+}
+
+// droppedSpans returns how many spans a store with a limit did not keep.
+func (s *store) droppedSpans() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.limit == nil {
+		return 0
+	}
+	return s.limit.dropped
+}
+
+// spanSize is the length of the text of sp.
+func spanSize(sp devapi.Span) int {
+	n := len(sp.TraceID) + len(sp.SpanID) + len(sp.ParentID) + len(sp.Name) + len(sp.Error)
+	for k, v := range sp.Attrs {
+		n += len(k) + len(v)
+	}
+	return n
 }
 
 // hideSecrets hides, from now on, the values of secrets, which maps each secret's name to its
@@ -120,7 +173,9 @@ func (s *store) writer(source string) io.Writer {
 func (s *store) addSpans(spans []*runnerv1.Span) {
 	hide := s.redactor()
 	for _, sp := range spans {
-		s.spans.Add(toSpan(s.app, sp, hide))
+		if span := toSpan(s.app, sp, hide); s.keepSpan(span) {
+			s.spans.Add(span)
+		}
 	}
 	s.changes.signal()
 }

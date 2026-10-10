@@ -33,6 +33,14 @@ func TestRun(t *testing.T) {
 	assert.Contains(t, errOut.String(), `unknown command "nope"`)
 }
 
+func TestRunL7RunnerIsHidden(t *testing.T) {
+	assert.NotContains(t, usage, "l7-runner")
+	var out, errOut bytes.Buffer
+	assert.Equal(t, 2, run([]string{"l7-runner"}, &out, &errOut))
+	assert.Equal(t, "aicoded l7-runner: --app is required\n", errOut.String())
+	assert.Empty(t, out.String())
+}
+
 func TestRunDevWithoutManifest(t *testing.T) {
 	testhome.Set(t)
 	var out, errOut bytes.Buffer

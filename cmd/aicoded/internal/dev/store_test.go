@@ -149,6 +149,19 @@ func span(trace, id, parent, name string, ms int64, fail string) *runnerv1.Span 
 	return &runnerv1.Span{TraceId: b(trace), SpanId: b(id), ParentSpanId: b(parent), Name: name, StartUnixNano: start, EndUnixNano: start + 10e6, Error: fail}
 }
 
+func TestLimitedSpans(t *testing.T) {
+	s := newStore("hello", io.Discard)
+	s.limitSpans(2, 20)
+	s.addSpans([]*runnerv1.Span{{Name: "a"}, {Name: strings.Repeat("b", 30)}, {Name: "c"}, {Name: "d"}})
+	var names []string
+	for _, sp := range s.spans.All() {
+		names = append(names, sp.Name)
+	}
+	assert.Equal(t, []string{"a", "c"}, names, "the first spans that fit")
+	assert.Equal(t, uint64(2), s.droppedSpans(), "one too large, one past the count")
+	assert.Zero(t, newStore("hello", io.Discard).droppedSpans(), "a store without a limit drops its oldest instead")
+}
+
 func TestTraces(t *testing.T) {
 	w := testWorkspace("billing", "shop")
 	one, two := "0123456789abcdef", "fedcba9876543210"

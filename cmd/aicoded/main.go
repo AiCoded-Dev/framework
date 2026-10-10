@@ -18,6 +18,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/dev"
 	"aicoded.dev/framework/cmd/aicoded/internal/explain"
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
+	"aicoded.dev/framework/cmd/aicoded/internal/l7runner"
 	"aicoded.dev/framework/cmd/aicoded/internal/rpcadd"
 	"aicoded.dev/framework/cmd/aicoded/internal/scaffold"
 	"aicoded.dev/framework/docs"
@@ -146,6 +147,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return fail(stderr, err)
 		}
 		return exitOK
+	case "l7-runner":
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return l7runner.Main(ctx, args, stderr)
 	case "login":
 		return runLogin(args, stdout, stderr)
 	case "logout":

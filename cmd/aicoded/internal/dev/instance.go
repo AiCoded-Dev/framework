@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,11 +17,9 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
 	"aicoded.dev/framework/cmd/aicoded/internal/gotool"
-	"aicoded.dev/framework/cmd/aicoded/internal/mysqlproxy"
 	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
-	"aicoded.dev/framework/runnerproto/socket"
 )
 
 const (
@@ -58,12 +54,9 @@ type Instance struct {
 	// Manifest is the app's permission list, with the sections aicoded generate wrote.
 	Manifest manifest.Manifest
 
+	served
 	store  *store
-	svc    *runnerService
 	runDir string
-	server *http.Server
-	dbSock net.Listener
-	db     *mysqlproxy.Proxy
 	cmd    *exec.Cmd
 	exited chan struct{}
 	// byHand marks the runner of an app the developer runs by hand: it has no process, and its
@@ -191,20 +184,10 @@ func (i *Instance) serve(ctx context.Context, m manifest.Manifest, values devcon
 	_, _ = rand.Read(csrfKey)
 	i.svc = newRunnerService(m, values, svc.env(), csrfKey, [][]byte{signer.Public()}, i.store)
 	i.svc.byHand = i.byHand
-	files, err := newFileService(filepath.Join(svc.StateDir, "files", m.App), m.Stores())
-	if err != nil {
-		return err
-	}
-	i.svc.files = files
-	i.store.mail.setEmail(m.Email)
-	i.svc.mail = i.store.mail
 	i.svc.router = svc.Router
-	l, err := socket.Listen(ctx, filepath.Join(i.runDir, runnerproto.RunnerSocket))
-	if err != nil {
+	if err := i.listenRunner(ctx, i.runDir, filepath.Join(svc.StateDir, "files", m.App), m, false); err != nil {
 		return err
 	}
-	i.server = socket.NewServer(i.svc.handler())
-	go func() { _ = i.server.Serve(l) }()
 	if m.SQLDB() {
 		return i.serveDatabase(ctx, m.App, svc.MySQL, svc.env())
 	}
@@ -218,25 +201,9 @@ func (i *Instance) serveDatabase(ctx context.Context, app string, admin *MySQLAd
 	if err != nil {
 		return err
 	}
-	l, err := socket.Listen(ctx, filepath.Join(i.runDir, runnerproto.MySQLSocket))
-	if err != nil {
-		return err
-	}
-	i.dbSock = l
-	logErr := func(err error) { i.store.add(sourceRunner, "ERROR", "database: "+err.Error(), true) }
-	i.db = mysqlproxy.New(up)
-	i.db.OnError = logErr
-	go serveDB(i.db, l, logErr)
-	return nil
-}
-
-// serveDB serves p on l until l is closed. When p stops for any other reason, serveDB logs why
-// and closes l, so the app's connections fail at once instead of waiting for an accept.
-func serveDB(p *mysqlproxy.Proxy, l net.Listener, logErr func(error)) {
-	if err := p.Serve(l); err != nil {
-		logErr(err)
-		_ = l.Close()
-	}
+	return i.listenDatabase(ctx, i.runDir, up, false, func(err error) {
+		i.store.add(sourceRunner, "ERROR", "database: "+err.Error(), true)
+	})
 }
 
 // Stop sends SIGTERM, waits for the app to exit (killing it after 15s) and removes its sockets.
@@ -251,18 +218,7 @@ func (i *Instance) Stop() {
 			<-i.exited
 		}
 	}
-	if i.server != nil {
-		_ = i.server.Close()
-	}
-	if i.dbSock != nil {
-		_ = i.dbSock.Close()
-	}
-	if i.db != nil {
-		i.db.Close()
-	}
-	if i.svc != nil && i.svc.files != nil {
-		i.svc.files.close()
-	}
+	i.close()
 	if i.byHand {
 		close(i.exited)
 		return
