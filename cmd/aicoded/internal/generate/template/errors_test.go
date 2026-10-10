@@ -132,6 +132,7 @@ func TestEscapers(t *testing.T) {
 		`<p>{{ x }}</p>`:            "render.Text(w, x)",
 		`<p class="a {{ x }}"></p>`: "render.Attr(w, x)",
 		`<p>{{$ x }}</p>`:           "render.HTML(w, x)",
+
 		`<ssr:form name="a" data-x="{{ x }}"></ssr:form>`:                           "render.Attr(w, x)",
 		`<ssr:form name="a"><ssr:input name="n" placeholder="{{ x }}"/></ssr:form>`: "render.Attr(w, x)",
 		`<ssr:form name="a"><ssr:input name="n"/></ssr:form>`:                       "render.Attr(w, v)",
