@@ -36,6 +36,10 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
+      - name: Fill the module download cache
+        run: |
+          go mod download all
+          (cd cmd/aicoded && go mod download all)
       - run: make test
 
   lint:
