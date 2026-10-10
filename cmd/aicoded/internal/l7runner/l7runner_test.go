@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/fs"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -263,6 +264,28 @@ func TestRunsTheApp(t *testing.T) {
 	assert.Empty(t, r.stderr.String(), "nothing is logged: no token, no query string")
 	assert.NoFileExists(t, r.control)
 	assert.NoFileExists(t, filepath.Join(r.runnerDir, runnerproto.RunnerSocket))
+}
+
+func TestNothingTheAppSendsReachesStderr(t *testing.T) {
+	var logged syncBuffer
+	defer log.SetOutput(log.Writer())
+	log.SetOutput(&logged)
+	r := folders(t, helloYAML)
+	r.start(t, r.args())
+	var d net.Dialer
+	conn, err := d.DialContext(t.Context(), "unix", filepath.Join(r.runnerDir, runnerproto.RunnerSocket))
+	require.NoError(t, err)
+	defer conn.Close()
+	// The HTTP/2 preface, then a SETTINGS frame of 5 bytes, which no list of settings fills.
+	_, err = conn.Write(append([]byte("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"), 0, 0, 5, 4, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5))
+	require.NoError(t, err)
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(5*time.Second)))
+	_, err = io.Copy(io.Discard, conn)
+	require.NoError(t, err, "the runner closes the connection")
+
+	assert.Equal(t, 0, r.stop())
+	assert.Empty(t, logged.String(), "the runner's servers log nothing")
+	assert.Empty(t, r.stderr.String())
 }
 
 // hello calls Hello on runner.sock as an app does.

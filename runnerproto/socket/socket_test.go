@@ -57,6 +57,20 @@ func TestListenReplacesStaleSocket(t *testing.T) {
 	require.NoError(t, l.Close())
 }
 
+func TestListenShared(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, runnerproto.AppSocket)
+	l, err := socket.ListenShared(t.Context(), path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = l.Close() })
+	st, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o666), st.Mode().Perm())
+
+	_, err = socket.ListenShared(t.Context(), filepath.Join(dir, "missing", runnerproto.AppSocket))
+	require.Error(t, err)
+}
+
 func TestShare(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, runnerproto.AppSocket)

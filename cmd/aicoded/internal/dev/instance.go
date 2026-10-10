@@ -185,7 +185,7 @@ func (i *Instance) serve(ctx context.Context, m manifest.Manifest, values devcon
 	i.svc = newRunnerService(m, values, svc.env(), csrfKey, [][]byte{signer.Public()}, i.store)
 	i.svc.byHand = i.byHand
 	i.svc.router = svc.Router
-	if err := i.listenRunner(ctx, i.runDir, filepath.Join(svc.StateDir, "files", m.App), m, false); err != nil {
+	if err := i.listenRunner(ctx, i.runDir, filepath.Join(svc.StateDir, "files", m.App), m); err != nil {
 		return err
 	}
 	if m.SQLDB() {
@@ -201,7 +201,7 @@ func (i *Instance) serveDatabase(ctx context.Context, app string, admin *MySQLAd
 	if err != nil {
 		return err
 	}
-	return i.listenDatabase(ctx, i.runDir, up, false, func(err error) {
+	return i.listenDatabase(ctx, i.runDir, up, func(err error) {
 		i.store.add(sourceRunner, "ERROR", "database: "+err.Error(), true)
 	})
 }

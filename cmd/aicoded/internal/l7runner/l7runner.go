@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -324,6 +325,7 @@ func checkLogin(ctx context.Context, up mysqlproxy.Upstream) error {
 	cfg := mysql.NewConfig()
 	cfg.Net, cfg.Addr, cfg.User, cfg.Passwd, cfg.DBName = up.Network, up.Address, up.User, up.Password, up.Database
 	cfg.Timeout = loginTimeout
+	cfg.Logger = log.New(io.Discard, "", 0)
 	conn, err := mysql.NewConnector(cfg)
 	if err != nil {
 		return errors.New("the DSN in --mysql-dsn-file cannot be used")

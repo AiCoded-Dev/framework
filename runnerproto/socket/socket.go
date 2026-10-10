@@ -52,6 +52,20 @@ func Share(path string) error {
 	return os.Chmod(path, sharedMode)
 }
 
+// ListenShared creates a Unix socket at path as Listen does, then makes it usable by every user
+// as Share does.
+func ListenShared(ctx context.Context, path string) (net.Listener, error) {
+	l, err := Listen(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	if err := Share(path); err != nil {
+		_ = l.Close()
+		return nil, err
+	}
+	return l, nil
+}
+
 // NewServer returns a server for h that speaks HTTP/1.1 and HTTP/2 without TLS and has timeouts set.
 // A stream that moves in neither direction for 60 seconds is cut; one that keeps moving may run
 // as long as it needs.
