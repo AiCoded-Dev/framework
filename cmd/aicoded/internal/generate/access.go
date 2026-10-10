@@ -28,55 +28,71 @@ type accessEntry struct {
 	Calls   []string
 }
 
-// accessMap returns the access entry of every page a viewer can open, keyed by URL pattern.
-// require holds every rule on the path that does not admit every viewer, root first, each as
-// its roles joined by "|"; guard tells whether a Guard runs on the path; shared tells whether
-// the nearest template from the page's own up to its deepest parameter folder that declares
-// guard="true" or shared="true" declares shared="true"; calls names the calls of the routes
-// that render the page. A layout with pages below it only redirects and has no entry.
+// accessMap returns the access entry of every page a viewer can open, keyed by URL pattern. A
+// layout with pages below it only redirects and has no entry.
 func accessMap(routes []*Route) map[string]accessEntry {
+	byPath := routeIndex(routes)
+	out := map[string]accessEntry{}
+	for _, r := range routes {
+		if !redirects(r, byPath) {
+			out[pattern(r.Path)] = accessOf(r, byPath)
+		}
+	}
+	return out
+}
+
+// routeIndex returns routes by path.
+func routeIndex(routes []*Route) map[string]*Route {
 	byPath := make(map[string]*Route, len(routes))
 	for _, r := range routes {
 		byPath[r.Path] = r
 	}
-	out := map[string]accessEntry{}
-	for _, r := range routes {
-		if r.Template.GetContentNode() != nil && hasPagesBelow(r.Path, byPath) {
+	return byPath
+}
+
+// redirects reports whether r is a layout with pages below it, which only redirects to one of
+// them.
+func redirects(r *Route, byPath map[string]*Route) bool {
+	return r.Template.GetContentNode() != nil && hasPagesBelow(r.Path, byPath)
+}
+
+// accessOf returns the access entry of the route r. require holds every rule on the path that
+// does not admit every viewer, root first, each as its roles joined by "|"; guard tells whether
+// a Guard runs on the path; shared tells whether the nearest template from the route's own up to
+// its deepest parameter folder that declares guard="true" or shared="true" declares
+// shared="true"; calls names the calls of the routes that render the page.
+func accessOf(r *Route, byPath map[string]*Route) accessEntry {
+	var e accessEntry
+	segs := segments(r.Path)
+	for i := 0; i <= len(segs); i++ {
+		x := byPath["/"+strings.Join(segs[:i], "/")]
+		if x == nil || x.Template.Access() == nil {
 			continue
 		}
-		var e accessEntry
-		segs := segments(r.Path)
-		for i := 0; i <= len(segs); i++ {
-			x := byPath["/"+strings.Join(segs[:i], "/")]
-			if x == nil || x.Template.Access() == nil {
-				continue
-			}
-			a := x.Template.Access()
-			e.Guard = e.Guard || a.Guard
-			if slices.Contains(a.Roles, "*") {
-				continue
-			}
-			rule := strings.Join(slices.Compact(slices.Sorted(slices.Values(a.Roles))), "|")
-			if !slices.Contains(e.Require, rule) {
-				e.Require = append(e.Require, rule)
-			}
+		a := x.Template.Access()
+		e.Guard = e.Guard || a.Guard
+		if slices.Contains(a.Roles, "*") {
+			continue
 		}
-		if len(e.Require) == 0 {
-			e.Require = []string{"*"}
+		rule := strings.Join(slices.Compact(slices.Sorted(slices.Values(a.Roles))), "|")
+		if !slices.Contains(e.Require, rule) {
+			e.Require = append(e.Require, rule)
 		}
-		e.Shared = shared(segs, byPath)
-		calls := map[string]bool{}
-		for _, x := range chain(r.Path, byPath) {
-			for _, c := range x.Template.Calls() {
-				calls[c.Name] = true
-			}
-		}
-		if len(calls) > 0 {
-			e.Calls = slices.Sorted(maps.Keys(calls))
-		}
-		out[pattern(r.Path)] = e
 	}
-	return out
+	if len(e.Require) == 0 {
+		e.Require = []string{"*"}
+	}
+	e.Shared = shared(segs, byPath)
+	calls := map[string]bool{}
+	for _, x := range chain(r.Path, byPath) {
+		for _, c := range x.Template.Calls() {
+			calls[c.Name] = true
+		}
+	}
+	if len(calls) > 0 {
+		e.Calls = slices.Sorted(maps.Keys(calls))
+	}
+	return e
 }
 
 // shared reports whether the nearest template from the route at segs up to its deepest

@@ -56,6 +56,7 @@ func TestDescribe(t *testing.T) {
 	s, err := Describe(t.Context(), root, "")
 	require.NoError(t, err)
 	all := []string{"*"}
+	noParams, noCalls, noForms := []generate.ParamInfo{}, []string{}, []generate.FormInfo{}
 	assert.Equal(t, Summary{Apps: []App{
 		{Name: "billing", Dir: filepath.Join(root, "billing"), Serves: []Serve{
 			{Name: "Fail", Callers: []string{"shop"}, Require: all},
@@ -70,7 +71,14 @@ func TestDescribe(t *testing.T) {
 			{Path: "/invoices/{id}", Require: all, Shared: true},
 			{Path: "/status", Require: all},
 		}, Calls: map[string][]string{"billing": {"Fail", "GetInvoice", "Missing", "Ping", "Secret"}},
-			Surface: surface.Surface{Size: 3, EntryPoints: 3}},
+			Surface: surface.Surface{Size: 3, EntryPoints: 3},
+			Routes: []generate.RouteInfo{
+				{Path: "/", Template: "pages/index.html", Layout: true, Params: noParams, Require: all, Calls: noCalls, Forms: noForms},
+				{Path: "/checks", Template: "pages/checks/index.html", Params: noParams, Require: all, Calls: noCalls, Forms: noForms},
+				{Path: "/invoices/{id}", Template: "pages/invoices/n_id/index.html", Params: []generate.ParamInfo{{Name: "id", Kind: "number"}},
+					Require: all, Shared: true, Calls: noCalls, Forms: noForms},
+				{Path: "/status", Template: "pages/status/index.html", Params: noParams, Require: all, Calls: noCalls, Forms: noForms},
+			}},
 	}}, s)
 
 	s, err = Describe(t.Context(), root, "hello")

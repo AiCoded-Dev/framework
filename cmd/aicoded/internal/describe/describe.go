@@ -1,6 +1,6 @@
 // Package describe runs aicoded describe: a compact summary of what each app of a workspace
-// serves, calls and may reach, from its permission list, of its surface, and of what is out of
-// date in it.
+// serves, calls and may reach, from its permission list, of its surface, of what is out of date
+// in it, and, in JSON, of its pages and layouts.
 package describe
 
 import (
@@ -53,6 +53,9 @@ type App struct {
 	Warnings []string        `json:"warnings,omitempty"`
 	// Findings are the generated files that are out of date, E-CHK-001, and the errors of generate.
 	Findings []problem.Problem `json:"findings,omitempty"`
+	// Routes lists every page and layout, sorted by path, from the templates as aicoded generate
+	// reads them. The text summary leaves them out.
+	Routes []generate.RouteInfo `json:"routes,omitempty"`
 }
 
 // Audience is who may use the app: people of the company and outside people.
@@ -143,6 +146,7 @@ func describeApp(ctx context.Context, a workspace.App, names map[string]string) 
 		TTL:        m.TTL,
 		Warnings:   res.Warnings,
 		Findings:   problem.From(a.Name, err),
+		Routes:     res.Routes,
 	}
 	if len(m.Audience.Internal) > 0 || len(m.Audience.External) > 0 {
 		d.Audience = &Audience{Internal: m.Audience.Internal, External: m.Audience.External}

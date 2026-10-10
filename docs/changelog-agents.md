@@ -4,6 +4,12 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `aicoded describe --json` and the MCP tool `describe` give each app `routes`: every page and
+  layout, sorted by path, with its `template`, `layout`, URL `params` and their kinds, `require`,
+  `guard`, `guard_at` (the path of the route whose template declares the nearest `Guard`),
+  `shared`, `live`, `calls`, and the `forms` of its own template with each field's `name`,
+  `kind`, `go_type`, `required` and `multiple`. The delivery pipeline builds its simulated
+  attacks from them. The text summary does not change.
 - A page with an id in its URL says whose records it shows. Every template at or below a
   parameter folder, page or layout, needs `guard="true"` on its own `<ssr:access>` or on that of
   a template between it and its deepest parameter folder, when its `Guard` decides who sees each

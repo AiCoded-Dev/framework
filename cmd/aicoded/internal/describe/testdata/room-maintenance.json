@@ -59,7 +59,175 @@
           "INSERT tickets",
           "UPDATE tickets"
         ]
-      }
+      },
+      "routes": [
+        {
+          "path": "/",
+          "template": "pages/index.html",
+          "layout": true,
+          "params": [],
+          "require": [
+            "staff"
+          ],
+          "guard": false,
+          "guard_at": "",
+          "shared": false,
+          "live": false,
+          "calls": [],
+          "forms": []
+        },
+        {
+          "path": "/tickets",
+          "template": "pages/tickets/index.html",
+          "layout": false,
+          "params": [],
+          "require": [
+            "staff"
+          ],
+          "guard": false,
+          "guard_at": "",
+          "shared": false,
+          "live": true,
+          "calls": [],
+          "forms": []
+        },
+        {
+          "path": "/tickets/report",
+          "template": "pages/tickets/report/index.html",
+          "layout": false,
+          "params": [],
+          "require": [
+            "staff"
+          ],
+          "guard": false,
+          "guard_at": "",
+          "shared": false,
+          "live": false,
+          "calls": [],
+          "forms": [
+            {
+              "name": "report",
+              "fields": [
+                {
+                  "name": "room",
+                  "kind": "select",
+                  "go_type": "int",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "title",
+                  "kind": "input",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "details",
+                  "kind": "textarea",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "/tickets/{id}",
+          "template": "pages/tickets/n_id/index.html",
+          "layout": false,
+          "params": [
+            {
+              "name": "id",
+              "kind": "number"
+            }
+          ],
+          "require": [
+            "staff"
+          ],
+          "guard": true,
+          "guard_at": "/tickets/{id}",
+          "shared": false,
+          "live": false,
+          "calls": [],
+          "forms": []
+        },
+        {
+          "path": "/tickets/{id}/edit",
+          "template": "pages/tickets/n_id/edit/index.html",
+          "layout": false,
+          "params": [
+            {
+              "name": "id",
+              "kind": "number"
+            }
+          ],
+          "require": [
+            "staff"
+          ],
+          "guard": true,
+          "guard_at": "/tickets/{id}/edit",
+          "shared": false,
+          "live": false,
+          "calls": [],
+          "forms": [
+            {
+              "name": "edit",
+              "fields": [
+                {
+                  "name": "title",
+                  "kind": "input",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "details",
+                  "kind": "textarea",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "/tickets/{id}/status",
+          "template": "pages/tickets/n_id/status/index.html",
+          "layout": false,
+          "params": [
+            {
+              "name": "id",
+              "kind": "number"
+            }
+          ],
+          "require": [
+            "staff",
+            "hotel-ops"
+          ],
+          "guard": true,
+          "guard_at": "/tickets/{id}",
+          "shared": false,
+          "live": false,
+          "calls": [],
+          "forms": [
+            {
+              "name": "status",
+              "fields": [
+                {
+                  "name": "status",
+                  "kind": "select",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

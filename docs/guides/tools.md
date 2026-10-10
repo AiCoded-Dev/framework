@@ -125,6 +125,29 @@ mail, and `external audience magic-link` after `audience`. A page with an id in 
 `guard` or `shared`, as [access](access.md) explains: the people example prints
 `page /users/{login}/info  require staff  shared`.
 
+`--json` prints the same summary as JSON, and the delivery pipeline builds its simulated attacks
+from it. Each app's `pages` hold what the lines above show, and its `routes` list every page and
+layout, sorted by path:
+
+- `path` and `require`, as the `access` section of the permission list writes them;
+- `template`, the route's `index.html` in the app folder;
+- `layout`: `true` for a layout with pages below it, which only redirects to one of them and has
+  no entry in the `access` section;
+- `params`, the parameters of the URL in path order, each with its `name` and a `kind` of
+  `number` (an `n_` folder) or `string` (an `s_` folder);
+- `guard`: `true` when a `Guard` runs on the path; `guard_at` is the path of the route whose
+  template declares the nearest one, or `""`;
+- `shared`, as in the `access` section;
+- `live`: `true` when the page opens a live connection, because it or a layout above it has
+  live values or page calls;
+- `calls`, the page calls of the page and the layouts above it;
+- `forms`, the forms of the route's own template, each with its `name` and its `fields`: `name`,
+  `kind` (`input`, `file`, `textarea` or `select`), `go_type`, `required` and `multiple`.
+  Radio buttons or checkboxes that share a name are one field.
+
+In the room-maintenance example, `/tickets/{id}/status` has `"guard": true` and
+`"guard_at": "/tickets/{id}"`: the `Guard` of the ticket's page runs before the status page.
+
 The surface is the app's size: the larger of its entry points and its effects. Its entry points
 are its pages, its page calls, counted once for each page that offers them, the functions it
 serves other apps and its scheduled jobs. Its effects are the tables its SQL writes, counted

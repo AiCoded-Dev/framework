@@ -63,7 +63,255 @@
         "writes": [
           "INSERT users"
         ]
-      }
+      },
+      "routes": [
+        {
+          "path": "/",
+          "template": "pages/index.html",
+          "layout": true,
+          "params": [],
+          "require": [
+            "*"
+          ],
+          "guard": false,
+          "guard_at": "",
+          "shared": false,
+          "live": false,
+          "calls": [],
+          "forms": []
+        },
+        {
+          "path": "/contact",
+          "template": "pages/contact/index.html",
+          "layout": false,
+          "params": [],
+          "require": [
+            "*"
+          ],
+          "guard": false,
+          "guard_at": "",
+          "shared": false,
+          "live": false,
+          "calls": [],
+          "forms": [
+            {
+              "name": "contact",
+              "fields": [
+                {
+                  "name": "name",
+                  "kind": "input",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "email",
+                  "kind": "input",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "topic",
+                  "kind": "select",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "message",
+                  "kind": "textarea",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "/home",
+          "template": "pages/home/index.html",
+          "layout": false,
+          "params": [],
+          "require": [
+            "*"
+          ],
+          "guard": false,
+          "guard_at": "",
+          "shared": false,
+          "live": true,
+          "calls": [],
+          "forms": []
+        },
+        {
+          "path": "/users",
+          "template": "pages/users/index.html",
+          "layout": true,
+          "params": [],
+          "require": [
+            "staff"
+          ],
+          "guard": false,
+          "guard_at": "",
+          "shared": false,
+          "live": true,
+          "calls": [],
+          "forms": []
+        },
+        {
+          "path": "/users/add",
+          "template": "pages/users/add/index.html",
+          "layout": false,
+          "params": [],
+          "require": [
+            "staff",
+            "hr"
+          ],
+          "guard": false,
+          "guard_at": "",
+          "shared": false,
+          "live": true,
+          "calls": [],
+          "forms": [
+            {
+              "name": "add",
+              "fields": [
+                {
+                  "name": "login",
+                  "kind": "input",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "name",
+                  "kind": "input",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "age",
+                  "kind": "input",
+                  "go_type": "uint8",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "team",
+                  "kind": "select",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "languages",
+                  "kind": "select",
+                  "go_type": "string",
+                  "required": false,
+                  "multiple": true
+                },
+                {
+                  "name": "remote",
+                  "kind": "input",
+                  "go_type": "bool",
+                  "required": false,
+                  "multiple": true
+                },
+                {
+                  "name": "shift",
+                  "kind": "input",
+                  "go_type": "uint8",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "bio",
+                  "kind": "textarea",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "photo",
+                  "kind": "file",
+                  "go_type": "string",
+                  "required": true,
+                  "multiple": false
+                },
+                {
+                  "name": "photos",
+                  "kind": "file",
+                  "go_type": "string",
+                  "required": false,
+                  "multiple": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "path": "/users/{login}",
+          "template": "pages/users/s_login/index.html",
+          "layout": true,
+          "params": [
+            {
+              "name": "login",
+              "kind": "string"
+            }
+          ],
+          "require": [
+            "staff"
+          ],
+          "guard": false,
+          "guard_at": "",
+          "shared": true,
+          "live": true,
+          "calls": [],
+          "forms": []
+        },
+        {
+          "path": "/users/{login}/contacts",
+          "template": "pages/users/s_login/contacts/index.html",
+          "layout": false,
+          "params": [
+            {
+              "name": "login",
+              "kind": "string"
+            }
+          ],
+          "require": [
+            "staff"
+          ],
+          "guard": true,
+          "guard_at": "/users/{login}/contacts",
+          "shared": false,
+          "live": true,
+          "calls": [],
+          "forms": []
+        },
+        {
+          "path": "/users/{login}/info",
+          "template": "pages/users/s_login/info/index.html",
+          "layout": false,
+          "params": [
+            {
+              "name": "login",
+              "kind": "string"
+            }
+          ],
+          "require": [
+            "staff"
+          ],
+          "guard": false,
+          "guard_at": "",
+          "shared": true,
+          "live": true,
+          "calls": [],
+          "forms": []
+        }
+      ]
     }
   ]
 }

@@ -39,6 +39,8 @@ type Result struct {
 	Files []string
 	// Warnings are the esbuild warnings, each "<file>:<line>: <text>".
 	Warnings []string
+	// Routes lists every page and layout of the app, sorted by URL pattern.
+	Routes []RouteInfo
 }
 
 // Run generates the app in dir as Generate describes. Before it writes anything, it checks the
@@ -83,7 +85,7 @@ func (g *gen) run(opts Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	res := Result{Changed: slices.Sorted(maps.Keys(changes)), Files: g.owned()}
+	res := Result{Changed: slices.Sorted(maps.Keys(changes)), Files: g.owned(), Routes: inventory(routes)}
 	if opts.Frozen {
 		var d Diagnostics
 		for _, rel := range res.Changed {

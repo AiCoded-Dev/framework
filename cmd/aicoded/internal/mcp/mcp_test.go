@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"aicoded.dev/framework/cmd/aicoded/internal/describe"
 	"aicoded.dev/framework/cmd/aicoded/internal/dev"
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
 	"aicoded.dev/framework/cmd/aicoded/internal/explain"
@@ -489,6 +490,22 @@ func TestNoSecretsInToolOutput(t *testing.T) {
 	assert.NotContains(t, logs.String(), secret, "nor does the terminal")
 	assert.NotContains(t, logs.String(), string(token), "aicoded mcp prints no login link")
 	assert.Contains(t, logs.String(), fmt.Sprintf("aicoded dev: the dev UI is at http://localhost:%d/; run aicoded dev in %s to get its login link\n", port, root))
+}
+
+// describe answers with what aicoded describe --json prints, the routes included.
+func TestDescribeTool(t *testing.T) {
+	requireGo(t)
+	testhome.Set(t)
+	dir := filepath.Join(frameworkDir(t), "examples")
+	cs := connect(t, dir, io.Discard)
+	got, err := json.Marshal(result[map[string]any](t, call(t, cs, "describe", map[string]any{"app": "room-maintenance"})))
+	require.NoError(t, err)
+	s, err := describe.Describe(t.Context(), dir, "room-maintenance")
+	require.NoError(t, err)
+	require.NotEmpty(t, s.Apps[0].Routes)
+	want, err := json.Marshal(s)
+	require.NoError(t, err)
+	assert.JSONEq(t, string(want), string(got))
 }
 
 func TestMailReceiveAndList(t *testing.T) {

@@ -184,7 +184,7 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 			return withDev(ctx, s, func(b devapi.Backend) (devapi.Broken, error) { return b.WhatBroke(ctx, in.App) })
 		})
 	tool(srv, &mcpsdk.Tool{Name: "describe", Annotations: readOnly,
-		Description: "Summarise the apps: app type, owner and audience, pages and their access rules, functions served and called, data, mail, outside services, scheduled jobs, settings, secret names, third-party modules, size and resource limits, the tables their SQL writes, their surface, and generated files that are out of date."},
+		Description: "Summarise the apps: app type, owner and audience, pages and their access rules, every page and layout with its URL parameters and forms, functions served and called, data, mail, outside services, scheduled jobs, settings, secret names, third-party modules, size and resource limits, the tables their SQL writes, their surface, and generated files that are out of date."},
 		func(ctx context.Context, in anyAppIn) (describe.Summary, error) {
 			if err := validApp(in.App, true); err != nil {
 				return describe.Summary{}, err

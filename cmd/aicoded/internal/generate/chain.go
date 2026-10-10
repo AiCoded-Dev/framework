@@ -54,7 +54,7 @@ func (g *gen) checkDocuments(routes []*Route) error {
 // withoutHTML refuses a page a viewer can open whose render chain has no <html> element. A
 // layout with pages below it only redirects, so it is not checked on its own.
 func withoutHTML(r *Route, routes map[string]*Route) *errs.Error {
-	if r.Template.GetContentNode() != nil && hasPagesBelow(r.Path, routes) {
+	if redirects(r, routes) {
 		return nil
 	}
 	for _, x := range chain(r.Path, routes) {
