@@ -1,3 +1,4 @@
+<ssr:access role="developer" guard="true"/>
 <ssr:var name="m" type="Message"/>
 <p><a href="/mail/{{ m.App }}">All mail of {{ m.App }}</a></p>
 <h1>{{ m.Subject != '' ? m.Subject : '(no subject)' }}</h1>

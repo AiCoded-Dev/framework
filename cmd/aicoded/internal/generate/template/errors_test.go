@@ -98,8 +98,8 @@ func TestOneWrapperPerElement(t *testing.T) {
 
 func TestFixes(t *testing.T) {
 	retired := map[int]bool{44: true}
-	assert.Len(t, fixes, 53-len(retired))
-	for n := 1; n <= 53; n++ {
+	assert.Len(t, fixes, 55-len(retired))
+	for n := 1; n <= 55; n++ {
 		code := fmt.Sprintf("E-GEN-%03d", n)
 		if retired[n] {
 			assert.Empty(t, Fix(code), code)
@@ -238,6 +238,8 @@ func TestAccessAttribute(t *testing.T) {
 		`<ssr:access role="a,"/>`:                      "E-GEN-031",
 		`<ssr:access role="{{ x }}"/>`:                 "E-GEN-031",
 		`<ssr:access role="a" guard/>`:                 "E-GEN-031",
+		`<ssr:access role="a" shared="yes"/>`:          "E-GEN-031",
+		`<ssr:access role="a" shared/>`:                "E-GEN-031",
 		`<ssr:access role="a" roles="b"/>`:             "E-GEN-031",
 		`<ssr:access role="a" ssr:if="x"/>`:            "E-GEN-031",
 	} {
@@ -258,6 +260,10 @@ func TestAccess(t *testing.T) {
 	tpl, err = parse(t, `<ssr:access role="*"/>`)
 	require.NoError(t, err)
 	assert.Equal(t, &Access{Roles: []string{"*"}, Line: 1}, tpl.Access())
+
+	tpl, err = parse(t, `<ssr:access role="staff" shared="true"/>`)
+	require.NoError(t, err)
+	assert.Equal(t, &Access{Roles: []string{"staff"}, Shared: true, Line: 1}, tpl.Access())
 
 	assert.NotContains(t, pageCode(t, `<p>a</p><ssr:access role="*"/>`), "access", "the tag renders nothing")
 

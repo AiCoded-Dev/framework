@@ -122,8 +122,12 @@ access:
   "/users/{login}/contacts":
     require: ["staff"]
     guard: true
+  "/users/{login}/info":
+    require: ["staff"]
+    shared: true
   "/notes/{id}":
     require: ["*"]
+    guard: true
     calls: ["star"]
 ```
 
@@ -131,6 +135,10 @@ access:
   first, with the roles of one rule joined by `|`; `["*"]` means every viewer the company login
   lets in.
 - `guard: true` says that a `Guard` on the page's path runs for it.
+- `shared: true` says that everyone the rules admit may see every record of a page with an id in
+  its URL: the nearest template, from the page up to its deepest parameter folder, that says
+  whose records the page shows declares `shared="true"`. A page with an id in its URL has
+  `guard: true` or `shared: true`, never both (E-MAN-023); see [access](access.md).
 - `calls` names the page calls of the page and of the layouts it is shown in.
 
 It writes the `services` section from `rpc/` and the clients in `services/`: the functions the

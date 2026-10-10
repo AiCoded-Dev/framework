@@ -1,0 +1,69 @@
+{
+  "apps": [
+    {
+      "name": "people",
+      "dir": "/apps/people",
+      "pages": [
+        {
+          "path": "/contact",
+          "require": [
+            "*"
+          ]
+        },
+        {
+          "path": "/home",
+          "require": [
+            "*"
+          ]
+        },
+        {
+          "path": "/users/add",
+          "require": [
+            "staff",
+            "hr"
+          ]
+        },
+        {
+          "path": "/users/{login}/contacts",
+          "require": [
+            "staff"
+          ],
+          "guard": true
+        },
+        {
+          "path": "/users/{login}/info",
+          "require": [
+            "staff"
+          ],
+          "shared": true
+        }
+      ],
+      "calls": {
+        "contacts": [
+          "Contacts"
+        ]
+      },
+      "sqldb": true,
+      "stores": [
+        "photos"
+      ],
+      "email": {
+        "from": "people@acme.example",
+        "to_domains": [
+          "acme.example"
+        ]
+      },
+      "settings": [
+        "team_address"
+      ],
+      "surface": {
+        "size": 5,
+        "entry_points": 5,
+        "effects": 2,
+        "writes": [
+          "INSERT users"
+        ]
+      }
+    }
+  ]
+}

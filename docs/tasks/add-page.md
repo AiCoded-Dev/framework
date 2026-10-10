@@ -46,7 +46,10 @@ of a user's card in the people example, at `/users/<login>/info`.
    Every page needs an access rule on its path, in its own template or in a parent's. This page
    has none of its own: `pages/users/index.html` holds `<ssr:access role="staff"/>`, which covers
    every page below `/users`. A page outside such a folder starts with its own rule, such as
-   `<ssr:access role="staff"/>`, or `<ssr:access role="*"/>` for every viewer.
+   `<ssr:access role="staff"/>`, or `<ssr:access role="*"/>` for every viewer. A page with an id
+   in its URL also says whose records it shows, with `guard="true"` or `shared="true"`
+   (E-GEN-054): this one inherits `shared="true"` from the card above it,
+   `pages/users/s_login/index.html`, since every member of `staff` sees every profile.
 3. Declare the types the template names, such as `User`, in a `.go` file next to it:
 
    <!-- code: examples/people/pages/users/s_login/info/types.go -->
@@ -104,7 +107,8 @@ The page's `lastSeen` is a live value, which [Add a live value](add-live-value.m
 
 - `aicoded check` generates, builds, vets, lints and tests the app.
 - `aicoded generate` records the page in the `access` section of `aicoded.yaml` as
-  `"/users/{login}/info"` with `require: ["staff"]`, and `aicoded describe` lists it.
+  `"/users/{login}/info"` with `require: ["staff"]` and `shared: true`, and `aicoded describe`
+  lists it.
 - Open `http://people.localhost:8080/users/alice/info` as a persona with the `staff` role. A
   persona without it gets 403, and a login that no user has gets 404.
 

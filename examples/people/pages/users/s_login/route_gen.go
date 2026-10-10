@@ -33,7 +33,7 @@ func NewRoute(dp RouteDataProvider) web.Route {
 	return &route{dp: dp}
 }
 
-func (rt *route) Access() web.Access { return web.Access{} }
+func (rt *route) Access() web.Access { return web.Access{Roles: []string{"staff"}} }
 
 func (rt *route) Layout() bool { return true }
 
@@ -64,62 +64,62 @@ func (s *state) Data(ctx context.Context, r *web.Request, w web.ResponseWriter) 
 func (s *state) DefaultRoute(context.Context, *web.Request) (string, error) { return "info", nil }
 
 func (s *state) Write(w io.Writer) error {
-//line index.html:2
+//line index.html:3
 	initials := s.RouteData.Initials
 	_ = initials
-//line index.html:3
+//line index.html:4
 	photos := s.RouteData.Photos
 	_ = photos
-//line index.html:4
+//line index.html:5
 	tabClass := s.RouteData.TabClass
 	_ = tabClass
-//line index.html:1
+//line index.html:2
 	user := s.RouteData.User
 	_ = user
 	if _, err := io.WriteString(w, _html0); err != nil {
 		return err
 	}
-//line index.html:6
+//line index.html:7
 	if err := render.Text(w, initials); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html1); err != nil {
 		return err
 	}
-//line index.html:8
+//line index.html:9
 	if err := render.Text(w, user.Name); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html2); err != nil {
 		return err
 	}
-//line index.html:10
+//line index.html:11
 	if err := render.Text(w, user.Login); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html3); err != nil {
 		return err
 	}
-//line index.html:11
+//line index.html:12
 	if err := render.Text(w, user.Age); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html4); err != nil {
 		return err
 	}
-//line index.html:12
+//line index.html:13
 	for _, photo := range photos {
 		if _, err := io.WriteString(w, _html5); err != nil {
 			return err
 		}
-//line index.html:12
+//line index.html:13
 		if err := render.Text(w, photo.Name); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, _html6); err != nil {
 			return err
 		}
-//line index.html:12
+//line index.html:13
 		if err := render.Text(w, photo.Size); err != nil {
 			return err
 		}
@@ -130,28 +130,28 @@ func (s *state) Write(w io.Writer) error {
 	if _, err := io.WriteString(w, _html8); err != nil {
 		return err
 	}
-//line index.html:15
+//line index.html:16
 	if err := render.Attr(w, tabClass("info")); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html9); err != nil {
 		return err
 	}
-//line index.html:15
+//line index.html:16
 	if err := render.URLPart(w, user.Login); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html10); err != nil {
 		return err
 	}
-//line index.html:16
+//line index.html:17
 	if err := render.Attr(w, tabClass("contacts")); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html9); err != nil {
 		return err
 	}
-//line index.html:16
+//line index.html:17
 	if err := render.URLPart(w, user.Login); err != nil {
 		return err
 	}

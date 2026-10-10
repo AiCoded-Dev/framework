@@ -73,6 +73,8 @@ var fixes = map[string]string{
 	gen(51): "move <ssr:assets/> and <ssr:content/> out of ssr:if and ssr:for, so they always render",
 	gen(52): "wrap the top layout, usually pages/index.html, in <!doctype html><html>…</html>; below a root gate each page writes its own document",
 	gen(53): `list only the roles this page adds; when it adds none, remove this <ssr:access>, or keep one role with guard="true"`,
+	gen(54): `add guard="true" to the page's <ssr:access> and check the viewer in its Guard, or shared="true" when everyone the rule admits may see every record`,
+	gen(55): `keep shared="true" only on a page with an id in its URL, without guard="true" on it or above it`,
 }
 
 func gen(n int) string { return fmt.Sprintf("E-GEN-%03d", n) }

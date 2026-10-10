@@ -156,6 +156,22 @@ services:
 	assert.Equal(t, []string{"admin", "auditor", "editor", "owner"}, m.Roles())
 }
 
+func TestAccess(t *testing.T) {
+	m := load(t, "app: notes\naccess:\n  \"/notes/{id}\":\n    require: [\"staff\"]\n    shared: true\n")
+	assert.Equal(t, map[string]manifest.Access{"/notes/{id}": {Require: []string{"staff"}, Shared: true}}, m.Access)
+
+	for src, line := range map[string]string{
+		"access:\n  \"/a\":\n    require: [\"*\"]\n  \"/a/{id}\":\n    require: [\"*\"]\n    guard: true\n    shared: true": "5",
+		`access: {"/a/{id}": {require: ["*"], shared: true, guard: true}}`:                                                  "2",
+	} {
+		_, err := manifest.Parse(manifest.FileName, []byte("app: a1\n"+src+"\n"))
+		var e *errs.Error
+		require.ErrorAs(t, err, &e, src)
+		assert.Equal(t, []string{manifest.FileName + ":" + line, "E-MAN-023", `access "/a/{id}" is both guarded and shared`,
+			"run aicoded generate and do not edit the access section by hand"}, []string{e.Pos, e.Code, e.Msg, e.Fix}, src)
+	}
+}
+
 func TestServices(t *testing.T) {
 	m := load(t, `app: shop
 services:

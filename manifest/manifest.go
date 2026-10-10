@@ -60,10 +60,14 @@ type Job struct {
 	Name string `yaml:"job"`
 }
 
-// Access is one entry of the access section aicoded generate writes.
+// Access is one entry of the access section aicoded generate writes: the role rules a viewer
+// must meet, whether a Guard on the page's path decides who sees each record, whether everyone
+// the rules admit may see every record, and the page calls. Guard and Shared are never both
+// set.
 type Access struct {
 	Require []string `yaml:"require"`
 	Guard   bool     `yaml:"guard"`
+	Shared  bool     `yaml:"shared"`
 	Calls   []string `yaml:"calls"`
 }
 
@@ -365,6 +369,7 @@ func (c *checker) check(m Manifest) {
 	c.checkOwner(m.Owner, c.section("owner"))
 	c.checkAudience(m.Audience, c.section("audience"))
 	c.checkData(m.Data, c.section("data"))
+	c.checkAccess(m.Access, c.section("access"))
 	c.checkEgress(m.Egress, c.section("egress"))
 	c.section("email")
 	c.checkEmail(m.Email)
@@ -388,6 +393,21 @@ func (c *checker) checkNames(names []string, key string, n *yaml.Node) {
 			c.add(line(item(n, i)), "E-MAN-005", fmt.Sprintf("%s name %q is listed twice", key, name), "remove the duplicate")
 		}
 		seen[name] = true
+	}
+}
+
+// checkAccess refuses an access entry that is both guarded and shared, which aicoded generate
+// never writes. The problem is at the entry's path.
+func (c *checker) checkAccess(access map[string]Access, n *yaml.Node) {
+	if n == nil || n.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		path := n.Content[i]
+		if a := access[path.Value]; a.Guard && a.Shared {
+			c.add(path.Line, "E-MAN-023", fmt.Sprintf("access %q is both guarded and shared", path.Value),
+				"run aicoded generate and do not edit the access section by hand")
+		}
 	}
 }
 

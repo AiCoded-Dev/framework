@@ -32,11 +32,12 @@ var reservedFolders = map[string]bool{"__ws": true, "_aicoded": true}
 
 // discover finds the routes under the app's pages/ folder, sorted by path. It refuses reserved
 // folder names, folders Go tools skip, a page with no access rule on its path, an access rule
-// that adds nothing to a rule above it, a Guard method the route does not declare, a default
-// page that is not a page below its layout, two parameter folders in one folder, folder names
-// Go code cannot use, two pages with one route key, live values the page cannot show or write
-// and <ssr:assets/> or <ssr:content/> inside a condition or loop. It reports every problem of
-// the run together as Diagnostics.
+// that adds nothing to a rule above it, a route with a parameter in its URL that does not say
+// whose records it shows, shared="true" where it means nothing, a Guard method the route does
+// not declare, a default page that is not a page below its layout, two parameter folders in one
+// folder, folder names Go code cannot use, two pages with one route key, live values the page
+// cannot show or write and <ssr:assets/> or <ssr:content/> inside a condition or loop. It
+// reports every problem of the run together as Diagnostics.
 func discover(app App, image func(routeDir, src string) (string, error)) ([]*Route, error) {
 	pages := filepath.Join(app.Dir, "pages")
 	var (
@@ -103,6 +104,12 @@ func discover(app App, image func(routeDir, src string) (string, error)) ([]*Rou
 			diags = append(diags, diag(templatePos(r.Path), "E-GEN-030", "%s has no access rule on its path", r.Path))
 		}
 		if e := addsNothing(r, routes); e != nil {
+			diags = append(diags, e)
+		}
+		if e := undeclared(r, routes, broken); e != nil {
+			diags = append(diags, e)
+		}
+		if e := sharedWithoutMeaning(r, routes); e != nil {
 			diags = append(diags, e)
 		}
 		if e := checkDefault(r, found); e != nil {
@@ -177,14 +184,15 @@ func open(p string, routes map[string]*Route, broken map[string]bool) bool {
 // addsNothing refuses a route's own access rule that adds nothing to a rule above it on the
 // path, since every rule on the path applies: a list of two or more different roles that
 // includes every role of that rule, as a list admits anyone with one of its roles, or "*"
-// without a guard below a rule that is not "*". It reports the nearest such rule above.
+// without guard="true" or shared="true" below a rule that is not "*". It reports the nearest
+// such rule above.
 func addsNothing(r *Route, routes map[string]*Route) *errs.Error {
 	c := r.Template.Access()
 	if c == nil {
 		return nil
 	}
 	star := c.Roles[0] == "*"
-	if star && c.Guard || !star && len(slices.Compact(slices.Sorted(slices.Values(c.Roles)))) < 2 {
+	if star && (c.Guard || c.Shared) || !star && len(slices.Compact(slices.Sorted(slices.Values(c.Roles)))) < 2 {
 		return nil
 	}
 	segs := segments(r.Path)
@@ -212,16 +220,99 @@ func addsNothing(r *Route, routes map[string]*Route) *errs.Error {
 			fix = fmt.Sprintf("remove this <ssr:access>: the rule in %s already decides who may open the page", above)
 		case len(added) > 0 && c.Guard:
 			fix = fmt.Sprintf(`list only the roles this page adds, such as role=%q guard="true"`, strings.Join(added, ","))
+		case len(added) > 0 && c.Shared:
+			fix = fmt.Sprintf(`list only the roles this page adds, such as role=%q shared="true"`, strings.Join(added, ","))
 		case len(added) > 0:
 			fix = fmt.Sprintf("list only the roles this page adds, such as role=%q", strings.Join(added, ","))
 		case c.Guard:
 			fix = fmt.Sprintf(`keep one role with the guard, such as role=%q guard="true"`, p.Roles[0])
+		case c.Shared:
+			fix = fmt.Sprintf(`write role="*" shared="true": the rule in %s already admits these roles`, above)
 		default:
 			fix = fmt.Sprintf("remove this <ssr:access>: the rule in %s already admits these roles", above)
 		}
 		msg := fmt.Sprintf("role=%q adds nothing to role=%q in %s: %s",
 			strings.Join(c.Roles, ","), strings.Join(p.Roles, ","), above, why)
 		return errs.At(fmt.Sprintf("%s:%d", templateFile(r.Path), c.Line), "E-GEN-053", msg, fix)
+	}
+	return nil
+}
+
+// undeclared refuses a route with a parameter folder on its path when no template from the
+// deepest parameter folder down to the route's own declares guard="true" or shared="true", so
+// nothing says whose records the route shows. A template there that did not parse has unknown
+// declarations, so the route is not reported.
+func undeclared(r *Route, routes map[string]*Route, broken map[string]bool) *errs.Error {
+	segs := segments(r.Path)
+	param := deepestParam(segs)
+	if param < 0 {
+		return nil
+	}
+	for i := param + 1; i <= len(segs); i++ {
+		q := "/" + strings.Join(segs[:i], "/")
+		if broken[q] {
+			return nil
+		}
+		if x := routes[q]; x != nil && declares(x) {
+			return nil
+		}
+	}
+	pos := templatePos(r.Path)
+	if a := r.Template.Access(); a != nil {
+		pos = fmt.Sprintf("%s:%d", templateFile(r.Path), a.Line)
+	}
+	if param == len(segs)-1 {
+		return diag(pos, "E-GEN-054", "%s has a parameter in its URL but does not say whose records it shows", r.Path)
+	}
+	return diag(pos, "E-GEN-054", "%s does not say whose records it shows, and no template between it and the parameter folder %s does",
+		r.Path, folder("/"+strings.Join(segs[:param+1], "/")))
+}
+
+// declares reports whether the route's template says whose records it shows.
+func declares(r *Route) bool {
+	a := r.Template.Access()
+	return a != nil && (a.Guard || a.Shared)
+}
+
+// deepestParam returns the index of the last parameter folder of segs, or -1.
+func deepestParam(segs []string) int {
+	for i := len(segs) - 1; i >= 0; i-- {
+		if isParam(segs[i]) {
+			return i
+		}
+	}
+	return -1
+}
+
+// The fixes of E-GEN-055, one for each case.
+const (
+	fixSharedAndGuard   = `keep one: guard="true" when the Guard decides who sees each record, or shared="true"`
+	fixSharedNoParam    = `remove shared="true": only a page with an id in its URL shows one record of many`
+	fixSharedBelowGuard = `remove shared="true": the Guard above still decides who sees each record`
+)
+
+// sharedWithoutMeaning refuses shared="true" that cannot say what it means: next to
+// guard="true", on a route with no parameter folder on its path, or below a route whose
+// template declares guard="true", since that Guard decides who sees each record. It reports the
+// nearest such Guard above.
+func sharedWithoutMeaning(r *Route, routes map[string]*Route) *errs.Error {
+	a := r.Template.Access()
+	if a == nil || !a.Shared {
+		return nil
+	}
+	pos := fmt.Sprintf("%s:%d", templateFile(r.Path), a.Line)
+	segs := segments(r.Path)
+	switch {
+	case a.Guard:
+		return errs.At(pos, "E-GEN-055", fmt.Sprintf(`%s declares both guard="true" and shared="true"`, r.Path), fixSharedAndGuard)
+	case deepestParam(segs) < 0:
+		return errs.At(pos, "E-GEN-055", fmt.Sprintf(`%s declares shared="true" but has no parameter in its URL`, r.Path), fixSharedNoParam)
+	}
+	for i := len(segs) - 1; i >= 0; i-- {
+		q := "/" + strings.Join(segs[:i], "/")
+		if x := routes[q]; x != nil && x.Template.Access() != nil && x.Template.Access().Guard {
+			return errs.At(pos, "E-GEN-055", fmt.Sprintf(`%s declares shared="true" below the Guard of %s`, r.Path, q), fixSharedBelowGuard)
+		}
 	}
 	return nil
 }

@@ -25,6 +25,9 @@ func (s Summary) WriteText(w io.Writer) error {
 			if p.Guard {
 				b.WriteString("  guard")
 			}
+			if p.Shared {
+				b.WriteString("  shared")
+			}
 			if len(p.Calls) > 0 {
 				fmt.Fprintf(&b, "  calls %s", join(p.Calls))
 			}

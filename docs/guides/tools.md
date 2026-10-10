@@ -121,7 +121,9 @@ app room-maintenance (/home/me/apps/room-maintenance)
 
 An app with more in its permission list gets more lines, such as `connectors crm` after
 `files`, `egress api.partner.example` and `schedule daily-summary  cron 0 6 * * *` after the
-mail, and `external audience magic-link` after `audience`.
+mail, and `external audience magic-link` after `audience`. A page with an id in its URL shows
+`guard` or `shared`, as [access](access.md) explains: the people example prints
+`page /users/{login}/info  require staff  shared`.
 
 The surface is the app's size: the larger of its entry points and its effects. Its entry points
 are its pages, its page calls, counted once for each page that offers them, the functions it

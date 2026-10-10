@@ -2,7 +2,8 @@
 
 Every page is closed until an access rule on its path opens it. Access rules check the viewer's
 roles; a Guard checks what only the data can tell, such as who owns a record. Both run, root
-first, before anything else a page does.
+first, before anything else a page does. A page with an id in its URL also says whose records it
+shows.
 
 ## Access rules
 
@@ -11,6 +12,7 @@ first, before anything else a page does.
 <ssr:access role="staff,hr"/>
 <ssr:access role="*"/>
 <ssr:access role="staff" guard="true"/>
+<ssr:access role="staff" shared="true"/>
 ```
 
 - `role` lists roles separated by commas, and a list admits anyone with one of its roles. A
@@ -26,10 +28,10 @@ first, before anything else a page does.
   example does. A rule that adds nothing to a rule above it is refused by `aicoded generate`
   (E-GEN-053): a list of two or more different roles that includes every role of the rule
   above, such as `role="staff,hr"` below `role="staff"`, which admits every member of `staff`;
-  and `role="*"` without `guard="true"` below a rule that is not `*`, which does not open the
-  page to every viewer. A single role repeated from above, such as `role="staff"` below
+  and `role="*"` without `guard="true"` or `shared="true"` below a rule that is not `*`, which
+  does not open the page to every viewer. A single role repeated from above, such as `role="staff"` below
   `role="staff"`, is allowed, and so are `role="*"` below `role="*"` and a single role or `*`
-  with `guard="true"`.
+  with `guard="true"` or `shared="true"`.
 - A page with no rule on its path is refused by `aicoded generate` (E-GEN-030). Pages are closed
   by default: a page nobody may open is safer than one everybody may open by mistake.
 
@@ -89,6 +91,44 @@ func (p *DP) Guard(ctx context.Context, r *web.Request) error {
 When the data lives in another app, that app checks the same rule again, since it holds the
 data and cannot trust its caller to have checked; see [calls between apps](calls-between-apps.md).
 
+## Whose records a page shows
+
+A page with a parameter in its URL, such as `/users/{login}` from the folder
+`pages/users/s_login/`, shows one record of many, so it says who may see which record. Every
+template at or below a parameter folder, page or layout, needs a declaration on its own
+`<ssr:access>` or on that of a template between it and its deepest parameter folder, and
+`aicoded generate` refuses a template without one (E-GEN-054):
+
+- `guard="true"` when a viewer may see only some of the records, such as their own: the page's
+  `Guard` checks the viewer against the record the URL names, as above;
+- `shared="true"` when everyone the access rules admit may see every record, such as a staff
+  directory that every member of `staff` reads.
+
+A declaration on a layout covers the pages below it, and `guard="true"` below `shared="true"`
+narrows it. In the people example every member of `staff` sees every profile, so the user card,
+a layout, declares `shared="true"`, which its info tab inherits; the contacts tab keeps its own
+`Guard`:
+
+```html
+<!-- pages/users/s_login/index.html -->
+<ssr:access role="staff" shared="true"/>
+<!-- pages/users/s_login/contacts/index.html -->
+<ssr:access role="staff" guard="true"/>
+```
+
+- Only a declaration from the deepest parameter folder down counts, since that parameter names
+  the record the page shows. A `Guard` on `pages/users/` runs for `/users/{login}` too, but does
+  not say whose profile the card shows.
+- `shared="true"`, whose only value is `"true"`, is refused next to `guard="true"`, on a template
+  whose URL has no parameter, and below a template with `guard="true"`, whose `Guard` still
+  decides who sees each record (E-GEN-055).
+- `role="*" shared="true"` keeps the rules above as they are, as `role="*" guard="true"` does.
+
+The [permission list](permission-list.md) records `shared: true` for each page that shows every
+record to everyone its rules admit, and `guard: true` for each page a `Guard` checks, so security
+sees which is which. Publishing tests each guarded page with another viewer, one who has the
+roles the page asks for but did not enter the record: see [publishing](publishing.md).
+
 ## The order of checks
 
 For a page load or a form post, in this order:
@@ -130,3 +170,6 @@ The access rule of `/users` is what keeps them out. Check roles in access rules,
   a page with a `Guard`.
 - [Check who owns a record](../tasks/ownership-check.md): a `Guard` on the page, and the same
   check in the app that holds the data.
+- [E-GEN-054](../errors/E-GEN-054.md) and [E-GEN-055](../errors/E-GEN-055.md): a page with an id
+  in its URL that does not say whose records it shows, and `shared="true"` where it means
+  nothing.

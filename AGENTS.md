@@ -27,9 +27,10 @@ not for changing the framework itself. Follow them in every change.
   commas, and a list admits anyone with one of its roles; `role="*"` admits every viewer. Every
   rule on the path applies, so require two roles by putting them on templates at different
   levels of the path, such as `staff` on a layout and `hr` on the page below it.
-- Check ownership in a `Guard`: write `guard="true"` in the page's `<ssr:access>`, compare the
-  record's owner with `auth.Viewer(ctx).Subject`, and return `web.Forbidden()` when the viewer may
-  not see the record, or `web.NotFound()` only when even its existence must stay hidden.
+- A page with an id in its URL declares `guard="true"` in its `<ssr:access>` and checks the viewer
+  in its `Guard`, or `shared="true"` when everyone its rule admits may see every record. A `Guard`
+  checks ownership: it compares the record's owner with `auth.Viewer(ctx).Subject` and returns
+  `web.Forbidden()` to refuse the viewer, or `web.NotFound()` only to hide that the record exists.
 - Put an `//ssr:access caller=<apps> role=<roles>` line right above every function of `rpc/`.
   Apps are joined by commas and roles by `|`; `apps=true`, in place of or next to `role=`, lets
   the apps call with no viewer.
@@ -142,8 +143,7 @@ The docs are built into `aicoded`. `aicoded explain <topic>` prints a page, and 
   `tasks/add-page`, `tasks/add-form`, `tasks/add-live-value`, `tasks/list-from-database`,
   `tasks/list-by-role`, `tasks/ownership-check`, `tasks/email-after-a-write`,
   `tasks/upload-a-file` and `tasks/call-another-app`.
-- `changelog` lists what changed in the framework, and an error code such as `E-DEV-003`
-  explains that error.
+- `changelog` lists what changed in the framework; an error code, such as `E-DEV-003`, its error.
 - `aicoded describe` summarises the apps: pages, access rules, functions served and called, data,
   mail, settings, secret names, modules, SQL writes, surface and stale generated files.
 - `go doc aicoded.dev/framework/<package>` prints a package's overview and rules; its examples

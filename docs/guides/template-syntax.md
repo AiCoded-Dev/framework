@@ -12,6 +12,7 @@ attributes do not work on `ssr:` tags (E-GEN-005).
 | Tag | What it does |
 |---|---|
 | `<ssr:access role="a,b" guard="true"/>` | who may open the page; see [access](access.md) |
+| `<ssr:access role="a,b" shared="true"/>` | who may open a page with an id in its URL that shows every record to everyone it admits; see [access](access.md) |
 | `<ssr:var name="…" type="…"/>` | declares a value the page's data provider fills |
 | `<ssr:content default="…"/>` | where the page below a layout is shown; see [routing](routing.md) |
 | `<ssr:assets/>` | the script and style tags of the page and the pages inside it; see [assets](assets.md) |

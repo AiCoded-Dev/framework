@@ -38,6 +38,9 @@ id := r.URLParamInt("id")     // from n_id, as an int64
   under a fixed folder, such as `notes/n_id` and `notes/by-slug/s_slug`.
 - Every hook of every page on the path sees all the parameters of the URL: the layout
   `pages/users/` reads `login` to mark the open user in its list.
+- A page with a parameter shows one record of many, so it says whose records it shows, with
+  `guard="true"` or `shared="true"` on its `<ssr:access>` or on that of a template between it and
+  its deepest parameter folder (E-GEN-054); see [access](access.md).
 - `URLParam` returns `""` and `URLParamInt` returns 0 for a name the path does not have.
 
 ## Layouts

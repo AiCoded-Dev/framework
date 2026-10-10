@@ -31,7 +31,7 @@ func NewRoute(dp RouteDataProvider) web.Route {
 	return &route{dp: dp}
 }
 
-func (rt *route) Access() web.Access { return web.Access{} }
+func (rt *route) Access() web.Access { return web.Access{Roles: []string{"editor"}} }
 
 func (rt *route) Layout() bool { return false }
 
@@ -62,23 +62,23 @@ func (s *state) Data(ctx context.Context, r *web.Request, w web.ResponseWriter) 
 func (s *state) DefaultRoute(context.Context, *web.Request) (string, error) { return "", nil }
 
 func (s *state) Write(w io.Writer) error {
-//line index.html:2
+//line index.html:3
 	doc := s.RouteData.Doc
 	_ = doc
-//line index.html:1
+//line index.html:2
 	item := s.RouteData.Item
 	_ = item
 	if _, err := io.WriteString(w, _html0); err != nil {
 		return err
 	}
-//line index.html:3
+//line index.html:4
 	if err := render.Text(w, item.Title); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html1); err != nil {
 		return err
 	}
-//line index.html:4
+//line index.html:5
 	if err := render.Text(w, doc); err != nil {
 		return err
 	}

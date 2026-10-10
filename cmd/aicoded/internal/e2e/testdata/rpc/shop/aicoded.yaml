@@ -5,6 +5,7 @@ access:
     require: ["*"]
   "/invoices/{id}":
     require: ["*"]
+    shared: true
   "/status":
     require: ["*"]
 # services is written by aicoded generate from rpc/ and the clients in services/; do not edit it

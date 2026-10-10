@@ -1,0 +1,13 @@
+app people (/apps/people)
+  page /contact  require *
+  page /home  require *
+  page /users/add  require staff, hr
+  page /users/{login}/contacts  require staff  guard
+  page /users/{login}/info  require staff  shared
+  calls contacts: Contacts
+  database
+  files photos
+  email from people@acme.example to acme.example
+  settings team_address
+  writes INSERT users
+  surface 5 (5 entry points, 2 effects)

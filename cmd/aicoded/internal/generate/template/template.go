@@ -47,11 +47,14 @@ var (
 )
 
 // Access is a template's <ssr:access> rule: the viewer needs one of Roles, "*" admits every
-// viewer, and Guard declares the route's Guard method. Line is the line of the tag.
+// viewer, Guard declares the route's Guard method, and Shared says that every viewer the rules
+// admit may see every record of the route and of the routes below it. Line is the line of the
+// tag.
 type Access struct {
-	Roles []string
-	Guard bool
-	Line  int
+	Roles  []string
+	Guard  bool
+	Shared bool
+	Line   int
 }
 
 // Call is an <ssr:call>: a function of the page that its script may call. In and Out are the
@@ -470,7 +473,8 @@ func (p *parser) nesting() string {
 	return ""
 }
 
-// accessTag reads the template's one <ssr:access role="a,b" guard="true"/>. It renders nothing.
+// accessTag reads the template's one <ssr:access role="a,b" guard="true"/> or
+// <ssr:access role="a,b" shared="true"/>. It renders nothing.
 func (p *parser) accessTag(attrs []tagAttr) error {
 	if in := p.nesting(); in != "" {
 		return p.fail("E-GEN-031", "<ssr:access> is inside %s; the rule always applies, so it must not be nested", in)
@@ -489,6 +493,11 @@ func (p *parser) accessTag(attrs []tagAttr) error {
 				return p.fail("E-GEN-031", `<ssr:access> has guard=%q; write guard="true" or leave it out`, at.value)
 			}
 			a.Guard = true
+		case "shared":
+			if at.value != "true" {
+				return p.fail("E-GEN-031", `<ssr:access> has shared=%q; write shared="true" or leave it out`, at.value)
+			}
+			a.Shared = true
 		default:
 			return p.fail("E-GEN-031", "<ssr:access> has the attribute %s", at.name)
 		}

@@ -21,14 +21,37 @@ func TestAccessMap(t *testing.T) {
 		"pages/notes/index.html":       `<ssr:access role="editor"/><ssr:call name="count" in="int" out="int"/><p>list</p>`,
 		"pages/notes/n_id/index.html":  `<ssr:access role="*" guard="true"/><ssr:call name="star" in="int" out="int"/><p>note</p>`,
 		"pages/admin/index.html":       `<ssr:access role="owner,admin"/><ssr:content/>`,
-		"pages/admin/s_tab/index.html": `<ssr:access role="admin"/><p>tab</p>`,
+		"pages/admin/s_tab/index.html": `<ssr:access role="admin" shared="true"/><p>tab</p>`,
 	}), noImages)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]accessEntry{
 		"/notes":       {Require: []string{"editor"}, Calls: []string{"count"}},
 		"/notes/{id}":  {Require: []string{"editor"}, Guard: true, Calls: []string{"star"}},
-		"/admin/{tab}": {Require: []string{"admin|owner", "admin"}},
+		"/admin/{tab}": {Require: []string{"admin|owner", "admin"}, Shared: true},
 	}, accessMap(rs), "layouts with pages below are left out; the note inherits the gate's rule and not its calls")
+}
+
+func TestAccessMapShared(t *testing.T) {
+	rs, err := discover(newApp(t, map[string]string{
+		"pages/index.html":                        `<ssr:access role="staff"/><ssr:content/>`,
+		"pages/users/s_login/index.html":          `<ssr:access role="staff" shared="true"/><ssr:content default="info"/>`,
+		"pages/users/s_login/info/index.html":     `<p>info</p>`,
+		"pages/users/s_login/contacts/index.html": `<ssr:access role="staff" guard="true"/>`,
+		"pages/teams/n_id/index.html":             `<ssr:access role="staff" shared="true"/><ssr:content/>`,
+		"pages/teams/n_id/s_tab/index.html":       `<ssr:access role="staff" guard="true"/>`,
+		"pages/rooms/n_id/index.html":             `<ssr:access role="staff" guard="true"/><ssr:content/>`,
+		"pages/rooms/n_id/s_tab/index.html":       `<ssr:access role="staff" guard="true"/>`,
+		"pages/rooms/n_id/log/index.html":         `<p>log</p>`,
+	}), noImages)
+	require.NoError(t, err)
+	staff := []string{"staff"}
+	assert.Equal(t, map[string]accessEntry{
+		"/users/{login}/info":     {Require: staff, Shared: true},
+		"/users/{login}/contacts": {Require: staff, Guard: true},
+		"/teams/{id}/{tab}":       {Require: staff, Guard: true},
+		"/rooms/{id}/{tab}":       {Require: staff, Guard: true},
+		"/rooms/{id}/log":         {Require: staff, Guard: true},
+	}, accessMap(rs), "a page inherits shared from the layout at its parameter; a guard below narrows it")
 }
 
 func TestAccessMapGuardAndRepeats(t *testing.T) {
@@ -47,6 +70,7 @@ func TestAccessSectionIsSpliced(t *testing.T) {
 	section, err := accessSection(map[string]accessEntry{
 		"/":           {Require: []string{"*"}},
 		"/notes/{id}": {Require: []string{"editor"}, Guard: true, Calls: []string{"star"}},
+		"/tags/{tag}": {Require: []string{"editor"}, Shared: true, Calls: []string{"count"}},
 	})
 	require.NoError(t, err)
 	// If yaml.v3 spaces this differently, fix the expectation, never the marker line.
@@ -58,6 +82,10 @@ access:
     require: ["editor"]
     guard: true
     calls: ["star"]
+  "/tags/{tag}":
+    require: ["editor"]
+    shared: true
+    calls: ["count"]
 `, string(section))
 
 	before := "# notes app\napp: notes # the name\naccess:\n  \"/old\":\n    require: [\"x\"]\n\n# secrets below\nsecrets: [api_key]\n"

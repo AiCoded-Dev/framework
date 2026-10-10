@@ -30,7 +30,7 @@ func NewRoute(dp RouteDataProvider) web.Route {
 	return &route{dp: dp}
 }
 
-func (rt *route) Access() web.Access { return web.Access{} }
+func (rt *route) Access() web.Access { return web.Access{Roles: []string{"developer"}} }
 
 func (rt *route) Layout() bool { return false }
 
@@ -61,74 +61,74 @@ func (s *state) Data(ctx context.Context, r *web.Request, w web.ResponseWriter) 
 func (s *state) DefaultRoute(context.Context, *web.Request) (string, error) { return "", nil }
 
 func (s *state) Write(w io.Writer) error {
-//line index.html:1
+//line index.html:2
 	trace := s.RouteData.Trace
 	_ = trace
 	if _, err := io.WriteString(w, _html0); err != nil {
 		return err
 	}
-//line index.html:2
+//line index.html:3
 	if err := render.Text(w, trace.ID); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html1); err != nil {
 		return err
 	}
-//line index.html:3
+//line index.html:4
 	if err := render.Text(w, trace.Duration); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html2); err != nil {
 		return err
 	}
-//line index.html:3
+//line index.html:4
 	if err := render.Text(w, trace.Apps); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html3); err != nil {
 		return err
 	}
-//line index.html:3
+//line index.html:4
 	if err := render.URLQuery(w, trace.ID); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html4); err != nil {
 		return err
 	}
-//line index.html:7
+//line index.html:8
 	for _, sp := range trace.Spans {
 		if _, err := io.WriteString(w, _html5); err != nil {
 			return err
 		}
-//line index.html:7
+//line index.html:8
 		if err := render.Attr(w, sp.Depth); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, _html6); err != nil {
 			return err
 		}
-//line index.html:7
+//line index.html:8
 		if err := render.Text(w, sp.Name); err != nil {
 			return err
 		}
-//line index.html:7
+//line index.html:8
 		if len(sp.Attrs) > 0 {
 			if _, err := io.WriteString(w, _html7); err != nil {
 				return err
 			}
-//line index.html:7
+//line index.html:8
 			for _, a := range sp.Attrs {
 				if _, err := io.WriteString(w, _html8); err != nil {
 					return err
 				}
-//line index.html:7
+//line index.html:8
 				if err := render.Text(w, a.Key); err != nil {
 					return err
 				}
 				if _, err := io.WriteString(w, _html9); err != nil {
 					return err
 				}
-//line index.html:7
+//line index.html:8
 				if err := render.Text(w, a.Value); err != nil {
 					return err
 				}
@@ -143,42 +143,42 @@ func (s *state) Write(w io.Writer) error {
 		if _, err := io.WriteString(w, _html12); err != nil {
 			return err
 		}
-//line index.html:7
+//line index.html:8
 		if err := render.Text(w, sp.App); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, _html13); err != nil {
 			return err
 		}
-//line index.html:7
+//line index.html:8
 		if err := render.Text(w, sp.Offset); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, _html12); err != nil {
 			return err
 		}
-//line index.html:7
+//line index.html:8
 		if err := render.Text(w, sp.Duration); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, _html14); err != nil {
 			return err
 		}
-//line index.html:7
+//line index.html:8
 		if err := render.Attr(w, trace.Total); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, _html15); err != nil {
 			return err
 		}
-//line index.html:7
+//line index.html:8
 		if err := render.Attr(w, sp.Length); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, _html16); err != nil {
 			return err
 		}
-//line index.html:7
+//line index.html:8
 		if err := render.Text(w, sp.Error); err != nil {
 			return err
 		}

@@ -19,18 +19,16 @@ type RouteData struct {
 
 // RouteDataProvider is what this page's DP implements.
 type RouteDataProvider interface {
+	Guard(ctx context.Context, r *web.Request) error
 	Data(ctx context.Context, r *web.Request, w web.ResponseWriter, data *RouteData) error
 }
 
 type route struct{ dp RouteDataProvider }
 
 // NewRoute returns the page for this folder.
-func NewRoute(dp RouteDataProvider) web.Route {
-	web.CheckNoGuard(dp, "/mail/s_app/s_id")
-	return &route{dp: dp}
-}
+func NewRoute(dp RouteDataProvider) web.Route { return &route{dp: dp} }
 
-func (rt *route) Access() web.Access { return web.Access{} }
+func (rt *route) Access() web.Access { return web.Access{Roles: []string{"developer"}} }
 
 func (rt *route) Layout() bool { return false }
 
@@ -46,7 +44,7 @@ type state struct {
 	RouteData RouteData
 }
 
-func (s *state) Guard(context.Context, *web.Request) error { return nil }
+func (s *state) Guard(ctx context.Context, r *web.Request) error { return s.dp.Guard(ctx, r) }
 
 func (s *state) InitForms(context.Context, *web.Request, web.ResponseWriter) error { return nil }
 
@@ -61,74 +59,74 @@ func (s *state) Data(ctx context.Context, r *web.Request, w web.ResponseWriter) 
 func (s *state) DefaultRoute(context.Context, *web.Request) (string, error) { return "", nil }
 
 func (s *state) Write(w io.Writer) error {
-//line index.html:1
+//line index.html:2
 	m := s.RouteData.M
 	_ = m
 	if _, err := io.WriteString(w, _html0); err != nil {
 		return err
 	}
-//line index.html:2
+//line index.html:3
 	if err := render.URLPart(w, m.App); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html1); err != nil {
 		return err
 	}
-//line index.html:2
+//line index.html:3
 	if err := render.Text(w, m.App); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html2); err != nil {
 		return err
 	}
-//line index.html:3
+//line index.html:4
 	if err := render.Text(w, render.If(m.Subject != "", m.Subject, "(no subject)")); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html3); err != nil {
 		return err
 	}
-//line index.html:5
+//line index.html:6
 	if err := render.Text(w, m.Folder); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html4); err != nil {
 		return err
 	}
-//line index.html:6
+//line index.html:7
 	if err := render.Attr(w, m.Stamp); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html5); err != nil {
 		return err
 	}
-//line index.html:6
+//line index.html:7
 	if err := render.Text(w, m.Time); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html6); err != nil {
 		return err
 	}
-//line index.html:7
+//line index.html:8
 	if err := render.Text(w, m.From); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html7); err != nil {
 		return err
 	}
-//line index.html:8
+//line index.html:9
 	if err := render.Text(w, m.To); err != nil {
 		return err
 	}
 	if _, err := io.WriteString(w, _html8); err != nil {
 		return err
 	}
-//line index.html:9
+//line index.html:10
 	if m.Cc != "" {
 		if _, err := io.WriteString(w, _html9); err != nil {
 			return err
 		}
-//line index.html:9
+//line index.html:10
 		if err := render.Text(w, m.Cc); err != nil {
 			return err
 		}
@@ -139,12 +137,12 @@ func (s *state) Write(w io.Writer) error {
 	if _, err := io.WriteString(w, _html11); err != nil {
 		return err
 	}
-//line index.html:10
+//line index.html:11
 	if m.Bcc != "" {
 		if _, err := io.WriteString(w, _html12); err != nil {
 			return err
 		}
-//line index.html:10
+//line index.html:11
 		if err := render.Text(w, m.Bcc); err != nil {
 			return err
 		}
@@ -155,12 +153,12 @@ func (s *state) Write(w io.Writer) error {
 	if _, err := io.WriteString(w, _html11); err != nil {
 		return err
 	}
-//line index.html:11
+//line index.html:12
 	if m.ReplyTo != "" {
 		if _, err := io.WriteString(w, _html13); err != nil {
 			return err
 		}
-//line index.html:11
+//line index.html:12
 		if err := render.Text(w, m.ReplyTo); err != nil {
 			return err
 		}
@@ -171,19 +169,19 @@ func (s *state) Write(w io.Writer) error {
 	if _, err := io.WriteString(w, _html14); err != nil {
 		return err
 	}
-//line index.html:14
+//line index.html:15
 	if m.Text != "" {
 		if _, err := io.WriteString(w, _html15); err != nil {
 			return err
 		}
-//line index.html:14
+//line index.html:15
 		if err := render.Text(w, m.Text); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, _html16); err != nil {
 			return err
 		}
-//line index.html:15
+//line index.html:16
 	} else {
 		if _, err := io.WriteString(w, _html17); err != nil {
 			return err
@@ -192,19 +190,19 @@ func (s *state) Write(w io.Writer) error {
 	if _, err := io.WriteString(w, _html11); err != nil {
 		return err
 	}
-//line index.html:16
+//line index.html:17
 	if m.HTML {
 		if _, err := io.WriteString(w, _html18); err != nil {
 			return err
 		}
-//line index.html:18
+//line index.html:19
 		if err := render.URLPart(w, m.App); err != nil {
 			return err
 		}
 		if _, err := io.WriteString(w, _html19); err != nil {
 			return err
 		}
-//line index.html:18
+//line index.html:19
 		if err := render.URLPart(w, m.ID); err != nil {
 			return err
 		}
@@ -215,31 +213,31 @@ func (s *state) Write(w io.Writer) error {
 	if _, err := io.WriteString(w, _html11); err != nil {
 		return err
 	}
-//line index.html:20
+//line index.html:21
 	if len(m.Attachments) > 0 {
 		if _, err := io.WriteString(w, _html21); err != nil {
 			return err
 		}
-//line index.html:25
+//line index.html:26
 		for _, a := range m.Attachments {
 			if _, err := io.WriteString(w, _html22); err != nil {
 				return err
 			}
-//line index.html:25
+//line index.html:26
 			if err := render.Text(w, a.Name); err != nil {
 				return err
 			}
 			if _, err := io.WriteString(w, _html23); err != nil {
 				return err
 			}
-//line index.html:25
+//line index.html:26
 			if err := render.Text(w, a.Type); err != nil {
 				return err
 			}
 			if _, err := io.WriteString(w, _html23); err != nil {
 				return err
 			}
-//line index.html:25
+//line index.html:26
 			if err := render.Text(w, a.Size); err != nil {
 				return err
 			}
@@ -251,7 +249,7 @@ func (s *state) Write(w io.Writer) error {
 			return err
 		}
 	}
-//line route_gen.go:255
+//line route_gen.go:253
 	return nil
 }
 

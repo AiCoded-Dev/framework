@@ -2,6 +2,7 @@ package generate
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -101,8 +102,8 @@ func TestDiscoverErrors(t *testing.T) {
 		},
 		"E-GEN-041": {
 			"pages/index.html":        `<ssr:access role="*"/><ssr:content/>`,
-			"pages/n_id/index.html":   `<p>id</p>`,
-			"pages/s_slug/index.html": `<p>slug</p>`,
+			"pages/n_id/index.html":   `<ssr:access role="*" shared="true"/>`,
+			"pages/s_slug/index.html": `<ssr:access role="*" shared="true"/>`,
 		},
 		"E-GEN-043": {"pages/index.html": `<ssr:access role="*"/><ssr:content/>`, "pages/my-page/index.html": `<p>x</p>`},
 	}
@@ -246,6 +247,101 @@ func TestAccessThatAddsSomething(t *testing.T) {
 	}
 }
 
+func TestWhoseRecords(t *testing.T) {
+	files := map[string]string{
+		"pages/index.html":            `<ssr:access role="staff"/><ssr:content/>`,
+		"pages/a/n_id/index.html":     "<p>a</p>\n<ssr:access role=\"staff\"/>",
+		"pages/b/s_x/index.html":      `<ssr:content/>`,
+		"pages/b/s_x/c/index.html":    `<p>c</p>`,
+		"pages/d/s_x/index.html":      `<ssr:access role="staff" shared="true"/><ssr:content/>`,
+		"pages/d/s_x/e/index.html":    `<p>the layout says it</p>`,
+		"pages/f/n_id/index.html":     `<ssr:access role="staff" guard="true"/><ssr:content/>`,
+		"pages/f/n_id/g/index.html":   `<p>the layout says it</p>`,
+		"pages/h/n_id/i/index.html":   `<ssr:access role="staff" shared="true"/>`,
+		"pages/j/index.html":          `<ssr:access role="staff" guard="true"/><ssr:content/>`,
+		"pages/j/n_id/index.html":     `<p>a Guard above the parameter does not say it</p>`,
+		"pages/k/n_a/index.html":      `<ssr:access role="staff" shared="true"/><ssr:content/>`,
+		"pages/k/n_a/s_b/index.html":  `<p>only the deepest parameter counts</p>`,
+		"pages/m/n_id/index.html":     `<p ssr:bogus="x"></p>`,
+		"pages/m/n_id/x/index.html":   `<p>below a template that did not parse</p>`,
+		"pages/n/n_id/o/index.html":   `<p>no template at the parameter</p>`,
+		"pages/n/n_id/o/p/index.html": `<ssr:access role="staff" guard="true"/>`,
+	}
+	assert.Equal(t, []string{
+		"pages/a/n_id/index.html:2 E-GEN-054",
+		"pages/b/s_x/c/index.html:1 E-GEN-054",
+		"pages/b/s_x/index.html:1 E-GEN-054",
+		"pages/j/n_id/index.html:1 E-GEN-054",
+		"pages/k/n_a/s_b/index.html:1 E-GEN-054",
+		"pages/m/n_id/index.html:1 E-GEN-005",
+		"pages/n/n_id/o/index.html:1 E-GEN-054",
+	}, diags(t, files))
+
+	_, err := discover(newApp(t, files), noImages)
+	var d Diagnostics
+	require.ErrorAs(t, err, &d)
+	assert.Equal(t, "/a/n_id has a parameter in its URL but does not say whose records it shows", d[0].Msg)
+	assert.Equal(t, "/b/s_x/c does not say whose records it shows, and no template between it and the parameter folder pages/b/s_x does", d[1].Msg)
+	assert.Equal(t, template.Fix("E-GEN-054"), d[0].Fix)
+}
+
+func TestSharedWithoutMeaning(t *testing.T) {
+	const decl = "\n<ssr:access role=\"staff\" %s/>"
+	for _, c := range []struct {
+		files         map[string]string
+		pos, msg, fix string
+	}{
+		{map[string]string{"pages/a/n_id/index.html": fmt.Sprintf(decl, `guard="true" shared="true"`)}, "pages/a/n_id/index.html:2",
+			`/a/n_id declares both guard="true" and shared="true"`,
+			`keep one: guard="true" when the Guard decides who sees each record, or shared="true"`},
+		{map[string]string{"pages/a/index.html": fmt.Sprintf(decl, `shared="true"`)}, "pages/a/index.html:2",
+			`/a declares shared="true" but has no parameter in its URL`,
+			`remove shared="true": only a page with an id in its URL shows one record of many`},
+		{map[string]string{
+			"pages/a/n_id/index.html":   `<ssr:access role="staff" guard="true"/><ssr:content/>`,
+			"pages/a/n_id/b/index.html": fmt.Sprintf(decl, `shared="true"`),
+		}, "pages/a/n_id/b/index.html:2", `/a/n_id/b declares shared="true" below the Guard of /a/n_id`,
+			`remove shared="true": the Guard above still decides who sees each record`},
+		{map[string]string{
+			"pages/a/index.html":      `<ssr:access role="staff" guard="true"/><ssr:content/>`,
+			"pages/a/n_id/index.html": fmt.Sprintf(decl, `shared="true"`),
+		}, "pages/a/n_id/index.html:2", `/a/n_id declares shared="true" below the Guard of /a`,
+			`remove shared="true": the Guard above still decides who sees each record`},
+	} {
+		c.files["pages/index.html"] = `<ssr:access role="staff"/><ssr:content/>`
+		_, err := discover(newApp(t, c.files), noImages)
+		var d Diagnostics
+		if assert.ErrorAs(t, err, &d, c.pos) && assert.Len(t, d, 1, c.pos) {
+			assert.Equal(t, []string{c.pos, "E-GEN-055", c.msg, c.fix}, []string{d[0].Pos, d[0].Code, d[0].Msg, d[0].Fix})
+		}
+	}
+
+	_, err := discover(newApp(t, map[string]string{
+		"pages/index.html":             `<ssr:access role="staff,hr"/><ssr:content/>`,
+		"pages/a/s_x/index.html":       `<ssr:access role="*" shared="true"/><ssr:content/>`,
+		"pages/a/s_x/b/index.html":     `<ssr:access role="staff" guard="true"/>`,
+		"pages/a/s_x/b/c/index.html":   `<ssr:access role="hr"/>`,
+		"pages/a/s_x/d/n_y/index.html": `<ssr:access role="staff" shared="true"/>`,
+	}), noImages)
+	assert.NoError(t, err, `a Guard below shared="true" narrows it, and role="*" with shared="true" keeps the rule above`)
+}
+
+func TestSharedAddsNothing(t *testing.T) {
+	for _, c := range []struct{ above, rule, fix string }{
+		{`role="staff"`, `role="staff,people" shared="true"`, `list only the roles this page adds, such as role="people" shared="true"`},
+		{`role="staff,hr"`, `role="hr,staff" shared="true"`, `write role="*" shared="true": the rule in pages/index.html already admits these roles`},
+	} {
+		_, err := discover(newApp(t, map[string]string{
+			"pages/index.html":      "<ssr:access " + c.above + "/><ssr:content/>",
+			"pages/n_id/index.html": "<ssr:access " + c.rule + "/>",
+		}), noImages)
+		var d Diagnostics
+		if assert.ErrorAs(t, err, &d, c.rule) && assert.Len(t, d, 1, c.rule) {
+			assert.Equal(t, []string{"E-GEN-053", c.fix}, []string{d[0].Code, d[0].Fix})
+		}
+	}
+}
+
 func TestFolderNames(t *testing.T) {
 	assert.Equal(t, []string{
 		"pages/.cache E-GEN-043",
@@ -275,7 +371,7 @@ func TestFolderNames(t *testing.T) {
 		"pages/type/index.html":            `<p>type</p>`,
 		"pages/x;func init(){}/index.html": `<p>x</p>`,
 		"pages/Ünï_2/index.html":           `<p>Ünï</p>`,
-		"pages/s_name/Ok_2/index.html":     `<p>fine</p>`,
+		"pages/s_name/Ok_2/index.html":     `<ssr:access role="*" shared="true"/>`,
 		"pages/no-page/a.png":              `png`,
 	}))
 }
@@ -300,7 +396,7 @@ func TestDefaultPage(t *testing.T) {
 		"pages/good/index.html":           `<p>good</p>`,
 		"pages/rel/index.html":            `<ssr:content default="grp/sub/"/>`,
 		"pages/rel/grp/sub/index.html":    `<p>below a folder without a page</p>`,
-		"pages/item/n_id/index.html":      `<ssr:content default="info"/>`,
+		"pages/item/n_id/index.html":      `<ssr:access role="*" shared="true"/><ssr:content default="info"/>`,
 		"pages/item/n_id/info/index.html": `<p>below a parameter folder</p>`,
 		"pages/missing/index.html":        "\n<ssr:content default=\"nothing\"/>",
 		"pages/missing/x/index.html":      `<p>x</p>`,
@@ -309,7 +405,7 @@ func TestDefaultPage(t *testing.T) {
 		"pages/self/index.html":           "\n<ssr:content default=\".\"/>",
 		"pages/self/x/index.html":         `<p>x</p>`,
 		"pages/param/index.html":          "\n<ssr:content default=\"s_slug\"/>",
-		"pages/param/s_slug/index.html":   `<p>x</p>`,
+		"pages/param/s_slug/index.html":   `<ssr:access role="*" shared="true"/>`,
 		"pages/query/index.html":          "\n<ssr:content default=\"x?tab=1\"/>",
 		"pages/query/x/index.html":        `<p>x</p>`,
 	}
@@ -331,17 +427,18 @@ func TestDefaultPage(t *testing.T) {
 }
 
 func TestTwoParameterFolders(t *testing.T) {
+	const shared = `<ssr:access role="*" shared="true"/>`
 	files := map[string]string{
 		"pages/index.html":            `<ssr:access role="*"/><ssr:content/>`,
-		"pages/n/n_a/index.html":      `<p>a</p>`,
-		"pages/n/s_b/x/index.html":    `<p>x</p>`,
+		"pages/n/n_a/index.html":      shared,
+		"pages/n/s_b/x/index.html":    shared,
 		"pages/n/s_slug/index.html":   `<p ssr:bogus="x"></p>`,
 		"pages/n/n_d/assets/a.png":    `png`,
-		"pages/m/n_id/a/index.html":   `<p>a</p>`,
-		"pages/m/n_id/b/index.html":   `<p>b</p>`,
-		"pages/m/n_id/s_x/index.html": `<p>x</p>`,
-		"pages/k/n_id/index.html":     `<p>number</p>`,
-		"pages/k/s_id/index.html":     `<p>text</p>`,
+		"pages/m/n_id/a/index.html":   shared,
+		"pages/m/n_id/b/index.html":   shared,
+		"pages/m/n_id/s_x/index.html": shared,
+		"pages/k/n_id/index.html":     shared,
+		"pages/k/s_id/index.html":     shared,
 	}
 	assert.Equal(t, []string{
 		"pages/k/s_id/index.html:1 E-GEN-041",

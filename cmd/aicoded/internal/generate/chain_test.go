@@ -50,7 +50,7 @@ func TestChain(t *testing.T) {
 		"pages/index.html":          `<ssr:access role="*"/><ssr:content/>`,
 		"pages/a/index.html":        `<p>gate</p>`,
 		"pages/a/b/index.html":      `<ssr:content/>`,
-		"pages/a/b/n_id/index.html": `<p>leaf</p>`,
+		"pages/a/b/n_id/index.html": `<ssr:access role="*" shared="true"/><p>leaf</p>`,
 		"pages/c/d/index.html":      `<p>d</p>`,
 	}), noImages)
 	require.NoError(t, err)

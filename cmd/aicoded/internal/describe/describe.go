@@ -67,12 +67,14 @@ type Job struct {
 	Cron string `json:"cron"`
 }
 
-// Page is one page of the access section: its path, the role rules a viewer must meet, whether it
-// guards the pages below it, and the page calls it makes.
+// Page is one page of the access section: its path, the role rules a viewer must meet, whether a
+// Guard on its path decides who sees each record, whether everyone the rules admit may see every
+// record, and the page calls it makes.
 type Page struct {
 	Path    string   `json:"path"`
 	Require []string `json:"require"`
 	Guard   bool     `json:"guard,omitempty"`
+	Shared  bool     `json:"shared,omitempty"`
 	Calls   []string `json:"calls,omitempty"`
 }
 
@@ -147,7 +149,7 @@ func describeApp(ctx context.Context, a workspace.App, names map[string]string) 
 	}
 	for _, path := range slices.Sorted(maps.Keys(m.Access)) {
 		access := m.Access[path]
-		d.Pages = append(d.Pages, Page{Path: path, Require: access.Require, Guard: access.Guard, Calls: access.Calls})
+		d.Pages = append(d.Pages, Page{Path: path, Require: access.Require, Guard: access.Guard, Shared: access.Shared, Calls: access.Calls})
 	}
 	for _, name := range slices.Sorted(maps.Keys(m.Services.Serves)) {
 		serve := m.Services.Serves[name]

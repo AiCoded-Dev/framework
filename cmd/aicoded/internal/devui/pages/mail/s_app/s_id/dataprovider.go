@@ -18,6 +18,15 @@ type DP struct{ d *deps.Deps }
 // NewDP returns the page's data provider.
 func NewDP(d *deps.Deps) *DP { return &DP{d: d} }
 
+// Guard answers 404 for a message the app's mail does not have, before the page reaches the
+// rest of the backend.
+func (p *DP) Guard(ctx context.Context, r *web.Request) error {
+	if _, err := p.d.Backend.MailGet(ctx, r.URLParam("app"), r.URLParam("id")); err != nil {
+		return web.NotFound()
+	}
+	return nil
+}
+
 // Data shows the message the URL names; an app or a message the workspace does not have is
 // not found.
 func (p *DP) Data(ctx context.Context, r *web.Request, _ web.ResponseWriter, data *RouteData) error {

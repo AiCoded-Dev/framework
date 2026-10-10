@@ -15,10 +15,10 @@ type Change struct{ Field, Key, Before, After string }
 // The changes come in the order of the fields, then by key. A list, such as egress, changes by
 // each item removed or added, removals first, each sorted; a new order is no change, and a field
 // left out equals an empty one. A keyed entry changes as a whole, written as text: a data
-// source's classes, sorted; an access path's "require <rules>", then "; guard" and "; calls
-// <names>" when they apply, its lists in written order; a served function's "callers <apps>",
-// then "; require <rules>" and "; apps" when they apply, its lists sorted; a job's cron. The
-// functions called from another app change one by one, keyed by that app.
+// source's classes, sorted; an access path's "require <rules>", then "; guard" or "; shared",
+// then "; calls <names>", when they apply, its lists in written order; a served function's
+// "callers <apps>", then "; require <rules>" and "; apps" when they apply, its lists sorted; a
+// job's cron. The functions called from another app change one by one, keyed by that app.
 func Diff(before, after Manifest) []Change {
 	var c changes
 	c.value("app", "", before.App, after.App)
@@ -114,6 +114,9 @@ func accessText(access map[string]Access) map[string]string {
 		text := "require " + strings.Join(a.Require, ", ")
 		if a.Guard {
 			text += "; guard"
+		}
+		if a.Shared {
+			text += "; shared"
 		}
 		if len(a.Calls) > 0 {
 			text += "; calls " + strings.Join(a.Calls, ", ")

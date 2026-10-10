@@ -7,9 +7,12 @@ checks again. The example is the contacts tab of a user in the people example, a
 
 ## Steps
 
-1. Ask for a `Guard` in the page's access rule with `guard="true"`. The framework calls a page's
-   `Guard` only when its own `<ssr:access>` has `guard="true"`, so `aicoded generate` refuses a
-   `Guard` method on a page without it (E-GEN-032):
+1. Ask for a `Guard` in the page's access rule with `guard="true"`. A page with an id in its URL
+   says whose records it shows: `guard="true"` says that its `Guard` decides, and `shared="true"`
+   that everyone the rule admits may see every record. `aicoded generate` refuses such a page
+   with neither (E-GEN-054). The framework calls a page's `Guard` only when its own
+   `<ssr:access>` has `guard="true"`, so `aicoded generate` also refuses a `Guard` method on a
+   page without it (E-GEN-032):
 
    <!-- code: examples/people/pages/users/s_login/contacts/index.html -->
    ```html
@@ -27,7 +30,9 @@ checks again. The example is the contacts tab of a user in the people example, a
    the whole path and before any form, `Data`, live value or page call of the page. On a layout
    or a gate, it covers every page below it. A page below needs a `Guard` of its own only for a
    check of its own, such as "only the author edits", and then `guard="true"` in its own
-   `<ssr:access>` too.
+   `<ssr:access>` too. Here the user card above, `pages/users/s_login/`, declares
+   `<ssr:access role="staff" shared="true"/>`, since every member of `staff` sees every
+   profile, and the contacts tab narrows it with its own `Guard`.
 3. Write the rule: the viewer owns the record, or has the role that sees everyone's.
 
    <!-- code: examples/people/pages/users/s_login/contacts/dataprovider.go DP.Guard -->
@@ -92,8 +97,9 @@ has no case folding and no trailing-space padding, so that the database, like th
 - `aicoded check` generates, builds, vets, lints and tests the apps. contacts tests `allowed` as a
   plain function, with no runner, and calls `Contacts` with no viewer and no database open, so the
   test fails if the function ever reads before it checks.
-- `aicoded generate` records `guard: true` for `"/users/{login}/contacts"` in the `access`
-  section of people's `aicoded.yaml`, and `aicoded describe` shows `guard` next to the page.
+- `aicoded generate` records `guard: true` for `"/users/{login}/contacts"` and `shared: true` for
+  `"/users/{login}/info"` in the `access` section of people's `aicoded.yaml`, and
+  `aicoded describe` shows `guard` and `shared` next to the pages.
 - With the personas alice (`staff`) and bob (`staff` and `hr`): alice opens
   `/users/alice/contacts` and gets 403 on `/users/bob/contacts`, and bob opens both.
 
@@ -101,6 +107,8 @@ has no case folding and no trailing-space padding, so that the database, like th
 
 - [Access rules](../guides/access.md)
 - [E-GEN-032](../errors/E-GEN-032.md): a `Guard` that no `guard="true"` asks for.
+- [E-GEN-054](../errors/E-GEN-054.md): a page with an id in its URL that does not say whose
+  records it shows.
 - [List own records, or all of them for a role](list-by-role.md): the list that goes with the
   check, with one constant statement for each case.
 - [The request pipeline](../guides/request-pipeline.md)

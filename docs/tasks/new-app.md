@@ -41,6 +41,7 @@ app with no pages.
        guard: true
      "/users/{login}/info":
        require: ["staff"]
+       shared: true
    # services is written by aicoded generate from rpc/ and the clients in services/; do not edit it
    services:
      calls:

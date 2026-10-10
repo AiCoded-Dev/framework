@@ -4,6 +4,21 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- A page with an id in its URL says whose records it shows. Every template at or below a
+  parameter folder, page or layout, needs `guard="true"` on its own `<ssr:access>` or on that of
+  a template between it and its deepest parameter folder, when its `Guard` decides who sees each
+  record, or the new `shared="true"`, when everyone the rules admit may see every record.
+  `aicoded generate` refuses a template with neither (E-GEN-054), and `shared="true"` next to
+  `guard="true"`, on a template whose URL has no parameter, or below a template with
+  `guard="true"` (E-GEN-055). `guard="true"` below `shared="true"` narrows it, and
+  `role="*" shared="true"` keeps the rules above, as `role="*" guard="true"` does. An app with
+  such a page fails `aicoded check` until each one declares: add `shared="true"` to the layout
+  or page at the parameter folder, such as `<ssr:access role="staff" shared="true"/>`, or
+  `guard="true"` and a `Guard`. The permission list's `access` entries gain `shared: true`
+  (`manifest.Access.Shared`), and an entry with both `guard` and `shared` is E-MAN-023. The
+  difference between two permission lists writes an entry as `require <rules>`, then `; guard`
+  or `; shared`, then `; calls <names>`. `aicoded describe` shows `shared` next to the page, and
+  `pages[].shared` in `--json`.
 - `aicoded dev` reports an app as `failed`, with its problems, or as `stopped` as soon as its
   address shows that, and prints the failure then. It used to wait until the app's old process
   had ended, which takes seconds while that process still serves a request; until then

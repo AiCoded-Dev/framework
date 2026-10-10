@@ -67,7 +67,7 @@ func TestDescribe(t *testing.T) {
 		{Name: "hello", Dir: filepath.Join(root, "hello"), Settings: []string{"greeting"}, Secrets: []string{"token"}},
 		{Name: "shop", Dir: filepath.Join(root, "shop"), Pages: []Page{
 			{Path: "/checks", Require: all},
-			{Path: "/invoices/{id}", Require: all},
+			{Path: "/invoices/{id}", Require: all, Shared: true},
 			{Path: "/status", Require: all},
 		}, Calls: map[string][]string{"billing": {"Fail", "GetInvoice", "Missing", "Ping", "Secret"}},
 			Surface: surface.Surface{Size: 3, EntryPoints: 3}},
@@ -82,21 +82,24 @@ func TestDescribe(t *testing.T) {
 		"surface": {"size": 0, "entry_points": 0, "effects": 0}}]}`, string(data))
 }
 
-// The room-maintenance example, described in text and JSON, matches its golden files.
+// The room-maintenance and people examples, described in text and JSON, match their golden
+// files.
 func TestDescribeExample(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not in PATH")
 	}
-	s, err := Describe(t.Context(), filepath.Join("..", "..", "..", "..", "examples"), "room-maintenance")
-	require.NoError(t, err)
-	require.Len(t, s.Apps, 1)
-	s.Apps[0].Dir = "/apps/room-maintenance"
-	var text bytes.Buffer
-	require.NoError(t, s.WriteText(&text))
-	golden(t, text.Bytes(), "room-maintenance.txt")
-	data, err := json.MarshalIndent(s, "", "  ")
-	require.NoError(t, err)
-	golden(t, append(data, '\n'), "room-maintenance.json")
+	for _, app := range []string{"room-maintenance", "people"} {
+		s, err := Describe(t.Context(), filepath.Join("..", "..", "..", "..", "examples"), app)
+		require.NoError(t, err)
+		require.Len(t, s.Apps, 1)
+		s.Apps[0].Dir = "/apps/" + app
+		var text bytes.Buffer
+		require.NoError(t, s.WriteText(&text))
+		golden(t, text.Bytes(), app+".txt")
+		data, err := json.MarshalIndent(s, "", "  ")
+		require.NoError(t, err)
+		golden(t, append(data, '\n'), app+".json")
+	}
 }
 
 func golden(t *testing.T, got []byte, name string) {
@@ -233,6 +236,7 @@ func TestDescribeText(t *testing.T) {
 			Pages: []Page{
 				{Path: "/", Require: []string{"*"}},
 				{Path: "/orders/{id}", Require: []string{"editor", "admin"}, Guard: true, Calls: []string{"Cancel", "Pay"}},
+				{Path: "/tags/{tag}", Require: []string{"editor"}, Shared: true},
 			},
 			Calls:    map[string][]string{"ledger": {"Post"}, "billing": {"GetInvoice", "Ping"}},
 			SQLDB:    true,
@@ -270,6 +274,7 @@ func TestDescribeText(t *testing.T) {
 app shop (/w/shop)
   page /  require *
   page /orders/{id}  require editor, admin  guard  calls Cancel, Pay
+  page /tags/{tag}  require editor  shared
   calls billing: GetInvoice, Ping
   calls ledger: Post
   database

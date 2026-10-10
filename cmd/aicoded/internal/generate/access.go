@@ -24,14 +24,16 @@ const accessMarker = "# access is written by aicoded generate from <ssr:access>;
 type accessEntry struct {
 	Require []string
 	Guard   bool
+	Shared  bool
 	Calls   []string
 }
 
 // accessMap returns the access entry of every page a viewer can open, keyed by URL pattern.
 // require holds every rule on the path that does not admit every viewer, root first, each as
-// its roles joined by "|"; guard tells whether a Guard runs on the path; calls names the calls
-// of the routes that render the page. A layout with pages below it only redirects and has no
-// entry.
+// its roles joined by "|"; guard tells whether a Guard runs on the path; shared tells whether
+// the nearest template from the page's own up to its deepest parameter folder that declares
+// guard="true" or shared="true" declares shared="true"; calls names the calls of the routes
+// that render the page. A layout with pages below it only redirects and has no entry.
 func accessMap(routes []*Route) map[string]accessEntry {
 	byPath := make(map[string]*Route, len(routes))
 	for _, r := range routes {
@@ -62,6 +64,7 @@ func accessMap(routes []*Route) map[string]accessEntry {
 		if len(e.Require) == 0 {
 			e.Require = []string{"*"}
 		}
+		e.Shared = shared(segs, byPath)
 		calls := map[string]bool{}
 		for _, x := range chain(r.Path, byPath) {
 			for _, c := range x.Template.Calls() {
@@ -74,6 +77,21 @@ func accessMap(routes []*Route) map[string]accessEntry {
 		out[pattern(r.Path)] = e
 	}
 	return out
+}
+
+// shared reports whether the nearest template from the route at segs up to its deepest
+// parameter folder that says whose records the route shows declares shared="true".
+func shared(segs []string, byPath map[string]*Route) bool {
+	param := deepestParam(segs)
+	if param < 0 {
+		return false
+	}
+	for i := len(segs); i > param; i-- {
+		if x := byPath["/"+strings.Join(segs[:i], "/")]; x != nil && declares(x) {
+			return x.Template.Access().Shared
+		}
+	}
+	return false
 }
 
 // pattern returns the URL pattern of the route at p: /notes/n_id becomes /notes/{id}.
@@ -95,6 +113,9 @@ func accessSection(m map[string]accessEntry) ([]byte, error) {
 		v := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{plain("require"), list(e.Require)}}
 		if e.Guard {
 			v.Content = append(v.Content, plain("guard"), yes())
+		}
+		if e.Shared {
+			v.Content = append(v.Content, plain("shared"), yes())
 		}
 		if len(e.Calls) > 0 {
 			v.Content = append(v.Content, plain("calls"), list(e.Calls))
