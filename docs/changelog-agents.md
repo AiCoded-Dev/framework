@@ -4,6 +4,22 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- The delivery pipeline attacks the app it built, as the security checks of layer L7, in two new
+  steps after `tests`, which run only when the tests passed. `attacks` starts the app, sends
+  requests without a valid session to every page, form, live connection and served function
+  (E-GATE-029), sends a viewer with no role to every page whose access rules name a role
+  (E-GATE-030), tests each guarded page with another viewer, who holds only the roles that the
+  access rules ask for up to the page that declares the `Guard` (E-GATE-031 and E-GATE-032, and
+  E-GATE-033 for a guarded page of which it reached no record), and posts markup in every text
+  field (E-GATE-034); an app that does not start, or stops, is E-GATE-036. `personal-data`
+  searches the app's output and spans for every value entered in its forms (E-GATE-035), and
+  fails an app that writes more than it reads (E-GATE-037). A page the attacks did not reach is
+  the note E-GATE-038. `checks` gains the value `all`, which `aicoded publish` and
+  `aicoded status` print as
+  `checks: the security checks of layers L1 to L5 and the simulated attacks (L7) ran`, for a
+  publish whose `attacks` step ran. The new guide `guides/simulated-attacks` says what each
+  attack does, who the test viewers are, and how to let the attacks reach every page: link every
+  page from a page its viewers reach, and let a form on a page without an id create the records.
 - The runner protocol's `HelloResponse` gains `app_socket_open`, for a runner that reaches
   `app.sock` as another user, such as the one the delivery pipeline runs the simulated attacks
   with. When it is set, the app makes `app.sock` mode 0666 right after it listens; otherwise

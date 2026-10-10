@@ -160,6 +160,8 @@ live values or page calls also opens one live connection. It runs the same acces
 - [MCP](mcp.md): the tools your AI assistant uses.
 - [Publishing](publishing.md): sending an app to the platform's delivery pipeline, what the
   commit holds, and reading the outcome.
+- [Simulated attacks](simulated-attacks.md): how the delivery pipeline attacks the running app,
+  and how to let the attacks reach every page.
 
 ## Tasks
 

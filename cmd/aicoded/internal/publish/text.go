@@ -39,6 +39,8 @@ func WriteText(w io.Writer, p platform.Publish) error {
 	}
 	switch p.Checks {
 	case "":
+	case "all":
+		b.WriteString("  checks: the security checks of layers L1 to L5 and the simulated attacks (L7) ran\n")
 	case "all-but-l7":
 		b.WriteString("  checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later\n")
 	case "partial":

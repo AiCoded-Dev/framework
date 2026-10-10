@@ -43,8 +43,8 @@ offline, and the `howto` tool of `aicoded mcp` gives the same pages to your AI a
     forms, live values, page calls, assets, the TypeScript API, the web API and the request
     pipeline;
   - building blocks, calls and tools: the permission list, the SQL database, file stores, mail,
-    settings and secrets, telemetry, calls between apps, `aicoded dev`, the tools, MCP and
-    publishing.
+    settings and secrets, telemetry, calls between apps, `aicoded dev`, the tools, MCP,
+    publishing and the simulated attacks.
 - [Error catalogue](docs/errors/README.md): every error code, with its fix.
 - [Examples](examples/README.md): people, a staff directory; contacts, the app it calls; and
   room-maintenance, a list of tickets with an ownership check.

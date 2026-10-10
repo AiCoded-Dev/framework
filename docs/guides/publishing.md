@@ -99,21 +99,23 @@ publish pub_hoskmcer6l2grf5cxrfq3ilioe of rooms at 1a2b3c4: Add the list of room
   checkout        passed
   modules         passed
   check           passed
-  lint            failed
+  lint            passed
   secrets         passed
   vulnerabilities passed
   licences        passed
   sbom            passed
   capabilities    passed
-  build           skipped
-  tests           skipped
-  rooms: deps/rooms.go:14: E-GATE-015: Error return value of `db.ExecContext` is not checked
-    fix: handle the error the call returns, or return it
-    docs: https://aicoded.dev/docs/errors/E-GATE-015
+  build           passed
+  tests           passed
+  attacks         failed
+  personal-data   passed
+  rooms: pages/rooms/n_id/index.html:1: E-GATE-032: POST /rooms/7 (form close) as another viewer with the roles staff: answered 303, expected 403 or 404
+    fix: check ownership in the page's Guard, which runs before every form, not in Data or Process
+    docs: https://aicoded.dev/docs/errors/E-GATE-032
   note: rooms: deps/rooms.go:31: E-GATE-025: //nolint:errcheck silences a check
     fix: remove the directive and fix what the check reports
     docs: https://aicoded.dev/docs/errors/E-GATE-025
-  checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later
+  checks: the security checks of layers L1 to L5 and the simulated attacks (L7) ran
   change record 7
 failed: 1 problem
 ```
@@ -135,13 +137,15 @@ commit, even an empty one made with `git commit --allow-empty`.
 
 Every publish gets a change record when it ends, whatever its outcome: who asked, with the
 summary, what changed, and which checks ran, each with its layers, its outcome and how many
-problems and notes it found. Its number is on the line `change record`.
+problems and notes it found. When the simulated attacks ran, it also counts the app's pages and
+those the attacks reached, and lists those they did not. Its number is on the line
+`change record`.
 
 ## What the delivery pipeline checks
 
-The delivery pipeline runs these steps in this order. Each scanner, the build and the tests run
-in a sandbox of their own, with no network. The layers are those of the security checks, which
-the change record names too.
+The delivery pipeline runs these steps in this order. Each scanner, the build, the tests and the
+app under attack run in a sandbox of their own, with no network. The layers are those of the
+security checks, which the change record names too.
 
 | Step | Layers | What it does | Stops the publish on |
 |---|---|---|---|
@@ -156,16 +160,21 @@ the change record names too.
 | `capabilities` | L2 Stays in its limits | follows the app's calls to the network, files and other capabilities with capslock | nothing |
 | `build` | L1 Approved parts only | builds the app's program | a build that fails |
 | `tests` | L1 Approved parts only | runs the tests with `-race` | a failing test (E-CHK-004) |
+| `attacks` | L7 Simulated attacks | starts the app it built and attacks it: requests without a session or a role, another viewer on each guarded page, and markup in every field | E-GATE-029 to E-GATE-034 and E-GATE-036 |
+| `personal-data` | L7 Simulated attacks | searches what the app wrote during the attacks, its output and its spans, for what was entered in its forms | E-GATE-035 and E-GATE-037 |
 
 `checkout` and `modules` come first, and a problem in either skips the rest. The steps from
 `check` to `capabilities` run no code of the app, and they run whatever one of them finds, so one
 publish shows every problem they find, with one exception: when `check` finds Go that does not
 compile (E-CHK-002) or `go mod tidy` fails (E-CHK-006), the steps that read the app's packages,
 `lint`, `vulnerabilities`, `licences` and `capabilities`, are `skipped`, while `secrets` and
-`sbom` still run. `build` and `tests` run only when all of them passed. A step that runs out
-of time, memory or disk is E-GATE-012, and tests that stop the checks, or the go command that
-runs them (E-CHK-008), are E-GATE-028. A finding of a check that has no code of its own is
-E-GATE-000.
+`sbom` still run. `build` and `tests` run only when all of them passed. `attacks` and
+`personal-data` run only when `tests` passed, on one run of the app, and `personal-data` is
+skipped when `attacks` ended in `error` or the app did not start (E-GATE-036).
+[Simulated attacks](simulated-attacks.md) says what each attack does and how to let the attacks
+reach every page. A step that runs out of time, memory or disk is E-GATE-012, and tests that stop
+the checks, or the go command that runs them (E-CHK-008), are E-GATE-028. A finding of a check
+that has no code of its own is E-GATE-000.
 
 Each check runs with the platform's own configuration, so nothing in the app's repository, such
 as a `.golangci.yml`, a `.gitleaksignore`, a `.gitleaks.toml`, a `gitleaks:allow` comment, an
@@ -184,7 +193,8 @@ change record counts the notes, and security sees them, so fix them when you can
   list of every module's licence and the SBOM are kept with the change record;
 - E-GATE-024: the app reaches a capability, such as the network or files, without a building
   block;
-- E-GATE-025: a directive silences a check.
+- E-GATE-025: a directive silences a check;
+- E-GATE-038: a page the simulated attacks did not reach, which the change record lists too.
 
 A known weakness that the app calls stops the publish when its score is 9.0 or more: the highest
 CVSS score of the weakness and its aliases, such as its CVE id, in the OSV database (E-GATE-020).
@@ -203,13 +213,16 @@ too, so the delivery pipeline also refuses a `go` line older than the release of
 with, such as `go 1.25.0` when it builds with Go 1.26 (E-GATE-026): `go mod edit -go=1.26.0`
 raises it.
 
-The simulated attacks (L7) do not run yet, so a publish whose `lint` step ran says
+A publish whose `attacks` step ran says
+`checks: the security checks of layers L1 to L5 and the simulated attacks (L7) ran`. A publish
+whose `lint` step ran but not its attacks, such as one whose tests failed or one to a platform
+that does not run the attacks yet, says
 `checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later`. Any
 other publish says `partial checks: not every security check ran; the steps above say which`,
 such as one that has not ended, one that a step before `lint` stopped, or one whose `check` found
 Go that does not compile; an older platform that runs only `aicoded check` and the tests says it
-of every publish. Approvals and releases to production come later too, so a publish that passes
-is checked and recorded, but runs nowhere yet.
+of every publish. Approvals and releases to production come later, so a publish that passes is
+checked and recorded, but runs nowhere yet.
 
 ## What security sees
 
@@ -241,7 +254,8 @@ says which sections are enforced today, and which the platform only records for 
   the commit, its modules, its permission list and its steps.
 - E-GATE-000 and E-GATE-013 to E-GATE-020: what the security checks find in the code, its
   history and its modules.
-- E-GATE-021 to E-GATE-025: notes, which do not stop a publish.
+- E-GATE-029 to E-GATE-037: what the simulated attacks find in the running app.
+- E-GATE-021 to E-GATE-025 and E-GATE-038: notes, which do not stop a publish.
 
 `aicoded explain <code>` prints the page of each, as does the `howto` tool of `aicoded mcp`.
 
@@ -262,5 +276,6 @@ running an app in production without the platform, `aicoded run`, comes later.
 
 - [Tools](tools.md): `aicoded publish`, `aicoded status`, `aicoded check` and `aicoded login`.
 - [MCP](mcp.md): the `publish` and `release_status` tools.
+- [Simulated attacks](simulated-attacks.md): what the `attacks` and `personal-data` steps do.
 - [Project structure](project-structure.md): which files are yours and which are generated.
 - [The error catalogue](../errors/README.md): every code with its page.

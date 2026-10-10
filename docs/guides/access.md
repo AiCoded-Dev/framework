@@ -126,8 +126,9 @@ a layout, declares `shared="true"`, which its info tab inherits; the contacts ta
 
 The [permission list](permission-list.md) records `shared: true` for each page that shows every
 record to everyone its rules admit, and `guard: true` for each page a `Guard` checks, so security
-sees which is which. Publishing tests each guarded page with another viewer, one who has the
-roles the page asks for but did not enter the record: see [publishing](publishing.md).
+sees which is which. The simulated attacks of the delivery pipeline test each guarded page with
+another viewer, who did not enter the record and holds only the roles that the access rules ask
+for up to the page that declares the `Guard`: see [simulated attacks](simulated-attacks.md).
 
 ## The order of checks
 

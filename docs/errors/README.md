@@ -74,6 +74,14 @@ Publishing uses these codes:
   silence a check.
 - E-GATE-026: a `godebug` setting in `go.mod`, a `//go:debug` comment in a Go file, or a `go`
   line older than the Go of the delivery pipeline, which change Go's security defaults.
+- E-GATE-029 to E-GATE-037: what the simulated attacks find in the running app: a page that
+  answers a request without a valid session, or lets in a viewer without the role its access
+  rule names; another viewer who saw or changed a record through a guarded page; a guarded page
+  of which the attacks reached no record; what someone entered, served as markup or found in the
+  app's log or telemetry; an app that did not start or stopped; and more log or telemetry than
+  the checks read.
+- E-GATE-038 is a note, which does not stop a publish: a page the simulated attacks did not
+  reach.
 
 `aicoded explain <CODE>` prints the page.
 

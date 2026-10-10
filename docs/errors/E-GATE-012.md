@@ -1,6 +1,6 @@
 # E-GATE-012: a step ran out of time, memory or disk
 
-The delivery pipeline stopped a step because it ran longer than its time limit, used more memory than its limit, or left too little free disk, as the message says. In the tests step, tests that never end, or that use much memory or write large files, cause this. In the steps of the security checks and in the build, the app is too large for the limits the platform gives them. In the modules step, the modules the app uses fill the disk.
+The delivery pipeline stopped a step because it ran longer than its time limit, used more memory than its limit, or left too little free disk, as the message says. In the tests step, tests that never end, or that use much memory or write large files, cause this. In the steps of the security checks and in the build, the app is too large for the limits the platform gives them; in the simulated attacks, the running app itself used more memory than its limit. In the modules step, the modules the app uses fill the disk.
 
 **Fix:** the one for the step that ran over:
 

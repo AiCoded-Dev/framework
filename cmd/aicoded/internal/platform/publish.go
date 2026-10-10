@@ -111,8 +111,9 @@ type Publish struct {
 	// Parent is the publish whose history this one's bundle continues.
 	Parent           *Parent `json:"parent,omitempty"`
 	HistoryRewritten bool    `json:"history_rewritten"`
-	// Checks is "all-but-l7" when every security check but the simulated attacks (L7) ran, and
-	// "partial" when some of them did not.
+	// Checks is "all" when every security check ran, the simulated attacks (L7) included,
+	// "all-but-l7" when every one but the simulated attacks ran, and "partial" when some of them
+	// did not.
 	Checks   string            `json:"checks"`
 	Steps    []Step            `json:"steps"`
 	Problems []problem.Problem `json:"problems"`
