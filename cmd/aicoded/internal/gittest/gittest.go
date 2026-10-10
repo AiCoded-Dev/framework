@@ -31,13 +31,16 @@ func NewApp(t testing.TB, name string) string {
 	return dir
 }
 
-// Init makes dir a git repository with no commit.
+// Init makes dir a git repository with no commit. Its git starts no maintenance in the
+// background, which could still be writing in dir when the test removes it.
 func Init(t testing.TB, dir string) {
 	t.Helper()
 	git(t, exec.CommandContext(t.Context(), "git", "init", "-q"), dir, "")
 	git(t, exec.CommandContext(t.Context(), "git", "config", "user.name", "Ana"), dir, "")
 	git(t, exec.CommandContext(t.Context(), "git", "config", "user.email", "ana@acme.example"), dir, "")
 	git(t, exec.CommandContext(t.Context(), "git", "config", "commit.gpgsign", "false"), dir, "")
+	git(t, exec.CommandContext(t.Context(), "git", "config", "maintenance.auto", "false"), dir, "")
+	git(t, exec.CommandContext(t.Context(), "git", "config", "gc.auto", "0"), dir, "")
 }
 
 // Write writes files, by their paths relative to dir.
@@ -82,7 +85,7 @@ func Head(t testing.TB, dir string) string {
 func Verify(t testing.TB, bundles ...[]byte) []string {
 	t.Helper()
 	dir := t.TempDir()
-	git(t, exec.CommandContext(t.Context(), "git", "init", "-q"), dir, "")
+	Init(t, dir)
 	var heads []string
 	for _, b := range bundles {
 		if err := os.WriteFile(filepath.Join(dir, "x.bundle"), b, 0o600); err != nil {

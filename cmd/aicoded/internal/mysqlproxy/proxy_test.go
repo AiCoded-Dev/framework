@@ -204,7 +204,10 @@ func TestProxyRefusesClients(t *testing.T) {
 		c := dialProxy(t, sock)
 		_, _, err := readPacket(c, maxHandshake)
 		require.NoError(t, err)
-		require.NoError(t, writePacket(c, first.seq, first.p))
+		err = writePacket(c, first.seq, first.p)
+		if len(first.p) <= maxHandshake {
+			require.NoError(t, err, name)
+		} // else the proxy may answer and close before it has read the whole packet
 		_, p, err := readPacket(c, maxHandshake)
 		require.NoError(t, err, name)
 		assert.Contains(t, string(p), "E-SQL-003", name)
