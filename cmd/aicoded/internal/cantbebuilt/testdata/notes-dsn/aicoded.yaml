@@ -1,0 +1,11 @@
+app: notes
+data:
+  - source: sqldb
+    classes: [internal]
+# access is written by aicoded generate from <ssr:access>; do not edit it
+access:
+  "/notes":
+    require: ["staff"]
+  "/notes/{id}":
+    require: ["staff"]
+    guard: true

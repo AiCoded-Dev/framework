@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<ssr:var name="notes" type="[]Note"/>
+<title>Notes</title>
+</head>
+<body>
+<h1>Notes</h1>
+<ul id="notes"><li ssr:for="n in notes"><b>{{ n.Title }}</b> by {{ n.Owner }}: {{ n.Body }}</li></ul>
+<ssr:form name="add">
+  <ssr:input name="title" type="text" required maxlength="100"/>
+  <ssr:textarea name="body" required maxlength="2000"/>
+  <button type="submit">Add</button>
+</ssr:form>
+</body>
+</html>

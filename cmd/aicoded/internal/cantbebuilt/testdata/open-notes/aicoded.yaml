@@ -1,0 +1,4 @@
+app: notes
+data:
+  - source: sqldb
+    classes: [internal]
