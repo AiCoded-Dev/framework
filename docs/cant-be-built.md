@@ -26,7 +26,7 @@ with the link reads every row.
   Guard decides who sees each record (`guard="true"`) or everyone its rule admits sees every
   record (`shared="true"`). `aicoded check` refuses a page that opens any note by the id in its
   URL and says neither: [E-GEN-054](errors/E-GEN-054.md). The same app, whose Guard lets in only
-  the note's owner, passes. Test:
+  the note's owner, passes the check. Test:
   [`TestNoteOpenedByAnyID`](../cmd/aicoded/internal/cantbebuilt/open_table_test.go), apps:
   [any-note](../cmd/aicoded/internal/cantbebuilt/testdata/any-note) and, with the Guard,
   [own-notes](../cmd/aicoded/internal/cantbebuilt/testdata/own-notes).
@@ -44,16 +44,19 @@ them to whoever gets its code.
 
 **What refuses it:**
 
-- **An app that opens its database itself.** `aicoded check` refuses a notes app that opens its
-  database with an address that holds the user and the password, at the line that opens it:
-  [E-LINT-006](errors/E-LINT-006.md). The same app that gets its database from the database
-  building block, with no address and no password, passes. Test:
+- **An app that opens its database itself.** An app may get its database only from the database
+  building block, and `aicoded check` refuses any app that opens one itself, with or without a
+  password, at the line that opens it: [E-LINT-006](errors/E-LINT-006.md). In the test, a notes
+  app opens its database with an address that holds the user and the password, and is refused.
+  The same app that gets its database from the building block, with no address and no password,
+  passes. Test:
   [`TestDatabaseOpenedWithPassword`](../cmd/aicoded/internal/cantbebuilt/database_key_test.go),
   apps: [notes-dsn](../cmd/aicoded/internal/cantbebuilt/testdata/notes-dsn) and, with the
   building block, [own-notes](../cmd/aicoded/internal/cantbebuilt/testdata/own-notes).
 - **A key written in the code.** The delivery pipeline's security checks look for passwords, keys
   and tokens in every commit that is published, and stop the publish on any they find:
-  [E-GATE-018](errors/E-GATE-018.md).
+  [E-GATE-018](errors/E-GATE-018.md). A test of the delivery pipeline, which is not public, makes
+  the attempt with a key in an app's code.
 
 **And the runner hands the app no key to leak.** The runner logs in to the database for the app.
 In the test, an app whose permission list declares a database looks for a key where a runner
@@ -73,9 +76,9 @@ the runner signs for this one app, valid for at most a minute, and the framework
 without a valid one with 401 before it reaches any of the app's own code: a page, a form and a
 live connection alike.
 
-In the test, requests go straight to a notes page closed to staff, past the company login, with
-no token, a malformed, forged or expired one, or one for another app. Each gets 401 and nothing of
-the page, the app logs why, and the form adds no note. The same requests with a token signed for
-a member of staff get the page, add the note and open the live connection. Test:
+In the test, requests go straight to a notes page that only staff may open, past the company
+login, with no token, a malformed, forged or expired one, or one for another app. Each gets 401
+and nothing of the page, the app logs why, and the form adds no note. The same requests with a
+token signed for a member of staff get the page, add the note and open the live connection. Test:
 [`TestRequestThatSkipsTheLogin`](../cmd/aicoded/internal/cantbebuilt/skip_login_test.go), app:
 [staff-notes](../cmd/aicoded/internal/cantbebuilt/testdata/staff-notes).

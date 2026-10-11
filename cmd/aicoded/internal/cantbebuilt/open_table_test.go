@@ -24,7 +24,7 @@ func TestListWithNoAccessRule(t *testing.T) {
 	}, runCheck(t, copyApp(t, "open-notes")))
 }
 
-// The list is closed to staff and shows each viewer their own notes, but a new page opens any
+// The list is open only to staff and shows each viewer their own notes, but a new page opens any
 // note by the id in its URL and says nothing about whose notes it shows (testdata/any-note).
 // aicoded check refuses that page. The same app whose page has guard="true" and a Guard that
 // lets in only the note's owner passes (testdata/own-notes).
@@ -96,7 +96,8 @@ func getAsStaff(t *testing.T, h http.Handler, path string) (int, string) {
 	return w.Code, w.Body.String()
 }
 
-// captureLog sends what the app logs into the returned buffer until the test ends.
+// captureLog sends what the app logs into the returned buffer until the test ends. It replaces
+// slog's default logger for the whole process, so tests in this package must not use t.Parallel.
 func captureLog(t *testing.T) *bytes.Buffer {
 	var b bytes.Buffer
 	old := slog.Default()

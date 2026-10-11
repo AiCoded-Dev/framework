@@ -22,12 +22,12 @@ import (
 
 // A request that skips the login: someone who reaches the app without passing the company login
 // sends it requests with no token, with a token they made, or with a real one that has expired or
-// was made for another app. The notes page is closed to staff and has a form that adds a note and
-// a live list (testdata/staff-notes). Each request goes straight to the app's socket, and each
-// form carries the form token of a page a member of staff opened. The app refuses every request
-// with 401 before any page code runs, logs why, and adds no note. The same requests with a token
-// the company login signed for that member of staff get the page, add the note and open the live
-// connection.
+// was made for another app. The notes page is one only staff may open and has a form that adds a
+// note and a live list (testdata/staff-notes). Each request goes straight to the app's socket,
+// and each form carries the form token of a page a member of staff opened. The app refuses every
+// request with 401 before any page code runs, logs why, and adds no note. The same requests with
+// a token the company login signed for that member of staff get the page, add the note and open
+// the live connection.
 func TestRequestThatSkipsTheLogin(t *testing.T) {
 	a := startApp(t, "staff-notes")
 	ana := devconfig.Persona{Name: "ana", Roles: []string{"staff"}}
