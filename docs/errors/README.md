@@ -94,6 +94,8 @@ Releasing uses these codes, each a release that the platform refuses before anyt
 - E-REL-006 and E-REL-008: an `email.from` address in a domain that the organisation has not
   verified, or that another app of the organisation has.
 
+E-REL-009 refuses the operator's purge of a publish that a live or pending release runs.
+
 `aicoded explain <CODE>` prints the page.
 
 Retired codes are never reused:
