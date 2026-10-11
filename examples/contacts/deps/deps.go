@@ -61,13 +61,14 @@ func Contacts(ctx context.Context, login string) (phones, emails []string, err e
 	return phones, emails, nil
 }
 
-// prepare creates the contacts table and, when it is empty, fills it with seed. A login compares
-// exactly, with no case folding and no trailing-space padding, so "Alice" and "alice " are not
-// "alice".
+// prepare creates the contacts table and, when it is empty, fills it with seed. A login is
+// compared with the viewer's Subject, so the column holds any Subject, of at most 512 bytes, and
+// compares exactly, with no case folding and no trailing-space padding, so "Alice" and "alice "
+// are not "alice".
 func prepare(ctx context.Context, conn *sql.DB) error {
 	if _, err := conn.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS contacts (
 		id BIGINT AUTO_INCREMENT PRIMARY KEY,
-		login VARCHAR(32) COLLATE utf8mb4_0900_bin NOT NULL,
+		login VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL,
 		kind ENUM('phone', 'email') NOT NULL,
 		value VARCHAR(254) NOT NULL,
 		UNIQUE KEY (login, kind, value)

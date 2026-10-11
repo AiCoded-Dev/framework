@@ -82,8 +82,10 @@ people is a staff directory. Its pages:
   Its `Data` calls `contacts.Contacts` with the request's context, so the call goes on behalf of
   the viewer, and answers 403 for `rpc.PermissionDenied` and 404 for `rpc.NotFound`. A user added
   in people has no contacts in contacts, so their tab answers 404.
-- A login is 1 to 32 lowercase letters and digits. The `login` column compares exactly, with no
-  case folding and no trailing-space padding, so `Alice` and `alice ` are not `alice`.
+- A login that the add form takes is 1 to 32 lowercase letters and digits. The `login` column is
+  compared with the viewer's `Subject`, so it is `VARCHAR(512) COLLATE utf8mb4_0900_bin`, as wide
+  as any `Subject`, and compares exactly, with no case folding and no trailing-space padding, so
+  `Alice` and `alice ` are not `alice`.
 
 Its tests check the add form's checks of the login and the photos, the contact form's address
 check and idempotency key, and the card's initials without a runner. They check the database code

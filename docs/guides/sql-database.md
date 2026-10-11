@@ -113,7 +113,7 @@ if err != nil {
 	return err
 }
 rows, err := d.DB.QueryContext(ctx, `SELECT login, name FROM users
-	WHERE login IN (SELECT login FROM JSON_TABLE(?, '$[*]' COLUMNS (login VARCHAR(64) PATH '$')) AS l)`,
+	WHERE login IN (SELECT login FROM JSON_TABLE(?, '$[*]' COLUMNS (login VARCHAR(512) COLLATE utf8mb4_0900_bin PATH '$')) AS l)`,
 	string(logins))
 ```
 

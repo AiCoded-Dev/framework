@@ -3,6 +3,7 @@ package devconfig_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -90,4 +91,26 @@ func TestLoadKeepsValuesOutOfErrors(t *testing.T) {
 	require.ErrorContains(t, err, "dev.yaml:5")
 	assert.Equal(t, "E-DEV-002", errs.Code(err))
 	assert.NotContains(t, err.Error(), "superse")
+}
+
+func TestLoadRefusesPersonaNames(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dev.yaml")
+	long := strings.Repeat("a", 513)
+	for name, persona := range map[string]string{
+		"empty":   `{name: "", roles: [staff]}`,
+		"null":    `{name: , roles: [staff]}`,
+		"missing": `{roles: [staff]}`,
+		"long":    `{name: ` + long + `}`,
+	} {
+		yml := "workspaces:\n  /src/apps:\n    port: 9000\n  /src/other:\n    personas:\n      - {name: alice}\n      - " + persona + "\n"
+		require.NoError(t, os.WriteFile(path, []byte(yml), 0o600))
+		_, err := devconfig.Load(path, "/src/apps")
+		assert.Equal(t, "E-DEV-021", errs.Code(err), name)
+		require.ErrorContains(t, err, "dev.yaml:7", name)
+		assert.NotContains(t, err.Error(), long[:20], "the name is never quoted")
+	}
+	require.NoError(t, os.WriteFile(path, []byte("workspaces:\n  /src/apps:\n    personas:\n      - {name: "+long[:512]+"}\n"), 0o600))
+	ws, err := devconfig.Load(path, "/src/apps")
+	require.NoError(t, err, "a name of 512 bytes")
+	assert.Len(t, ws.Personas[0].Name, 512)
 }

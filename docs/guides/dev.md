@@ -72,7 +72,8 @@ workspaces:
 
 On your computer, personas stand in for the company login. Choose one at
 `http://<app>.localhost:8080/_aicoded/persona`; a cookie keeps the choice. A persona's name is
-both the viewer's `Subject` and `Name`, with the persona's roles and groups.
+both the viewer's `Subject` and `Name`, with the persona's roles and groups, so it is 1 to 512
+bytes, as a `Subject` is (E-DEV-021).
 
 Without `personas` in `dev.yaml`, there are two: `all-roles`, with every role that the `access`
 and `services` sections of the workspace's apps name, and `no-roles`. The first persona of the
@@ -110,7 +111,7 @@ Only problems of the whole workspace stop `aicoded dev`:
 - no app (E-MAN-006);
 - two apps with one name when it starts (E-DEV-010);
 - a port in use (E-DEV-011);
-- a `dev.yaml` that is not valid (E-DEV-001, E-DEV-002, E-DEV-020);
+- a `dev.yaml` that is not valid (E-DEV-001, E-DEV-002, E-DEV-020, E-DEV-021);
 - a state folder that others can read (E-DEV-009);
 - another `aicoded dev` for the same workspace (E-DEV-012);
 - a `--manual` name that no app of the workspace has (E-DEV-014);

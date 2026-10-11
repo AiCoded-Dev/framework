@@ -13,8 +13,10 @@ Changes to the API that AI assistants build apps with. Newest first.
   constant `__Host-` cookie, `r.Cookie` or `r.CookiesNamed` with a constant name that does not
   start with `__Host-`, and `Add` and `Set` of a header, or `r.Cookie`, passed around as values.
 - `auth.Viewer(ctx).Subject` is at most 512 bytes: the app refuses a viewer token whose subject
-  is empty or longer. Store it in a `VARCHAR(512) COLLATE utf8mb4_0900_bin` column, as the
-  room-maintenance example and the `sqldb` examples now do.
+  is empty or longer. Store it, and any column compared with it, as
+  `VARCHAR(512) COLLATE utf8mb4_0900_bin`, as the examples, the `sqldb` examples and the
+  `JSON_TABLE` of `guides/sql-database` now do. A persona in `dev.yaml` whose name, its `Subject`,
+  is empty or longer is E-DEV-021.
 - On the platform, `auth.Viewer(ctx).Subject` is `<iss>|<sub>`, the issuer of the company login
   and the person's id there, the same on every visit; `Name` is the name the login shows, and
   `Groups` and `Roles` are empty for now. The runner serves the login under `/_aicoded/`, which no
