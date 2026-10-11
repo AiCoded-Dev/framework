@@ -1,0 +1,6 @@
+app: key-hunt
+data:
+  - source: sqldb
+    classes: [internal]
+# access is written by aicoded generate from <ssr:access>; do not edit it
+access: {}

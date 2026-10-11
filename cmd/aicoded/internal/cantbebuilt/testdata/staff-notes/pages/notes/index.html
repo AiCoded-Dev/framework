@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<ssr:access role="staff"/>
+<ssr:var name="notes" type="[]string" reactive="true"/>
+<title>Staff notes</title>
+<ssr:assets/>
+</head>
+<body>
+<h1>Staff notes</h1>
+<ul id="notes"><li ssr:for="n in notes">{{ n }}</li></ul>
+<ssr:form name="add">
+  <ssr:input name="note" type="text" required maxlength="100"/>
+  <button type="submit">Add</button>
+</ssr:form>
+</body>
+</html>
