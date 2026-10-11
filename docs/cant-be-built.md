@@ -8,7 +8,7 @@ Each case below says what goes wrong and what refuses it, and links the tests th
 attempt on purpose, in small apps like those an AI assistant writes. Where a test also runs the
 same app without the mistake, that app works, so the mistake alone is refused. `aicoded publish`
 runs `aicoded check` before it sends an app, and the delivery pipeline runs it again on every
-publish. The tests are part of the open framework, for anyone to read and run.
+publish. The linked tests are part of the open framework, for anyone to read and run.
 
 ## A table anyone can read
 
