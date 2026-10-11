@@ -28,7 +28,7 @@ import (
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
-	"aicoded.dev/framework/cmd/aicoded/internal/testmysql"
+	"aicoded.dev/framework/internal/testmysql"
 )
 
 // teamAddress is people's setting team_address, where it mails the team.

@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/testmysql"
+	"aicoded.dev/framework/internal/testmysql"
 	"aicoded.dev/framework/runnerproto"
 )
 

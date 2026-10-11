@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
-	"aicoded.dev/framework/cmd/aicoded/internal/mysqlproxy"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
+	"aicoded.dev/framework/runnerproto/mysqlproxy"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 	"aicoded.dev/framework/runnerproto/runnerv1/runnerv1connect"
 	"aicoded.dev/framework/runnerproto/socket"

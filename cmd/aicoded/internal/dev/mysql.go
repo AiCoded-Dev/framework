@@ -15,8 +15,8 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/mysqlproxy"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/runnerproto/mysqlproxy"
 )
 
 // prepareTimeout bounds Prepare.

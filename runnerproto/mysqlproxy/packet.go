@@ -1,6 +1,6 @@
 // Package mysqlproxy serves an app's mysql.sock. It speaks just enough of the MySQL protocol to
 // greet the app without asking for credentials, log in upstream as the app's own database user,
-// and relay the session through a command allow-list.
+// and relay the session through a command allow-list. Runners import it; apps do not.
 package mysqlproxy
 
 import (

@@ -18,11 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
-	"aicoded.dev/framework/cmd/aicoded/internal/mysqlproxy"
-	"aicoded.dev/framework/cmd/aicoded/internal/testmysql"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/internal/testmysql"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
+	"aicoded.dev/framework/runnerproto/mysqlproxy"
 	"aicoded.dev/framework/runnerproto/socket"
 )
 

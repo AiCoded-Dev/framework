@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"aicoded.dev/framework/cmd/aicoded/internal/testmysql"
+	"aicoded.dev/framework/internal/testmysql"
 )
 
 // serveProxy serves a proxy to up on a Unix socket and returns the socket's path. onError, if

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
-	"aicoded.dev/framework/cmd/aicoded/internal/testmysql"
+	"aicoded.dev/framework/internal/testmysql"
 )
 
 var (

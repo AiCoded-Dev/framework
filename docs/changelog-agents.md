@@ -4,6 +4,15 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- The runner side of the runner protocol is public, for runners: `runnerproto/server` serves
+  `runner.sock` to one app, and `mysql.sock` through `runnerproto/mysqlproxy`, with the building
+  blocks behind provider interfaces. It checks what the app sends before any provider sees it,
+  accepts the environments `dev`, `preview` and `production`, and hands the app the form key its
+  runner chose, so two instances of an app with one key take each other's form tokens. A file
+  name in a store is at most 1024 bytes, each part at most 255 bytes, with no control characters
+  (E-FILE-001). Of the spans an app exports, the runner keeps at most 1024 per export, drops those
+  with ids of the wrong size, cuts names, errors and attribute values at 4 KiB, and keeps at most
+  64 attributes, whose keys are at most 256 bytes. Apps cannot import either package (E-LINT-001).
 - The delivery pipeline attacks the app it built, as the security checks of layer L7, in two new
   steps after `tests`, which run only when the tests passed. `attacks` starts the app, sends
   requests without a valid session to every page, form, live connection and served function

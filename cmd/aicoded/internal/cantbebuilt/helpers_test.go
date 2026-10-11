@@ -26,7 +26,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/dev"
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
-	"aicoded.dev/framework/cmd/aicoded/internal/testmysql"
+	"aicoded.dev/framework/internal/testmysql"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto/viewer"
 )

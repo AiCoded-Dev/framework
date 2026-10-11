@@ -15,9 +15,9 @@ import (
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
-	"aicoded.dev/framework/cmd/aicoded/internal/mysqlproxy"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
+	"aicoded.dev/framework/runnerproto/mysqlproxy"
 	"aicoded.dev/framework/runnerproto/socket"
 )
 
