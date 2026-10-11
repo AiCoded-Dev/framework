@@ -21,6 +21,7 @@ import (
 	"aicoded.dev/framework/runnerproto"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 	"aicoded.dev/framework/runnerproto/runnerv1/runnerv1connect"
+	"aicoded.dev/framework/runnerproto/server"
 	"aicoded.dev/framework/runnerproto/viewer"
 )
 
@@ -71,12 +72,12 @@ func (f *fakeCallee) last() servedCall {
 }
 
 // newTestRouter returns a router on which billing is served by callee.
-func newTestRouter(t *testing.T, callee *fakeCallee) (*Router, *Signer) {
+func newTestRouter(t *testing.T, callee *fakeCallee) (*server.Router, *Signer) {
 	signer, err := NewSigner()
 	require.NoError(t, err)
 	mux := http.NewServeMux()
 	mux.Handle(runnerv1connect.NewAppServiceHandler(callee))
-	r := NewRouter(signer)
+	r := server.NewRouter(signer)
 	r.Add(billingApp, serveAt(t, mux))
 	return r, signer
 }
@@ -87,7 +88,7 @@ func mint(t *testing.T, s *Signer, p devconfig.Persona, app string, at time.Time
 	return token
 }
 
-func callBilling(t *testing.T, r *Router, method, token string) (*runnerv1.CallResponse, error) {
+func callBilling(t *testing.T, r *server.Router, method, token string) (*runnerv1.CallResponse, error) {
 	return r.Call(t.Context(), shopApp, &runnerv1.CallRequest{App: "billing", Method: method, Payload: []byte("7"), Viewer: token}, "")
 }
 
@@ -160,7 +161,6 @@ func TestRouterWithTheCalleeNotRunning(t *testing.T) {
 	_, err := r.Call(t.Context(), shopApp, &runnerv1.CallRequest{App: "reports", Method: "Stats", Viewer: mint(t, signer, alice, "shop", time.Now())}, "")
 	var ce *connect.Error
 	require.ErrorAs(t, err, &ce)
-	assert.Equal(t, notRunning("reports").Message(), ce.Message())
 	assert.Equal(t, "E-RPC-011: \"reports\" is not running in this workspace\n"+
 		"  fix: run aicoded dev in a folder above both apps, and never call, in OnStart, an app that calls this app too\n"+
 		"  docs: https://aicoded.dev/docs/errors/E-RPC-011", ce.Message())
@@ -270,7 +270,7 @@ func TestRouterPassesOnOnlyWhatAFunctionMayReturn(t *testing.T) {
 func TestRouterWithTheCalleeGone(t *testing.T) {
 	signer, err := NewSigner()
 	require.NoError(t, err)
-	r := NewRouter(signer)
+	r := server.NewRouter(signer)
 	r.Add(billingApp, "/nonexistent/app.sock")
 	_, err = r.Call(t.Context(), shopApp, &runnerv1.CallRequest{App: "billing", Method: "Ping"}, "")
 	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err))
@@ -312,7 +312,7 @@ func TestRouterAddAndRemoveCloseTheOldClient(t *testing.T) {
 	require.NoError(t, err)
 	mux := http.NewServeMux()
 	mux.Handle(runnerv1connect.NewAppServiceHandler(&fakeCallee{}))
-	r := NewRouter(signer)
+	r := server.NewRouter(signer)
 	first, closed := closedConns(t, mux)
 	r.Add(billingApp, first)
 	_, err = callBilling(t, r, "Ping", "")

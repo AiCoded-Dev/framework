@@ -17,23 +17,27 @@ import (
 	"aicoded.dev/framework/runnerproto"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 	"aicoded.dev/framework/runnerproto/runnerv1/runnerv1connect"
+	"aicoded.dev/framework/runnerproto/server"
 	"aicoded.dev/framework/runnerproto/socket"
 	"aicoded.dev/framework/runnerproto/viewer"
 )
 
-func newService() *runnerService {
-	return newRunnerService(
-		manifest.Manifest{App: "rooms", Settings: []string{"greeting"}, Secrets: []string{"api_key"}},
-		devconfig.AppValues{Settings: map[string]string{"greeting": "hi", "extra": "x"}, Secrets: map[string]string{"api_key": "s3cret", "other": "y"}},
-		devconfig.EnvPreview, []byte(strings.Repeat("k", 32)), [][]byte{make([]byte, ed25519.PublicKeySize)}, newStore("rooms", io.Discard))
-}
+var (
+	rooms       = manifest.Manifest{App: "rooms", Settings: []string{"greeting"}, Secrets: []string{"api_key"}}
+	roomsValues = devconfig.AppValues{Settings: map[string]string{"greeting": "hi", "extra": "x"}, Secrets: map[string]string{"api_key": "s3cret", "other": "y"}}
+)
 
-func serveRunner(t *testing.T, svc *runnerService) *http.Client {
-	return serveSocket(t, svc.handler())
+// serveRooms serves rooms as aicoded dev does and returns a client of runner.sock, the store of
+// its spans and mail, and the server.
+func serveRooms(t *testing.T) (*http.Client, *store, *server.Server) {
+	st := newStore("rooms", io.Discard)
+	hc, srv, _ := serveDev(t, rooms, roomsValues, st, nil)
+	return hc, st, srv
 }
 
 func TestHello(t *testing.T) {
-	c := runnerv1connect.NewLifecycleServiceClient(serveRunner(t, newService()), socket.BaseURL, connect.WithGRPC())
+	hc, _, _ := serveRooms(t)
+	c := runnerv1connect.NewLifecycleServiceClient(hc, socket.BaseURL, connect.WithGRPC())
 	resp, err := c.Hello(t.Context(), connect.NewRequest(&runnerv1.HelloRequest{ProtocolVersion: runnerproto.ProtocolVersion}))
 	require.NoError(t, err)
 	assert.Equal(t, "rooms", resp.Msg.GetApp())
@@ -48,7 +52,8 @@ func TestHello(t *testing.T) {
 }
 
 func TestSecrets(t *testing.T) {
-	c := runnerv1connect.NewSecretsServiceClient(serveRunner(t, newService()), socket.BaseURL, connect.WithGRPC())
+	hc, _, _ := serveRooms(t)
+	c := runnerv1connect.NewSecretsServiceClient(hc, socket.BaseURL, connect.WithGRPC())
 	resp, err := c.GetSecret(t.Context(), connect.NewRequest(&runnerv1.GetSecretRequest{Name: "api_key"}))
 	require.NoError(t, err)
 	assert.Equal(t, []byte("s3cret"), resp.Msg.GetValue())
@@ -58,38 +63,36 @@ func TestSecrets(t *testing.T) {
 }
 
 func TestFilesOnTheRunnerSocket(t *testing.T) {
-	stat := func(svc *runnerService) error {
-		c := runnerv1connect.NewFilesServiceClient(serveRunner(t, svc), socket.BaseURL, connect.WithGRPC())
+	stat := func(hc *http.Client) error {
+		c := runnerv1connect.NewFilesServiceClient(hc, socket.BaseURL, connect.WithGRPC())
 		_, err := c.Stat(t.Context(), connect.NewRequest(&runnerv1.StatRequest{Store: "docs", Name: "."}))
 		return err
 	}
-	assert.Equal(t, connect.CodeUnimplemented, connect.CodeOf(stat(newService())), "no file service, no handler")
+	hc, _, _ := serveRooms(t)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(stat(hc)), "a store the app does not declare")
 
-	svc := newService()
-	files, err := newFileService(t.TempDir(), []string{"docs"})
-	require.NoError(t, err)
-	t.Cleanup(files.close)
-	svc.files = files
-	require.NoError(t, stat(svc))
+	m := rooms
+	m.Data = []manifest.Data{{Source: "filestore:docs", Classes: []string{"internal"}}}
+	hc, _, _ = serveDev(t, m, roomsValues, newStore("rooms", io.Discard), nil)
+	require.NoError(t, stat(hc))
 }
 
 func TestRunnerRefusesOversizedMessages(t *testing.T) {
-	svc := newService()
-	tc := runnerv1connect.NewTelemetryServiceClient(serveRunner(t, svc), socket.BaseURL, connect.WithGRPC())
+	hc, st, _ := serveRooms(t)
+	tc := runnerv1connect.NewTelemetryServiceClient(hc, socket.BaseURL, connect.WithGRPC())
 	big := &runnerv1.Span{Name: "a", Attributes: map[string]string{"k": strings.Repeat("x", runnerproto.MaxMessageBytes)}}
 	_, err := tc.Export(t.Context(), connect.NewRequest(&runnerv1.ExportRequest{Spans: []*runnerv1.Span{big}}))
 	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err))
-	assert.Empty(t, svc.store.spans.All())
+	assert.Empty(t, st.spans.All())
 }
 
 func TestExportAndReady(t *testing.T) {
-	svc := newService()
-	hc := serveRunner(t, svc)
+	hc, st, srv := serveRooms(t)
 	tc := runnerv1connect.NewTelemetryServiceClient(hc, socket.BaseURL, connect.WithGRPC())
 	_, err := tc.Export(t.Context(), connect.NewRequest(&runnerv1.ExportRequest{Spans: []*runnerv1.Span{{Name: "a"}}, Dropped: 3}))
 	require.NoError(t, err)
-	assert.Len(t, svc.store.spans.All(), 1)
-	assert.Equal(t, uint64(3), svc.dropped.Load())
+	assert.Len(t, st.spans.All(), 1)
+	assert.Equal(t, uint64(3), st.exportDropped.Load())
 
 	lc := runnerv1connect.NewLifecycleServiceClient(hc, socket.BaseURL, connect.WithGRPC())
 	for range 2 {
@@ -97,7 +100,7 @@ func TestExportAndReady(t *testing.T) {
 		require.NoError(t, err)
 	}
 	select {
-	case <-svc.ready:
+	case <-srv.Ready():
 	default:
 		t.Fatal("not ready")
 	}
@@ -126,31 +129,30 @@ func TestRing(t *testing.T) {
 }
 
 func TestCallOnTheRunnerSocket(t *testing.T) {
-	call := func(svc *runnerService, method string) (*connect.Response[runnerv1.CallResponse], error) {
-		c := runnerv1connect.NewRpcServiceClient(serveRunner(t, svc), socket.BaseURL, connect.WithGRPC())
-		req := connect.NewRequest(&runnerv1.CallRequest{App: "billing", Method: method, Payload: []byte("7")})
+	call := func(m manifest.Manifest, r *server.Router) (*connect.Response[runnerv1.CallResponse], error) {
+		hc, _, _ := serveDev(t, m, devconfig.AppValues{}, newStore(m.App, io.Discard), r)
+		c := runnerv1connect.NewRpcServiceClient(hc, socket.BaseURL, connect.WithGRPC())
+		req := connect.NewRequest(&runnerv1.CallRequest{App: "billing", Method: "Ping", Payload: []byte("7")})
 		req.Header().Set("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
 		return c.Call(t.Context(), req)
 	}
-	_, err := call(newService(), "Ping")
-	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err), "no router, no calls")
-	var ce *connect.Error
-	require.ErrorAs(t, err, &ce)
-	assert.Equal(t, notRunning("billing").Message(), ce.Message(), "the same refusal as the router's")
-	assert.Equal(t, runnerproto.OriginRunner, origin(err))
-
 	callee := &fakeCallee{}
-	r, _ := newTestRouter(t, callee)
-	shop := newRunnerService(shopApp, devconfig.AppValues{}, devconfig.EnvDev, nil, nil, newStore("shop", io.Discard))
-	shop.router = r
-	resp, err := call(shop, "Ping")
+	r, signer := newTestRouter(t, callee)
+	_, err := call(shopApp, nil)
+	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err), "no router, no calls")
+	assert.Equal(t, runnerproto.OriginRunner, origin(err))
+	_, routerErr := server.NewRouter(signer).Call(t.Context(), shopApp, &runnerv1.CallRequest{App: "billing", Method: "Ping"}, "")
+	var ce, router *connect.Error
+	require.ErrorAs(t, err, &ce)
+	require.ErrorAs(t, routerErr, &router)
+	assert.Equal(t, router.Message(), ce.Message(), "the same refusal as the router's")
+
+	resp, err := call(shopApp, r)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("Ping:7"), resp.Msg.GetPayload())
 	assert.Equal(t, "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", callee.last().traceparent)
 
-	reports := newRunnerService(manifest.Manifest{App: "reports"}, devconfig.AppValues{}, devconfig.EnvDev, nil, nil, newStore("reports", io.Discard))
-	reports.router = r
-	_, err = call(reports, "Ping")
+	_, err = call(manifest.Manifest{App: "reports"}, r)
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
 	require.ErrorContains(t, err, "E-RPC-008", "the caller is the app on the socket, whatever the request says")
 	assert.Equal(t, runnerproto.OriginRunner, origin(err), "the runner's mark reaches the app")

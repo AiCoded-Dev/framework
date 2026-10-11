@@ -87,10 +87,8 @@ func (r *Router) put(app string, c *callee) {
 // return, and never with the runner's mark.
 func (r *Router) Call(ctx context.Context, caller manifest.Manifest, req *runnerv1.CallRequest, traceparent string) (*runnerv1.CallResponse, error) {
 	app, fn := req.GetApp(), req.GetMethod()
-	if !slices.Contains(caller.Services.Calls[app], fn) {
-		return nil, refuse(connect.CodePermissionDenied, errs.New("E-RPC-008",
-			fmt.Sprintf("%s calls %s of %s, which services.calls in its permission list does not name", caller.App, quote(fn), quote(app)),
-			"call other apps only through their generated clients in services/, and run aicoded generate in "+caller.App))
+	if err := callDeclared(caller, app, fn); err != nil {
+		return nil, err
 	}
 	r.mu.RLock()
 	to, ok := r.apps[app]
@@ -142,6 +140,17 @@ func (r *Router) Call(ctx context.Context, caller manifest.Manifest, req *runner
 		return nil, passOn(err)
 	}
 	return &runnerv1.CallResponse{Payload: resp.Msg.GetPayload()}, nil
+}
+
+// callDeclared refuses, with E-RPC-008, a call of the app of caller to fn of app that
+// services.calls in its permission list does not name.
+func callDeclared(caller manifest.Manifest, app, fn string) error {
+	if slices.Contains(caller.Services.Calls[app], fn) {
+		return nil
+	}
+	return refuse(connect.CodePermissionDenied, errs.New("E-RPC-008",
+		fmt.Sprintf("%s calls %s of %s, which services.calls in its permission list does not name", caller.App, quote(fn), quote(app)),
+		"call other apps only through their generated clients in services/, and run aicoded generate in "+caller.App))
 }
 
 // notRunning returns the refusal of a call to app, which the runner does not serve.

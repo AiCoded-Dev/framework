@@ -74,7 +74,7 @@ type Files interface {
 // Mail sends an app's mail and serves its mailbox. The server checks every message against the
 // mail rules and the app's email section first, and every folder, page and message id the app
 // names. A target that keeps no mailbox answers List, Get, Delete and Move with a
-// *connect.Error.
+// *connect.Error, E-MAIL-008 with the code Unimplemented.
 type Mail interface {
 	// Send sends msg from the address from, the app's email.from, at most once for each
 	// idempotency key, and returns the message's id.
@@ -93,7 +93,8 @@ type Mail interface {
 type Secrets interface {
 	// Secret returns the value of the secret name, which the app declares.
 	Secret(ctx context.Context, name string) (string, error)
-	// Settings returns the values of the settings. Hello hands the app those it declares.
+	// Settings returns the values of the settings. Hello hands the app those it declares. It may
+	// be called from several goroutines at once, and the server never changes the map.
 	Settings() map[string]string
 }
 

@@ -33,9 +33,9 @@ import (
 type Config struct {
 	// Generated lists the files aicoded generate owns in the app, relative to its folder and
 	// slash-separated. Every other file is checked as hand-written, whatever its name or header.
-	// E-LINT-001, E-LINT-006, E-LINT-007 and E-LINT-009 read generated files too, and a generated
-	// file may also import the packages only generated files may import; E-LINT-004 and
-	// E-LINT-005 read hand-written files only. A problem in a generated file is reported where
+	// E-LINT-001, E-LINT-006, E-LINT-007, E-LINT-009 and E-LINT-012 read generated files too, and
+	// a generated file may also import the packages only generated files may import; E-LINT-004
+	// and E-LINT-005 read hand-written files only. A problem in a generated file is reported where
 	// its //line comment points, such as the line of the template that the code was written from,
 	// when that comment names a file in the app folder, and at the generated file otherwise.
 	Generated []string
@@ -111,6 +111,7 @@ func Run(ctx context.Context, dir string, cfg Config) (Result, error) {
 	a.methods = methodsOf(pkgs, slices.Sorted(maps.Keys(refused)))
 	a.sqlMethods = methodsOf(pkgs, sqlMethods)
 	a.reflection = methodsOf(pkgs, reflection)
+	a.http = httpTypesOf(pkgs)
 	g, err := checker.Analyze(a.analyzers(), pkgs, nil)
 	if err != nil {
 		return Result{}, err
@@ -214,6 +215,8 @@ type app struct {
 	sqlMethods map[string][]*types.Func
 	// reflection holds the methods of reflection in the loaded packages, by name.
 	reflection map[string][]*types.Func
+	// http holds the types of net/http that E-LINT-012 reads, nil when the build has no net/http.
+	http *httpTypes
 	// mu guards writes, which the analyzers fill in parallel.
 	mu sync.Mutex
 	// writes holds the writes of the app's constant SQL.
@@ -237,6 +240,7 @@ func (a *app) analyzers() []*analysis.Analyzer {
 		a.analyzer("entries", a.entryPoints),
 		a.analyzer("names", a.names),
 		a.analyzer("sql", a.constantSQL),
+		a.analyzer("cookies", a.cookies),
 	}
 }
 

@@ -3,7 +3,7 @@ package mysqlproxy
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1" //nolint:gosec // the MySQL protocol requires SHA-1
+	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
@@ -31,9 +31,9 @@ func scramble(plugin, password string, nonce []byte) ([]byte, error) {
 	}
 	nonce = nonce[:nonceLen]
 	if plugin == "mysql_native_password" {
-		h1 := sha1.Sum([]byte(password)) //nolint:gosec // the MySQL protocol requires SHA-1
-		h2 := sha1.Sum(h1[:])            //nolint:gosec // the MySQL protocol requires SHA-1
-		h := sha1.New()                  //nolint:gosec // the MySQL protocol requires SHA-1
+		h1 := sha1.Sum([]byte(password))
+		h2 := sha1.Sum(h1[:])
+		h := sha1.New()
 		h.Write(nonce)
 		h.Write(h2[:])
 		out := h.Sum(nil)
@@ -77,5 +77,5 @@ func encryptPassword(pemKey []byte, password string, nonce []byte) ([]byte, erro
 	for i := range plain {
 		plain[i] ^= nonce[i%len(nonce)]
 	}
-	return rsa.EncryptOAEP(sha1.New(), rand.Reader, pub, plain, nil) //nolint:gosec // the MySQL protocol requires SHA-1
+	return rsa.EncryptOAEP(sha1.New(), rand.Reader, pub, plain, nil)
 }

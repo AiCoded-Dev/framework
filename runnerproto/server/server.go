@@ -55,8 +55,8 @@ type Options struct {
 	// the app to do the same with app.sock: for an app that runs as another user. Dir then
 	// decides who reaches them.
 	ShareAppSocket bool
-	// Adopted serves an app that is already running and said Hello to an earlier server: Ready
-	// is closed at once.
+	// Adopted marks an app that is already running and said Hello to an earlier server. Ready is
+	// closed at New; nothing else changes.
 	Adopted bool
 	// Database is where the proxy on mysql.sock logs in. It is set exactly when the app declares
 	// sqldb.
@@ -297,8 +297,12 @@ func (t telemetryService) Export(ctx context.Context, req *connect.Request[runne
 
 type rpcService struct{ s *Server }
 
-// Call carries a call of the app to another app.
+// Call carries a call of the app to another app. It refuses a call that services.calls in the
+// app's permission list does not name before Calls sees it.
 func (r rpcService) Call(ctx context.Context, req *connect.Request[runnerv1.CallRequest]) (*connect.Response[runnerv1.CallResponse], error) {
+	if err := callDeclared(r.s.m, req.Msg.GetApp(), req.Msg.GetMethod()); err != nil {
+		return nil, err
+	}
 	calls := r.s.providers.Calls
 	if calls == nil {
 		return nil, notRunning(req.Msg.GetApp())

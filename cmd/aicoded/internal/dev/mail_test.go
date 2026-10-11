@@ -1,8 +1,8 @@
 package dev
 
 import (
+	"io"
 	"math"
-	"net/http"
 	"strconv"
 	"strings"
 	"testing"
@@ -11,17 +11,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto/mailrules"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 	"aicoded.dev/framework/runnerproto/runnerv1/runnerv1connect"
 )
 
+// mailClient serves an app with the mail rules email and returns a client and its mail catcher.
 func mailClient(t *testing.T, email *manifest.Email) (runnerv1connect.MailServiceClient, *mailService) {
-	svc := newMailService(email, nil)
-	mux := http.NewServeMux()
-	mux.Handle(runnerv1connect.NewMailServiceHandler(svc))
-	return runnerv1connect.NewMailServiceClient(serveSocket(t, mux), socketBaseURL, connect.WithGRPC()), svc
+	st := newStore("notes", io.Discard)
+	hc, _, _ := serveDev(t, manifest.Manifest{App: "notes", Email: email}, devconfig.AppValues{}, st, nil)
+	return runnerv1connect.NewMailServiceClient(hc, socketBaseURL, connect.WithGRPC()), st.mail
 }
 
 var acme = &manifest.Email{From: "ops@acme.example", ToDomains: []string{"acme.example"}}

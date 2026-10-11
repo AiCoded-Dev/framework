@@ -53,6 +53,14 @@ or, on your computer, the persona you chose.
 
 Decide ownership by `Subject`, never by `Name`, which two people can share.
 
+On the platform, `Subject` is `<iss>|<sub>`: the issuer of the company login and the person's
+id there, such as `https://login.microsoftonline.com/<tenant>/v2.0|AAAAAAAAAAAAAAAAAAAAAIkzqFVr`.
+It stays the same on every visit, and no two people, or two company logins, share one. Keep it
+as it is, as text: never parse it or build it from parts. `Name` is the name the company login
+shows. The platform gives no groups or roles yet, so `Groups` and `Roles` are empty there, and a
+page opens there only when every access rule on its path is `role="*"`. On your computer,
+`Subject` is the persona's name.
+
 ## Guards
 
 `guard="true"` declares the page's `Guard`, which `aicoded generate` adds to its data provider:

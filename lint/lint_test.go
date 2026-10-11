@@ -130,6 +130,7 @@ func TestImports(t *testing.T) {
 		`bad/bad.go:7: E-LINT-001: app code may not import "reflect"`,
 		`bad/bad.go:9: E-LINT-001: app code may not import "aicoded.dev/framework/manifest"`,
 		`bad/bad.go:10: E-LINT-001: app code may not import "aicoded.dev/framework/runnerproto"`,
+		`bad/bad.go:11: E-LINT-001: app code may not import "aicoded.dev/framework/runnerproto/server"`,
 		`bad/dot.go:3: E-LINT-001: app code may not import "path/filepath"`,
 		`bad/own.go:4: ` + unread("imports/_hidden"),
 		`bad/own.go:5: ` + unread("imports/skipped"),
@@ -829,4 +830,40 @@ func TestTemplate(t *testing.T) {
 	r, err := lint.Run(t.Context(), filepath.Join("testdata", "template"), lint.Config{Generated: []string{"pages/route_gen.go"}})
 	require.NoError(t, err)
 	assert.Equal(t, []lint.Write{{Table: "carts", Op: "DELETE"}}, r.Writes, "the writes of a template's constant SQL")
+}
+
+func TestCookies(t *testing.T) {
+	const (
+		name   = "E-LINT-012: a cookie that app code sets must have a Name that is a constant starting with __Host-"
+		secure = "E-LINT-012: a cookie that app code sets must have Secure: true"
+		domain = "E-LINT-012: a cookie that app code sets may not have a Domain"
+		zero   = "E-LINT-012: make a cookie with an http.Cookie literal that sets its Name, Secure: true and no Domain, not as an empty value"
+		header = "E-LINT-012: the value of a Set-Cookie header must be the String() of an http.Cookie, or a constant __Host- cookie with Secure and no Domain"
+		byKey  = `E-LINT-012: set a cookie with w.Header().Add("Set-Cookie", c.String()), not by its key in a header map`
+	)
+	assert.Equal(t, []string{
+		"bad/bad.go:19: " + name,
+		"bad/bad.go:20: " + secure,
+		"bad/bad.go:21: " + domain,
+		"bad/bad.go:23: " + name,
+		"bad/bad.go:23: " + secure,
+		"bad/bad.go:24: " + name,
+		"bad/bad.go:25: " + name,
+		"bad/bad.go:27: " + name,
+		"bad/bad.go:28: " + secure,
+		"bad/bad.go:29: " + domain,
+		"bad/bad.go:30: E-LINT-012: set the Name, Secure and Domain of a cookie only with = and a constant, one field at a time",
+		"bad/bad.go:31: E-LINT-012: app code may not take the address of the Name, Secure or Domain of a cookie",
+		"bad/bad.go:32: " + zero,
+		"bad/bad.go:33: " + zero,
+		"bad/bad.go:35: " + header,
+		"bad/bad.go:36: " + header,
+		"bad/bad.go:37: " + header,
+		"bad/bad.go:38: " + byKey,
+		"bad/bad.go:39: " + byKey,
+		"bad/bad.go:40: " + header,
+		"bad/bad.go:41: E-LINT-009: app code may not use http.SetCookie",
+		"bad/bad.go:43: " + secure,
+		"bad/bad.go:44: " + name,
+	}, run(t, "cookies"), "good sets __Host- cookies with Secure and no Domain, reads a cookie and sets other headers, also with a key lint cannot read")
 }

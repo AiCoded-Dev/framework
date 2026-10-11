@@ -135,6 +135,25 @@ func TestReservedFolders(t *testing.T) {
 	}))
 }
 
+func TestAicodedFolderAtAnyDepth(t *testing.T) {
+	assert.Equal(t, []string{
+		"pages/_aicoded/index.html:1 E-GEN-016",
+		"pages/a/_aicoded/index.html:1 E-GEN-016",
+		"pages/a/b/_aicoded/index.html:1 E-GEN-016",
+		"pages/n_id/c/_aicoded/index.html:1 E-GEN-016",
+	}, diags(t, map[string]string{
+		"pages/index.html":                   `<ssr:access role="*"/><ssr:content/>`,
+		"pages/_aicoded/index.html":          `<p>login</p>`,
+		"pages/a/index.html":                 `<p>a</p><ssr:content/>`,
+		"pages/a/_aicoded/index.html":        `<p>callback</p>`,
+		"pages/a/b/index.html":               `<p>b</p><ssr:content/>`,
+		"pages/a/b/_aicoded/index.html":      `<p>logout</p>`,
+		"pages/n_id/index.html":              `<ssr:access role="*" guard="true"/><ssr:content/>`,
+		"pages/n_id/c/_aicoded/index.html":   `<p>deep</p>`,
+		"pages/n_id/c/_aicoded/x/index.html": `<p>not walked</p>`,
+	}), "the runner owns /_aicoded/ at every depth")
+}
+
 func TestDenyByDefault(t *testing.T) {
 	assert.Equal(t, []string{
 		"pages/a/b/index.html:1 E-GEN-030",

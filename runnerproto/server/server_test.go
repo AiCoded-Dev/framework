@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"aicoded.dev/framework/runnerproto"
 	"aicoded.dev/framework/runnerproto/mysqlproxy"
 	"aicoded.dev/framework/runnerproto/runnerv1"
+	"aicoded.dev/framework/runnerproto/socket"
 )
 
 func hello(t *testing.T, c clients) *runnerv1.HelloResponse {
@@ -131,19 +133,18 @@ func TestReady(t *testing.T) {
 	assert.Len(t, readies, 2, "OnReady hears every Ready")
 }
 
-func TestAdoptedIsReadyAtNew(t *testing.T) {
-	f := newFakes()
-	opts := options(t, f)
+func TestAdoptedClosesReadyAtNew(t *testing.T) {
+	opts := options(t, newFakes())
 	opts.Adopted = true
+	readies := make(chan struct{}, 1)
+	opts.OnReady = func() { readies <- struct{}{} }
 	s := start(t, opts)
 	assert.True(t, isClosed(s.Ready()))
+	assert.Empty(t, readies, "OnReady hears only the Ready the app sends")
 
-	c := dial(opts.Dir)
-	resp, err := c.secrets.GetSecret(t.Context(), connect.NewRequest(&runnerv1.GetSecretRequest{Name: "token"}))
-	require.NoError(t, err, "an adopted app calls without a new Hello")
-	assert.Equal(t, []byte("s3cret"), resp.Msg.GetValue())
-	_, err = c.life.Ready(t.Context(), connect.NewRequest(&runnerv1.ReadyRequest{}))
+	_, err := dial(opts.Dir).life.Ready(t.Context(), connect.NewRequest(&runnerv1.ReadyRequest{}))
 	require.NoError(t, err)
+	assert.Len(t, readies, 1)
 }
 
 func TestSockets(t *testing.T) {
@@ -170,6 +171,24 @@ func TestSockets(t *testing.T) {
 	require.NoError(t, s.Close())
 	assert.NoFileExists(t, sock)
 	assert.NoFileExists(t, db)
+}
+
+// failingAccept is a listener whose Accept fails as it does when the runner is out of files.
+type failingAccept struct{ net.Listener }
+
+func (failingAccept) Accept() (net.Conn, error) { return nil, syscall.EMFILE }
+
+func TestServeDBClosesTheSocketWhenItFails(t *testing.T) {
+	sock := filepath.Join(shortDir(t), runnerproto.MySQLSocket)
+	l, err := socket.Listen(t.Context(), sock)
+	require.NoError(t, err)
+
+	var logged []error
+	serveDB(mysqlproxy.New(mysqlproxy.Upstream{}), failingAccept{l}, func(err error) { logged = append(logged, err) })
+	assert.Equal(t, []error{syscall.EMFILE}, logged)
+	var d net.Dialer
+	_, err = d.DialContext(t.Context(), "unix", sock)
+	require.Error(t, err, "the app's connections fail at once")
 }
 
 func TestSharedSockets(t *testing.T) {

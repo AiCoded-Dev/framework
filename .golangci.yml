@@ -29,6 +29,10 @@ linters:
       - path: ^manifest/manifest\.go$
         text: "G304"
         linters: [gosec]
+      # The MySQL protocol requires SHA-1 in its password scramble and its RSA padding.
+      - path: ^runnerproto/mysqlproxy/auth\.go$
+        text: "G401|G505"
+        linters: [gosec]
 
 formatters:
   enable:

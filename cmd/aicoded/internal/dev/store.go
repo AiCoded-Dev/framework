@@ -2,6 +2,7 @@ package dev
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
@@ -46,6 +48,9 @@ type store struct {
 	hidden  map[string]string // secret value → name, of every start of the app
 	hide    *redactor
 	limit   *spanLimit // nil: the ring of spans drops its oldest
+	// exportDropped counts the spans that the app or the runner server dropped before they
+	// reached the store.
+	exportDropped atomic.Uint64
 }
 
 // spanLimit bounds the spans a store keeps: at most count spans, of at most size bytes of text
@@ -167,6 +172,13 @@ func (s *store) writer(source string) io.Writer {
 		line: func(line string) { s.write(source, line) },
 		cut:  func(text string) int { return s.redactor().cut(text) },
 	}
+}
+
+// Export keeps spans, which the app exported, and counts the spans dropped before they reached
+// the store.
+func (s *store) Export(_ context.Context, spans []*runnerv1.Span, dropped uint64) {
+	s.addSpans(spans)
+	s.exportDropped.Add(dropped)
 }
 
 // addSpans keeps spans, which the app exported.

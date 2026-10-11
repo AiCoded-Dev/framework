@@ -2,6 +2,7 @@ package dev
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"net"
 	"net/http"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
+	"aicoded.dev/framework/runnerproto/server"
 	"aicoded.dev/framework/runnerproto/socket"
 )
 
@@ -41,9 +43,30 @@ func helloManifest(t *testing.T) manifest.Manifest {
 	return m
 }
 
-// serveSocket serves h on a Unix socket in a short temp dir and returns a client for it.
-func serveSocket(t *testing.T, h http.Handler) *http.Client {
-	return socket.Client(serveAt(t, h))
+// shortDir returns a new folder whose socket paths fit a Unix socket address.
+func shortDir(t *testing.T) string {
+	dir, err := os.MkdirTemp("", "aicoded-")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
+
+// serveDev serves the app of m in the environment preview through the runner server with the
+// providers of aicoded dev: its file stores in a new folder, which it returns, the mail and spans
+// of st, the values v and the calls of router, which may be nil. It returns a client of
+// runner.sock and the server.
+func serveDev(t *testing.T, m manifest.Manifest, v devconfig.AppValues, st *store, router *server.Router) (*http.Client, *server.Server, string) {
+	dir := shortDir(t)
+	filesDir := filepath.Join(dir, "files")
+	files, err := newFileStore(filesDir, m.Stores())
+	require.NoError(t, err)
+	t.Cleanup(files.close)
+	srv, err := server.New(t.Context(), server.Options{Dir: dir, Manifest: m, Env: server.EnvPreview,
+		ViewerKeys: []ed25519.PublicKey{make([]byte, ed25519.PublicKeySize)}, CSRFKey: newCSRFKey(),
+		Providers: providers(files, st, v, router)})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = srv.Close() })
+	return socket.Client(filepath.Join(dir, runnerproto.RunnerSocket)), srv, filesDir
 }
 
 // serveAt serves h on a Unix socket in a short temp dir and returns the socket's path.
@@ -88,10 +111,7 @@ func writeFile(t *testing.T, path, data string) {
 
 // serveAtWith serves h like serveAt, with state as the server's ConnState hook.
 func serveAtWith(t *testing.T, h http.Handler, state func(net.Conn, http.ConnState)) string {
-	dir, err := os.MkdirTemp("", "aicoded-")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	path := filepath.Join(dir, runnerproto.RunnerSocket)
+	path := filepath.Join(shortDir(t), runnerproto.RunnerSocket)
 	l, err := socket.Listen(t.Context(), path)
 	require.NoError(t, err)
 	srv := socket.NewServer(h)

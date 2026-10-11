@@ -2,31 +2,34 @@ package dev
 
 import (
 	"context"
-	"net/http"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/iotest"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
+	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 	"aicoded.dev/framework/runnerproto/runnerv1/runnerv1connect"
 )
 
-// filesClient serves a file service with the given stores and returns a client and the folder
-// that holds the stores.
+// filesClient serves an app with the given stores and returns a client and the folder that holds
+// the stores.
 func filesClient(t *testing.T, stores ...string) (runnerv1connect.FilesServiceClient, string) {
-	dir := t.TempDir()
-	svc, err := newFileService(dir, stores)
-	require.NoError(t, err)
-	t.Cleanup(svc.close)
-	mux := http.NewServeMux()
-	mux.Handle(runnerv1connect.NewFilesServiceHandler(svc))
-	return runnerv1connect.NewFilesServiceClient(serveSocket(t, mux), socketBaseURL, connect.WithGRPC()), dir
+	m := manifest.Manifest{App: "notes"}
+	for _, s := range stores {
+		m.Data = append(m.Data, manifest.Data{Source: "filestore:" + s, Classes: []string{"internal"}})
+	}
+	hc, _, dir := serveDev(t, m, devconfig.AppValues{}, newStore("notes", io.Discard), nil)
+	return runnerv1connect.NewFilesServiceClient(hc, socketBaseURL, connect.WithGRPC()), dir
 }
 
 func putFile(ctx context.Context, c runnerv1connect.FilesServiceClient, name string, chunks ...string) error {
@@ -131,9 +134,9 @@ func TestFileServiceSweepsTemporaryFiles(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(outside, tmpPrefix+"z"), []byte("x"), 0o600))
 	require.NoError(t, os.Symlink(outside, filepath.Join(store, "link")))
 
-	svc, err := newFileService(dir, []string{"docs"})
+	files, err := newFileStore(dir, []string{"docs"})
 	require.NoError(t, err)
-	t.Cleanup(svc.close)
+	t.Cleanup(files.close)
 	assert.NoFileExists(t, filepath.Join(store, tmpPrefix+"x"))
 	assert.NoFileExists(t, filepath.Join(store, "a", tmpPrefix+"y"))
 	assert.FileExists(t, filepath.Join(store, "keep.txt"))
@@ -229,10 +232,14 @@ func TestFileWritesAreWholeOrAbsent(t *testing.T) {
 }
 
 func TestFileWritesStopAtTheLimit(t *testing.T) {
-	defer func(old int64) { maxFileSize = old }(maxFileSize)
-	maxFileSize = 4
-	c, dir := filesClient(t, "docs")
-	require.NoError(t, putFile(t.Context(), c, "small.txt", "12", "34"))
-	assert.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(putFile(t.Context(), c, "big.txt", "12", "345")))
+	dir := t.TempDir()
+	files, err := newFileStore(dir, []string{"docs"})
+	require.NoError(t, err)
+	t.Cleanup(files.close)
+	_, err = files.Write(t.Context(), "docs", "small.txt", strings.NewReader("1234"))
+	require.NoError(t, err)
+	tooLarge := errors.New("E-FILE-002: big.txt is larger than 4 bytes")
+	_, err = files.Write(t.Context(), "docs", "big.txt", io.MultiReader(strings.NewReader("1234"), iotest.ErrReader(tooLarge)))
+	require.ErrorIs(t, err, tooLarge, "the server fails the data of a write past the limit")
 	assert.Equal(t, 1, storeEntries(dir), "only small.txt: neither big.txt nor its temporary file stays")
 }

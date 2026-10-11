@@ -89,6 +89,13 @@ var rules = []Rule{
 		Do:    "Require released versions of the framework and of the modules that modules: declares; only an aicoded installed from a framework checkout accepts the replace line its aicoded init writes.",
 		Fix:   "remove the replace line, the go.work file, the vendor folder or the GOFLAGS entries outside the list; run go clean -modcache when go mod verify fails; and require a released version of the module; when the go command itself cannot run, fix what it reports, such as the go line of go.mod or GOTOOLCHAIN",
 	},
+	{
+		Code:  "E-LINT-012",
+		Title: "cookie not __Host-",
+		Dont:  "Set a cookie whose name does not start with __Host-, that lacks Secure: true or that has a Domain, or write a Set-Cookie header that is not the String() of an http.Cookie.",
+		Do:    "Make each cookie with an http.Cookie literal whose constant Name starts with __Host-, with Path: \"/\", Secure: true and no Domain, and set it with w.Header().Add(\"Set-Cookie\", c.String()).",
+		Fix:   "name the cookie with a constant that starts with __Host-, set Path: \"/\" and Secure: true, leave out Domain, and set it with w.Header().Add(\"Set-Cookie\", c.String())",
+	},
 }
 
 // Rules returns every rule, sorted by code.

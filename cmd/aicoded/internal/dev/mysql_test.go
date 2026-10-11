@@ -6,10 +6,8 @@ import (
 	"database/sql"
 	"io"
 	"net"
-	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -23,7 +21,6 @@ import (
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
 	"aicoded.dev/framework/runnerproto/mysqlproxy"
-	"aicoded.dev/framework/runnerproto/socket"
 )
 
 func TestNewMySQLAdmin(t *testing.T) {
@@ -175,27 +172,6 @@ func open(t *testing.T, cfg *mysql.Config) *sql.DB {
 	db := sql.OpenDB(c)
 	t.Cleanup(func() { _ = db.Close() })
 	return db
-}
-
-// failingAccept is a listener whose Accept fails as it does when the runner is out of files.
-type failingAccept struct{ net.Listener }
-
-func (failingAccept) Accept() (net.Conn, error) { return nil, syscall.EMFILE }
-
-func TestServeDBClosesTheSocketWhenItFails(t *testing.T) {
-	dir, err := os.MkdirTemp("", "aicoded-")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	sock := filepath.Join(dir, runnerproto.MySQLSocket)
-	l, err := socket.Listen(t.Context(), sock)
-	require.NoError(t, err)
-
-	var logged []error
-	serveDB(mysqlproxy.New(mysqlproxy.Upstream{}), failingAccept{l}, func(err error) { logged = append(logged, err) })
-	assert.Equal(t, []error{syscall.EMFILE}, logged)
-	var d net.Dialer
-	_, err = d.DialContext(t.Context(), "unix", sock)
-	require.Error(t, err, "the app's connections fail at once")
 }
 
 func TestStartNeedsMySQL(t *testing.T) {

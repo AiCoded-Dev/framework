@@ -16,7 +16,8 @@
 //   - Open each store once, in OnStart, and share it with the pages through the app's deps
 //     package.
 //   - Names are slash-separated paths inside the store, such as 2026/42.pdf, with no leading
-//     slash, no . or .. parts and no control characters, of at most 1024 bytes (E-FILE-001).
+//     slash, no . or .. parts and no control characters, of at most 1024 bytes, each part of at
+//     most 255 bytes (E-FILE-001).
 //   - A file is at most 1 GiB (E-FILE-002).
 //
 // Read more in the guide docs/guides/file-stores.md and the task docs/tasks/upload-a-file.md, which

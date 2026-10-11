@@ -16,9 +16,10 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | CLI | `aicoded init`, `aicoded explain`, `aicoded login`, `logout` and `whoami`, the sign-in that `aicoded publish` and `status` use, and the `app_create` and `howto` tools of `aicoded mcp` |
 | PUB | `aicoded publish` and `aicoded status`, and the `publish` and `release_status` tools of `aicoded mcp` |
 | GATE | the security checks of the platform's delivery pipeline, in the problems and notes of a publish |
+| REL | the platform's release of a publish to production |
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
-| MAIL | mail rules |
+| MAIL | mail rules, and the mailbox where a target keeps none |
 
 Calls between apps use these codes:
 
@@ -82,6 +83,16 @@ Publishing uses these codes:
   the checks read.
 - E-GATE-038 is a note, which does not stop a publish: a page the simulated attacks did not
   reach.
+
+Releasing uses these codes, each a release that the platform refuses before anything runs:
+
+- E-REL-001: a publish that did not pass the delivery pipeline, or has no built app.
+- E-REL-002: an organisation that the platform's operator has not placed on a server.
+- E-REL-003: an app built with a framework older than v0.4.0.
+- E-REL-004, E-REL-005 and E-REL-007: what the platform does not run yet: an audience other than
+  everyone in the organisation, settings and secrets, and calls between apps.
+- E-REL-006 and E-REL-008: an `email.from` address in a domain that the organisation has not
+  verified, or that another app of the organisation has.
 
 `aicoded explain <CODE>` prints the page.
 

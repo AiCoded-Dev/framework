@@ -290,8 +290,10 @@ func TestCallsOnTheRunnerSocket(t *testing.T) {
 		req.Header().Set("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
 		return c.rpc.Call(t.Context(), req)
 	}
-	c, _ := serve(t)
-	_, err := call(c)
+	opts := options(t, newFakes())
+	opts.Manifest = shopApp
+	start(t, opts)
+	_, err := call(dial(opts.Dir))
 	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err), "no Calls, no calls")
 	var ce *connect.Error
 	require.ErrorAs(t, err, &ce)
@@ -317,4 +319,35 @@ func TestCallsOnTheRunnerSocket(t *testing.T) {
 		assert.Equal(t, []byte("Ping:7"), resp.Msg.GetPayload())
 		assert.Equal(t, "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", callee.last().traceparent)
 	}
+}
+
+// fakeCalls answers every call, and keeps which calls reached it.
+type fakeCalls struct{ recorder }
+
+func (f *fakeCalls) Call(_ context.Context, caller manifest.Manifest, req *runnerv1.CallRequest, _ string) (*runnerv1.CallResponse, error) {
+	if err := f.record(caller.App, req.GetApp(), req.GetMethod()); err != nil {
+		return nil, err
+	}
+	return &runnerv1.CallResponse{Payload: []byte("ok")}, nil
+}
+
+func TestCallsNotDeclaredNeverReachCalls(t *testing.T) {
+	calls := &fakeCalls{}
+	for _, tc := range []struct {
+		m    manifest.Manifest
+		want string
+	}{{manifest.Manifest{App: "reports"}, "E-RPC-008"}, {shopApp, ""}} {
+		opts := options(t, newFakes())
+		opts.Manifest, opts.Providers = tc.m, Providers{Calls: calls}
+		start(t, opts)
+		_, err := dial(opts.Dir).rpc.Call(t.Context(), connect.NewRequest(&runnerv1.CallRequest{App: "billing", Method: "Ping"}))
+		if tc.want != "" {
+			assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+			require.ErrorContains(t, err, tc.want)
+			assert.Equal(t, runnerproto.OriginRunner, origin(err))
+			continue
+		}
+		require.NoError(t, err)
+	}
+	assert.Equal(t, []string{"shop billing Ping"}, calls.seen(), "only the call that services.calls names reaches Calls")
 }

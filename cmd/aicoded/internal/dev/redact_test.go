@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -69,11 +68,10 @@ func TestRedactSpans(t *testing.T) {
 
 func TestRedactMail(t *testing.T) {
 	s, _ := secretStore(map[string]string{"token": leaked})
-	s.mail.setEmail(acme)
 	m := msg("ana@acme.example")
 	m.Subject, m.Text, m.Html = "key "+leaked, "the key is "+leaked, "<b>"+leaked+"</b>"
 	m.Attachments = []*runnerv1.Attachment{{Filename: leaked + ".txt", ContentType: "text/plain", Data: []byte(leaked)}}
-	_, err := s.mail.Send(t.Context(), connect.NewRequest(m))
+	_, err := s.mail.Send(t.Context(), acme.From, m)
 	require.NoError(t, err)
 	s.mail.deliver(&runnerv1.GetResponse{Summary: &runnerv1.MessageSummary{Subject: "re: " + leaked}, Text: leaked})
 

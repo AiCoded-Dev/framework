@@ -3,7 +3,7 @@ package dev
 import (
 	"cmp"
 	"context"
-	"crypto/rand"
+	"crypto/ed25519"
 	"errors"
 	"fmt"
 	"io"
@@ -20,13 +20,13 @@ import (
 	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
+	"aicoded.dev/framework/runnerproto/server"
 )
 
 const (
 	readyTimeout  = 30 * time.Second
 	stopTimeout   = 15 * time.Second
 	maxSocketPath = 100
-	csrfKeySize   = 32
 	runDirPattern = "aicoded-"
 )
 
@@ -39,7 +39,7 @@ type Services struct {
 	MySQL *MySQLAdmin
 	// Router carries the app's calls to the other apps of the workspace; with nil, every call
 	// fails with E-RPC-011.
-	Router *Router
+	Router *server.Router
 	// Env is the environment the app runs in, which also names its database: devconfig.EnvDev
 	// when empty, or devconfig.EnvPreview.
 	Env devconfig.Env
@@ -54,7 +54,9 @@ type Instance struct {
 	// Manifest is the app's permission list, with the sections aicoded generate wrote.
 	Manifest manifest.Manifest
 
-	served
+	values devconfig.AppValues
+	srv    *server.Server
+	files  *fileStore
 	store  *store
 	runDir string
 	cmd    *exec.Cmd
@@ -124,8 +126,8 @@ func launch(ctx context.Context, dir, bin string, m manifest.Manifest, values de
 	if err != nil {
 		return nil, err
 	}
-	i := &Instance{Name: m.App, Manifest: m, store: st, runDir: runDir, exited: make(chan struct{})}
-	if err := i.run(ctx, dir, bin, m, values, svc, signer); err != nil {
+	i := &Instance{Name: m.App, Manifest: m, values: values, store: st, runDir: runDir, exited: make(chan struct{})}
+	if err := i.run(ctx, dir, bin, svc, signer); err != nil {
 		i.Stop()
 		return nil, err
 	}
@@ -138,16 +140,16 @@ func launchByHand(ctx context.Context, runDir string, m manifest.Manifest, value
 	if err := checkStart(m, values, svc); err != nil {
 		return nil, err
 	}
-	i := &Instance{Name: m.App, Manifest: m, store: st, runDir: runDir, exited: make(chan struct{}), byHand: true}
-	if err := i.serve(ctx, m, values, svc, signer); err != nil {
+	i := &Instance{Name: m.App, Manifest: m, values: values, store: st, runDir: runDir, exited: make(chan struct{}), byHand: true}
+	if err := i.serve(ctx, svc, signer); err != nil {
 		i.Stop()
 		return nil, err
 	}
 	return i, nil
 }
 
-func (i *Instance) run(ctx context.Context, dir, bin string, m manifest.Manifest, values devconfig.AppValues, svc Services, signer *Signer) error {
-	if err := i.serve(ctx, m, values, svc, signer); err != nil {
+func (i *Instance) run(ctx context.Context, dir, bin string, svc Services, signer *Signer) error {
+	if err := i.serve(ctx, svc, signer); err != nil {
 		return err
 	}
 
@@ -166,7 +168,7 @@ func (i *Instance) run(ctx context.Context, dir, bin string, m manifest.Manifest
 	}()
 
 	select {
-	case <-i.svc.ready:
+	case <-i.srv.Ready():
 		return nil
 	case <-i.exited:
 		return errs.New("E-DEV-004", i.Name+" exited before it was ready", "read the app's log lines above; main must call app.Main")
@@ -177,33 +179,38 @@ func (i *Instance) run(ctx context.Context, dir, bin string, m manifest.Manifest
 	}
 }
 
-// serve serves the runner protocol on runner.sock in the run folder, and the database on
-// mysql.sock when m declares sqldb.
-func (i *Instance) serve(ctx context.Context, m manifest.Manifest, values devconfig.AppValues, svc Services, signer *Signer) error {
-	csrfKey := make([]byte, csrfKeySize)
-	_, _ = rand.Read(csrfKey)
-	i.svc = newRunnerService(m, values, svc.env(), csrfKey, [][]byte{signer.Public()}, i.store)
-	i.svc.byHand = i.byHand
-	i.svc.router = svc.Router
-	if err := i.listenRunner(ctx, i.runDir, filepath.Join(svc.StateDir, "files", m.App), m); err != nil {
-		return err
-	}
-	if m.SQLDB() {
-		return i.serveDatabase(ctx, m.App, svc.MySQL, svc.env())
-	}
-	return nil
-}
-
-// serveDatabase prepares the database of app in env and serves it on mysql.sock through a proxy
-// that logs in as the app's own user.
-func (i *Instance) serveDatabase(ctx context.Context, app string, admin *MySQLAdmin, env devconfig.Env) error {
-	up, err := admin.Prepare(ctx, app, string(env))
+// serve serves the runner protocol on runner.sock in the run folder through the runner server,
+// and the database on mysql.sock when the app declares sqldb, with a fresh form key.
+func (i *Instance) serve(ctx context.Context, svc Services, signer *Signer) error {
+	m := i.Manifest
+	files, err := newFileStore(filepath.Join(svc.StateDir, "files", m.App), m.Stores())
 	if err != nil {
 		return err
 	}
-	return i.listenDatabase(ctx, i.runDir, up, func(err error) {
-		i.store.add(sourceRunner, "ERROR", "database: "+err.Error(), true)
-	})
+	i.files = files
+	i.store.mail.setEmail(m.Email)
+	opts := server.Options{
+		Dir:        i.runDir,
+		Manifest:   m,
+		Env:        string(svc.env()),
+		Version:    "dev",
+		ViewerKeys: []ed25519.PublicKey{signer.Public()},
+		CSRFKey:    newCSRFKey(),
+		Providers:  providers(files, i.store, i.values, svc.Router),
+	}
+	if m.SQLDB() {
+		up, err := svc.MySQL.Prepare(ctx, m.App, string(svc.env()))
+		if err != nil {
+			return err
+		}
+		opts.Database = &up
+		opts.OnDatabaseError = func(err error) { i.store.add(sourceRunner, "ERROR", "database: "+err.Error(), true) }
+	}
+	if i.byHand {
+		opts.OnReady = func() { fmt.Fprintf(i.store.out, "aicoded dev: %s is ready (run by hand)\n", m.App) }
+	}
+	i.srv, err = server.New(ctx, opts)
+	return err
 }
 
 // Stop sends SIGTERM, waits for the app to exit (killing it after 15s) and removes its sockets.
@@ -218,7 +225,12 @@ func (i *Instance) Stop() {
 			<-i.exited
 		}
 	}
-	i.close()
+	if i.srv != nil {
+		_ = i.srv.Close()
+	}
+	if i.files != nil {
+		i.files.close()
+	}
 	if i.byHand {
 		close(i.exited)
 		return

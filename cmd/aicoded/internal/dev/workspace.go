@@ -31,6 +31,7 @@ import (
 	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto/runnerv1"
+	"aicoded.dev/framework/runnerproto/server"
 )
 
 // Config is what Open runs a workspace with.
@@ -156,7 +157,7 @@ func newWorkspace(ctx context.Context, cfg Config, apps []workspace.App, l net.L
 		return nil, err
 	}
 	w := &Workspace{cfg: cfg, out: &lockedWriter{w: cfg.Out}, port: l.Addr().(*net.TCPAddr).Port, signer: signer, changes: newChanges()}
-	w.svc = Services{StateDir: cfg.State, Router: NewRouter(signer), Env: cfg.Dev.Env}
+	w.svc = Services{StateDir: cfg.State, Router: server.NewRouter(signer), Env: cfg.Dev.Env}
 	if cfg.Dev.MySQL != "" {
 		if w.svc.MySQL, err = NewMySQLAdmin(cfg.Dev.MySQL); err != nil {
 			return nil, err
@@ -482,7 +483,7 @@ func (w *Workspace) MailReceive(_ context.Context, app string, m devapi.InboundM
 	if err != nil {
 		return "", err
 	}
-	if _, err := s.store.mail.rules(); err != nil {
+	if !s.store.mail.declared() {
 		return "", fmt.Errorf("%s declares no email in aicoded.yaml", app)
 	}
 	return s.store.mail.deliver(&runnerv1.GetResponse{
@@ -591,4 +592,15 @@ func summarize(id string, spans []devapi.Span) devapi.TraceSummary {
 	slices.Sort(sum.Apps)
 	sum.DurationMS = float64(end.Sub(sum.Start)) / float64(time.Millisecond)
 	return sum
+}
+
+// maxQuote bounds the part of a string the developer sent that an error message repeats.
+const maxQuote = 64
+
+// quote quotes s for an error message, cut at maxQuote bytes.
+func quote(s string) string {
+	if len(s) > maxQuote {
+		return strconv.Quote(strings.ToValidUTF8(s[:maxQuote], "")) + "..."
+	}
+	return strconv.Quote(s)
 }

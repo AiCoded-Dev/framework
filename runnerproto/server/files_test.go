@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"net"
 	"strings"
 	"syscall"
 	"testing"
@@ -176,6 +177,8 @@ func TestFileErrors(t *testing.T) {
 		{syscall.ENOTDIR, connect.CodeFailedPrecondition, "stat a/b.txt: not a directory"},
 		{syscall.ENAMETOOLONG, connect.CodeInvalidArgument, "stat a/b.txt: file name too long"},
 		{errors.New("PROPFIND https://user:pw@dav.example/docs failed"), connect.CodeInternal, "stat a/b.txt: internal error"},
+		{&net.OpError{Op: "dial", Net: "tcp", Err: syscall.ECONNREFUSED}, connect.CodeInternal, "stat a/b.txt: internal error"},
+		{&fs.PathError{Op: "read", Path: "/srv/stores/docs/a/b.txt", Err: syscall.EIO}, connect.CodeInternal, "stat a/b.txt: internal error"},
 		{connect.NewError(connect.CodeUnavailable, errors.New("the store is busy")), connect.CodeUnavailable, "the store is busy"},
 	} {
 		f.files.fail(tc.err)

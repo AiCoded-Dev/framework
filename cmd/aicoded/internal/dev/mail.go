@@ -5,9 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"math"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,15 +13,13 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
-	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/manifest"
-	"aicoded.dev/framework/runnerproto/mailrules"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 )
 
-// mailService is the app's mail catcher. It checks outbound mail against the mail rules and
-// the permission list, and keeps it instead of sending it: the last 1000 messages, with the
-// secret values hidden. It also serves the app's mailbox from memory.
+// mailService is the app's mail catcher. The runner server hands it mail that passed the mail
+// rules and the permission list, and it keeps that mail instead of sending it: the last 1000
+// messages, with the secret values hidden. It also serves the app's mailbox from memory.
 type mailService struct {
 	hide    func() *redactor
 	changes *changes // told of every message sent, received, moved or deleted; may be nil
@@ -51,49 +47,19 @@ func (s *mailService) setEmail(email *manifest.Email) {
 	s.email = email
 }
 
-// rules returns the mail rules, or an error when the app declares none.
-func (s *mailService) rules() (*manifest.Email, error) {
+// declared reports whether the app declares email.
+func (s *mailService) declared() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.email == nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("email is not declared in aicoded.yaml"))
-	}
-	return s.email, nil
+	return s.email != nil
 }
 
-// inDomains reports whether address is in email.to_domains.
-func inDomains(email *manifest.Email, address string) bool {
-	return slices.Contains(email.ToDomains, mailrules.Domain(address))
-}
-
-// errDomain names only the domain of address, so that the error never repeats a person's address.
-func errDomain(address string) error {
-	return connect.NewError(connect.CodeInvalidArgument, errs.New("E-MAIL-003",
-		"the domain "+quote(mailrules.Domain(address))+" is not in email.to_domains in aicoded.yaml",
-		"send only to the domains in email.to_domains; to mail another domain, add it to email.to_domains"))
-}
-
-func (s *mailService) Send(_ context.Context, req *connect.Request[runnerv1.SendRequest]) (*connect.Response[runnerv1.SendResponse], error) {
-	email, err := s.rules()
-	if err != nil {
-		return nil, err
-	}
-	m := req.Msg
-	if err := mailrules.Check(m); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-	for _, a := range slices.Concat(m.GetTo(), m.GetCc(), m.GetBcc()) {
-		if !inDomains(email, a.GetAddress()) {
-			return nil, errDomain(a.GetAddress())
-		}
-	}
-	if r := m.GetReplyTo(); r != nil && !strings.EqualFold(r.GetAddress(), email.From) && !inDomains(email, r.GetAddress()) {
-		return nil, errDomain(r.GetAddress())
-	}
+// Send keeps msg as sent from the address from, once for each idempotency key.
+func (s *mailService) Send(_ context.Context, from string, m *runnerv1.SendRequest) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if id, ok := s.keys[m.GetIdempotencyKey()]; ok {
-		return connect.NewResponse(&runnerv1.SendResponse{Id: id}), nil
+		return id, nil
 	}
 	s.count++
 	id := fmt.Sprintf("sent-%d", s.count)
@@ -105,7 +71,7 @@ func (s *mailService) Send(_ context.Context, req *connect.Request[runnerv1.Send
 	sent := proto.Clone(&runnerv1.GetResponse{
 		Summary: &runnerv1.MessageSummary{
 			Id:       id,
-			From:     &runnerv1.Address{Name: m.GetFromName(), Address: email.From},
+			From:     &runnerv1.Address{Name: m.GetFromName(), Address: from},
 			To:       m.GetTo(),
 			Subject:  m.GetSubject(),
 			DateUnix: time.Now().Unix(),
@@ -117,18 +83,11 @@ func (s *mailService) Send(_ context.Context, req *connect.Request[runnerv1.Send
 	redactMail(sent, s.hide())
 	s.sent.Add(sent)
 	s.changes.signal()
-	return connect.NewResponse(&runnerv1.SendResponse{Id: id}), nil
+	return id, nil
 }
 
-func (s *mailService) List(_ context.Context, req *connect.Request[runnerv1.ListRequest]) (*connect.Response[runnerv1.ListResponse], error) {
-	if _, err := s.rules(); err != nil {
-		return nil, err
-	}
-	folder := req.Msg.GetFolder()
-	if err := mailrules.Folder(folder); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
-	offset, limit := mailrules.Page(int(req.Msg.GetOffset()), int(req.Msg.GetLimit()))
+// List returns a page of the messages in folder, newest first, and how many it holds.
+func (s *mailService) List(_ context.Context, folder string, offset, limit int) ([]*runnerv1.MessageSummary, int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var in []*runnerv1.MessageSummary
@@ -137,13 +96,8 @@ func (s *mailService) List(_ context.Context, req *connect.Request[runnerv1.List
 			in = append(in, proto.Clone(sum).(*runnerv1.MessageSummary))
 		}
 	}
-	total := len(in)
-	if total > math.MaxInt32 {
-		total = math.MaxInt32
-	}
 	start := min(offset, len(in))
-	page := in[start:min(start+limit, len(in))]
-	return connect.NewResponse(&runnerv1.ListResponse{Messages: page, Total: int32(total)}), nil
+	return in[start:min(start+limit, len(in))], len(in), nil
 }
 
 // find returns the index of message id in the mailbox; the caller holds s.mu.
@@ -155,50 +109,38 @@ func (s *mailService) find(id string) (int, error) {
 	return i, nil
 }
 
-func (s *mailService) Get(_ context.Context, req *connect.Request[runnerv1.GetRequest]) (*connect.Response[runnerv1.GetResponse], error) {
-	if _, err := s.rules(); err != nil {
-		return nil, err
-	}
+func (s *mailService) Get(_ context.Context, id string) (*runnerv1.GetResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	i, err := s.find(req.Msg.GetId())
+	i, err := s.find(id)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(proto.Clone(s.box[i]).(*runnerv1.GetResponse)), nil
+	return proto.Clone(s.box[i]).(*runnerv1.GetResponse), nil
 }
 
-func (s *mailService) Delete(_ context.Context, req *connect.Request[runnerv1.DeleteRequest]) (*connect.Response[runnerv1.DeleteResponse], error) {
-	if _, err := s.rules(); err != nil {
-		return nil, err
-	}
+func (s *mailService) Delete(_ context.Context, id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	i, err := s.find(req.Msg.GetId())
+	i, err := s.find(id)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	s.box = slices.Delete(s.box, i, i+1)
 	s.changes.signal()
-	return connect.NewResponse(&runnerv1.DeleteResponse{}), nil
+	return nil
 }
 
-func (s *mailService) Move(_ context.Context, req *connect.Request[runnerv1.MoveRequest]) (*connect.Response[runnerv1.MoveResponse], error) {
-	if _, err := s.rules(); err != nil {
-		return nil, err
-	}
-	if err := mailrules.Folder(req.Msg.GetFolder()); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
+func (s *mailService) Move(_ context.Context, id, folder string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	i, err := s.find(req.Msg.GetId())
+	i, err := s.find(id)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	s.box[i].GetSummary().Folder = req.Msg.GetFolder()
+	s.box[i].GetSummary().Folder = folder
 	s.changes.signal()
-	return connect.NewResponse(&runnerv1.MoveResponse{}), nil
+	return nil
 }
 
 // deliver puts a copy of msg, with the secret values hidden, into the inbox as if it had

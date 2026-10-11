@@ -8,5 +8,6 @@ import (
 
 	_ "aicoded.dev/framework/manifest"
 	_ "aicoded.dev/framework/runnerproto"
+	_ "aicoded.dev/framework/runnerproto/server"
 	_ "google.golang.org/protobuf/proto"
 )

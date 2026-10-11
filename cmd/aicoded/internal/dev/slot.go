@@ -238,7 +238,7 @@ func (w *Workspace) runByHand(ctx context.Context, s *slot, m manifest.Manifest,
 	s.mu.Lock()
 	old := s.inst
 	s.mu.Unlock()
-	if !renew && old != nil && old.byHand && reflect.DeepEqual(old.Manifest, m) && reflect.DeepEqual(old.svc.values, values) {
+	if !renew && old != nil && old.byHand && reflect.DeepEqual(old.Manifest, m) && reflect.DeepEqual(old.values, values) {
 		s.set(devapi.Manual, nil)
 		return
 	}

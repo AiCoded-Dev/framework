@@ -4,6 +4,24 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- A new lint rule, E-LINT-012: app code sets only `__Host-` cookies with `Secure: true` and no
+  `Domain`. Make each cookie with an `http.Cookie` literal whose `Name` is a constant starting with
+  `__Host-`, with `Path: "/"`, and set it with `w.Header().Add("Set-Cookie", c.String())`. Lint
+  also refuses changing a cookie's `Name`, `Secure` or `Domain` to anything else, an empty cookie
+  from `new` or `var`, and a `Set-Cookie` header whose value is not `c.String()` or a constant
+  `__Host-` cookie.
+- On the platform, `auth.Viewer(ctx).Subject` is `<iss>|<sub>`, the issuer of the company login
+  and the person's id there, the same on every visit; `Name` is the name the login shows, and
+  `Groups` and `Roles` are empty for now. The runner serves the login under `/_aicoded/`, which no
+  page folder may be named at any depth (E-GEN-016).
+- `aicoded dev` and the runner of the simulated attacks serve apps through `runnerproto/server`,
+  so an app meets the runner's checks on your computer too: the bounds of file names and spans
+  below, and a call to another app that `services.calls` does not name is refused (E-RPC-008)
+  before the runner looks for the app. An error of a file store that is not about the file, such
+  as a store that cannot be reached, reaches the app as `internal error`.
+- New codes for releases to production, which the platform refuses before anything runs:
+  E-REL-001 to E-REL-008. E-MAIL-008 is a mailbox call where the platform keeps no mailbox yet;
+  sending works there.
 - The runner side of the runner protocol is public, for runners: `runnerproto/server` serves
   `runner.sock` to one app, and `mysql.sock` through `runnerproto/mysqlproxy`, with the building
   blocks behind provider interfaces. It checks what the app sends before any provider sees it,

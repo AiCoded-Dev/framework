@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -85,7 +84,7 @@ func TestChanged(t *testing.T) {
 		"a runner entry": func() { s.store.add(sourceRunner, "ERROR", "boom", false) },
 		"a span":         func() { s.store.addSpans([]*runnerv1.Span{span("0123456789abcdef", "s1000000", "", "GET", 0, "")}) },
 		"a sent mail": func() {
-			_, err := s.store.mail.Send(t.Context(), connect.NewRequest(msg("ana@acme.example")))
+			_, err := s.store.mail.Send(t.Context(), acme.From, msg("ana@acme.example"))
 			require.NoError(t, err)
 		},
 		"a received mail": func() {
@@ -211,9 +210,9 @@ func TestMailQueries(t *testing.T) {
 	for i := range mailCount + 1 {
 		m := msg("ana@acme.example")
 		m.IdempotencyKey, m.Subject = fmt.Sprint(i), fmt.Sprint("message ", i)
-		resp, err := mail.Send(t.Context(), connect.NewRequest(m))
+		id, err := mail.Send(t.Context(), acme.From, m)
 		require.NoError(t, err)
-		assert.Equal(t, fmt.Sprint("sent-", i+1), resp.Msg.GetId())
+		assert.Equal(t, fmt.Sprint("sent-", i+1), id)
 	}
 	id, err := w.MailReceive(t.Context(), "shop", devapi.InboundMail{From: "bob@acme.example", Subject: "Hello", Text: "hi"})
 	require.NoError(t, err)

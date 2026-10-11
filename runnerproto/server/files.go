@@ -69,15 +69,20 @@ func fileError(op, name string, err error) error {
 	return connect.NewError(code, &fs.PathError{Op: op, Path: name, Err: cause})
 }
 
-// fileCause returns the code of err and the cause the app may read.
+// fileCause returns the code of err and the cause the app may read: the errno or fs error err
+// wraps when it is one that fileCode maps to a file code, and "internal error" for any other,
+// such as a provider's failure to reach its storage.
 func fileCause(err error) (connect.Code, error) {
 	var errno syscall.Errno
 	if errors.As(err, &errno) {
-		return fileCode(errno), errno
-	}
-	for _, known := range []error{fs.ErrNotExist, fs.ErrExist, fs.ErrPermission} {
-		if errors.Is(err, known) {
-			return fileCode(known), known
+		if code := fileCode(errno); code != connect.CodeInternal {
+			return code, errno
+		}
+	} else {
+		for _, known := range []error{fs.ErrNotExist, fs.ErrExist, fs.ErrPermission} {
+			if errors.Is(err, known) {
+				return fileCode(known), known
+			}
 		}
 	}
 	return connect.CodeInternal, errors.New("internal error")

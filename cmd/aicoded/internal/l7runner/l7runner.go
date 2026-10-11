@@ -4,11 +4,12 @@
 //	aicoded l7-runner --app <tree> --runner-dir <dir> --control <socket path> --state <dir>
 //	                  [--mysql-dsn-file <file> --mysql-database <name>]
 //
-// It serves the runner protocol to the app as aicoded dev does, in the environment preview, and
-// builds and starts nothing: the pipeline starts the app, as another user, once the runner
-// answers on its control socket. The control API, for the pipeline alone, reports the app's
-// state, mints viewer tokens and returns the app's spans. Nothing listens on TCP, and nothing is
-// logged but one line on stderr when the command fails or cannot open the app's database.
+// It serves the runner protocol to the app through the runner server with the providers of
+// aicoded dev, in the environment preview, and builds and starts nothing: the pipeline starts
+// the app, as another user, once the runner answers on its control socket. The control API, for
+// the pipeline alone, reports the app's state, mints viewer tokens and returns the app's spans.
+// Nothing listens on TCP, and nothing is logged but one line on stderr when the command fails or
+// cannot open the app's database.
 package l7runner
 
 import (
