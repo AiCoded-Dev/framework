@@ -23,7 +23,7 @@ func ExampleOpen() {
 		}
 		_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS notes (
 			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			owner VARCHAR(255) NOT NULL,
+			owner VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL,
 			title VARCHAR(200) NOT NULL,
 			created DATETIME NOT NULL)`)
 		return err

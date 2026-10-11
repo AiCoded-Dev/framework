@@ -37,7 +37,6 @@ not for changing the framework itself. Follow them in every change.
 - Check ownership again in every function of `rpc/` that returns a viewer's records, and refuse
   anyone else with the code `PermissionDenied`.
 - Store `auth.Viewer(ctx).Subject` as a record's owner, never the viewer's name.
-- Pass every value in SQL with a `?` placeholder.
 - Give every mail an `IdempotencyKey` that names what it is about, such as `invoice-42-reminder`,
   so that a retried request never mails twice. Send it after the data it reports is committed.
 - Declare in `aicoded.yaml` every data source, mail address, setting, secret and third-party
@@ -55,8 +54,7 @@ not for changing the framework itself. Follow them in every change.
 ## Never
 
 - Never write a password, key, token or DSN into code, `aicoded.yaml`, tests or docs. Read
-  settings with `config.String` and secrets with `secrets.Get`, and call `Reveal()` only where
-  the value is used.
+  settings with `config.String` and secrets with `secrets.Get`; call `Reveal()` only where used.
 - Never import `os`, `os/exec`, `net`, `syscall`, `reflect`, `unsafe` or `log`, a cloud SDK or
   a database driver: the building blocks reach everything through the runner, and `log/slog`
   logs. App code imports only its own packages, the building blocks, the standard packages that
@@ -88,6 +86,8 @@ not for changing the framework itself. Follow them in every change.
 - Never add a `replace` line to `go.mod`, a `go.work` file or a `vendor` folder: `aicoded check`
   refuses them (E-LINT-011) but for the framework's `replace` that `aicoded init` writes from a
   checkout, and the delivery pipeline refuses every one (E-GATE-001). Require released versions.
+- Never set or read a cookie whose name does not start with `__Host-`. Set each with `Path: "/"`,
+  `Secure: true` and no `Domain`, as `w.Header().Add("Set-Cookie", c.String())` (E-LINT-012).
 - Never add `//nolint` or `#nosec`, skip a test or weaken a check to make it pass. Stop and
   explain the problem to the developer.
 

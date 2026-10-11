@@ -68,11 +68,11 @@ func TestTickets(t *testing.T) {
 	assert.Equal(t, "Leaking hot tap", title(t, d, tap), "a ticket that is not open keeps its text")
 	require.ErrorIs(t, d.SetStatus(ctx, tap, "closed"), ErrNoStatus, "a status is open, in progress or done")
 
-	long := strings.Repeat("s", 255)
-	id, err := d.AddTicket(ctx, long, 101, "Long subject", "The company login issues subjects of up to 255 characters.")
+	long := strings.Repeat("s", 512)
+	id, err := d.AddTicket(ctx, long, 101, "Long subject", "A subject is at most 512 bytes.")
 	require.NoError(t, err)
-	assert.Equal(t, []int64{id}, ids(t, d, auth.Identity{Subject: long, Roles: []string{"staff"}}), "a subject of 255 characters is kept whole")
-	assert.Empty(t, ids(t, d, auth.Identity{Subject: long[:254], Roles: []string{"staff"}}))
+	assert.Equal(t, []int64{id}, ids(t, d, auth.Identity{Subject: long, Roles: []string{"staff"}}), "a subject of 512 bytes is kept whole")
+	assert.Empty(t, ids(t, d, auth.Identity{Subject: long[:511], Roles: []string{"staff"}}))
 }
 
 // ids returns the ids of the tickets that viewer may open.

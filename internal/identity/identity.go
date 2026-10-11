@@ -9,6 +9,7 @@ import (
 
 // Identity is a viewer verified by the company login. The zero Identity has no roles or groups.
 type Identity struct {
+	// Subject is the viewer's stable id, at most 512 bytes; empty only for the zero Identity.
 	Subject string
 	Name    string
 	Groups  []string

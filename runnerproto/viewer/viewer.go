@@ -18,6 +18,9 @@ const Header = "Aicoded-Viewer"
 // MaxLifetime is the longest a token may be valid.
 const MaxLifetime = 60 * time.Second
 
+// MaxSubject bounds the Subject of a viewer, in bytes.
+const MaxSubject = 512
+
 const (
 	clockSkew   = 5 * time.Second
 	maxTokenLen = 8 << 10
@@ -53,7 +56,8 @@ func (c Claims) lifetimeOK() bool {
 		c.Expires-c.IssuedAt <= int64(MaxLifetime/time.Second)
 }
 
-// shapeOK reports whether c has an audience and names either a viewer, or only the calling app.
+// shapeOK reports whether c has an audience and names either a viewer, with a subject of 1 to
+// MaxSubject bytes, or only the calling app.
 func (c Claims) shapeOK() bool {
 	if c.Audience == "" {
 		return false
@@ -61,13 +65,13 @@ func (c Claims) shapeOK() bool {
 	if c.App {
 		return c.Caller != "" && c.Subject == "" && c.Name == "" && len(c.Groups) == 0 && len(c.Roles) == 0
 	}
-	return c.Subject != ""
+	return c.Subject != "" && len(c.Subject) <= MaxSubject
 }
 
 // Sign returns a token for c signed with key.
 func Sign(key ed25519.PrivateKey, c Claims) (string, error) {
 	if !c.shapeOK() {
-		return "", errors.New("viewer token: needs an audience and a subject, or for an app token a caller and no viewer")
+		return "", errors.New("viewer token: needs an audience and a subject of 1 to 512 bytes, or for an app token a caller and no viewer")
 	}
 	if !c.lifetimeOK() {
 		return "", errors.New("viewer token: lifetime must be positive and at most 60s")

@@ -7,8 +7,11 @@ package dev
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
+	"slices"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
+	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto/server"
 )
 
@@ -22,22 +25,35 @@ func newCSRFKey() []byte {
 	return key
 }
 
-// providers returns what the local runner gives the app of a server: the file stores in files,
-// the mail catcher and the spans of st, the values of dev.yaml and the calls of router, which
-// may be nil.
-func providers(files *fileStore, st *store, v devconfig.AppValues, router *server.Router) server.Providers {
-	p := server.Providers{Files: files, Mail: st.mail, Secrets: devValues{v}, Telemetry: st}
+// providers returns what the local runner gives the app of m through a server: the file stores
+// in files, the mail catcher and the spans of st, the values of dev.yaml and the calls of router,
+// which may be nil.
+func providers(m manifest.Manifest, files *fileStore, st *store, v devconfig.AppValues, router *server.Router) server.Providers {
+	p := server.Providers{Files: files, Mail: st.mail, Secrets: devValues{m: m, v: v}, Telemetry: st}
 	if router != nil {
 		p.Calls = router
 	}
 	return p
 }
 
-// devValues hold the values of an app's settings and secrets in dev.yaml.
-type devValues struct{ v devconfig.AppValues }
+// devValues hold the values in dev.yaml of the settings and secrets that the app of m declares,
+// and hand out no other.
+type devValues struct {
+	m manifest.Manifest
+	v devconfig.AppValues
+}
 
 func (d devValues) Secret(_ context.Context, name string) (string, error) {
+	if !slices.Contains(d.m.Secrets, name) {
+		return "", fmt.Errorf("secret %s is not declared", quote(name))
+	}
 	return d.v.Secrets[name], nil
 }
 
-func (d devValues) Settings() map[string]string { return d.v.Settings }
+func (d devValues) Settings() map[string]string {
+	out := make(map[string]string, len(d.m.Settings))
+	for _, n := range d.m.Settings {
+		out[n] = d.v.Settings[n]
+	}
+	return out
+}

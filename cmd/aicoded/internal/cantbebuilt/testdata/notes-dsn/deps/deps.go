@@ -31,7 +31,7 @@ func (d *Deps) Start(ctx context.Context) error {
 	}
 	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS notes (
 		id BIGINT AUTO_INCREMENT PRIMARY KEY,
-		owner VARCHAR(255) COLLATE utf8mb4_0900_bin NOT NULL,
+		owner VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL,
 		title VARCHAR(100) NOT NULL,
 		body TEXT NOT NULL,
 		KEY (owner)

@@ -63,7 +63,7 @@ func FormValues(ctx context.Context, f *Form) {
 func Request(r *web.Request) {
 	slog.Info("agent", "agent", r.Header.Get("User-Agent")) // leak: the request reaches slog.Info
 	slog.Info("path", "path", r.URL.Path)                   // leak: the request reaches slog.Info
-	if c, err := r.Cookie("theme"); err == nil {
+	if c, err := r.Cookie("__Host-theme"); err == nil {
 		fmt.Println(c.Value) // leak: the request reaches fmt.Println
 	}
 	body, _ := io.ReadAll(r.Body)

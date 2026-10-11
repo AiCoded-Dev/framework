@@ -1,4 +1,4 @@
-// Package good sets only __Host- cookies with Secure and no Domain.
+// Package good sets and reads only __Host- cookies with Path=/, Secure and no Domain.
 package good
 
 import (
@@ -16,21 +16,24 @@ func Set(w web.ResponseWriter, v string) {
 	c := &http.Cookie{Name: theme, Value: v, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode}
 	w.Header().Add("Set-Cookie", c.String())
 	c.Value, c.MaxAge = "", -1
-	c.Name, c.Secure, c.Domain = "__Host-other", true, ""
+	c.Name, c.Path, c.Secure, c.Domain = "__Host-other", "/", true, ""
 	w.Header().Add("Set-Cookie", c.String())
+	w.Header().Add("Set-Cookie", (&http.Cookie{Name: theme, Path: "/", Secure: true, MaxAge: -1}).String())
 	w.Header().Set("Set-Cookie", "__Host-lang=pt; Path=/; Secure; HttpOnly")
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Add(key(), v)
-	all := []http.Cookie{{Name: theme, Secure: true}}
+	all := []http.Cookie{{Name: theme, Path: "/", Secure: true}}
 	_ = all
 }
 
 // Read returns the theme a viewer chose.
-func Read(r *http.Request) string {
+func Read(r *web.Request, name string) string {
 	c, err := r.Cookie(theme)
 	if err != nil {
 		return ""
 	}
+	_ = r.CookiesNamed(theme)
+	_, _ = r.Cookie(name)
 	return c.Value
 }
 

@@ -231,7 +231,7 @@ func TestFileWritesAreWholeOrAbsent(t *testing.T) {
 	_, _ = s.CloseAndReceive()
 }
 
-func TestFileWritesStopAtTheLimit(t *testing.T) {
+func TestFileWritesLeaveNothingWhenTheDataFails(t *testing.T) {
 	dir := t.TempDir()
 	files, err := newFileStore(dir, []string{"docs"})
 	require.NoError(t, err)

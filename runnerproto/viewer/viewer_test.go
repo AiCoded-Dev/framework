@@ -157,6 +157,24 @@ func TestVerifyChecksTheShape(t *testing.T) {
 	}
 }
 
+func TestSubjectBound(t *testing.T) {
+	pub, priv := key(t)
+	c := claims()
+	c.Subject = strings.Repeat("s", viewer.MaxSubject)
+	got, err := viewer.Verify([]ed25519.PublicKey{pub}, sign(t, priv, c), "rooms", now)
+	require.NoError(t, err)
+	assert.Equal(t, c.Subject, got.Subject, "a subject of 512 bytes")
+	for _, subject := range []string{"", strings.Repeat("s", viewer.MaxSubject+1)} {
+		c.Subject = subject
+		_, err := viewer.Sign(priv, c)
+		require.Error(t, err, "Sign refuses a subject of %d bytes", len(subject))
+		payload, err := json.Marshal(c)
+		require.NoError(t, err)
+		_, err = viewer.Verify([]ed25519.PublicKey{pub}, raw(priv, payload), "rooms", now)
+		require.ErrorIs(t, err, viewer.ErrMalformed, "Verify refuses a subject of %d bytes", len(subject))
+	}
+}
+
 func TestVerifyIssued(t *testing.T) {
 	pub, priv := key(t)
 	_, otherPriv := key(t)

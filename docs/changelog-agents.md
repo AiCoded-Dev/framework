@@ -4,12 +4,17 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
-- A new lint rule, E-LINT-012: app code sets only `__Host-` cookies with `Secure: true` and no
-  `Domain`. Make each cookie with an `http.Cookie` literal whose `Name` is a constant starting with
-  `__Host-`, with `Path: "/"`, and set it with `w.Header().Add("Set-Cookie", c.String())`. Lint
-  also refuses changing a cookie's `Name`, `Secure` or `Domain` to anything else, an empty cookie
-  from `new` or `var`, and a `Set-Cookie` header whose value is not `c.String()` or a constant
-  `__Host-` cookie.
+- A new lint rule, E-LINT-012: app code sets only `__Host-` cookies with `Path: "/"`,
+  `Secure: true` and no `Domain`, and reads only `__Host-` cookies. Make each cookie with an
+  `http.Cookie` literal whose `Name` is a constant starting with `__Host-`, and set it with
+  `w.Header().Add("Set-Cookie", c.String())`; delete one with the same fields and `MaxAge: -1`.
+  Lint also refuses changing a cookie's `Name`, `Path`, `Secure` or `Domain` to anything else, an
+  empty cookie from `new` or `var`, a `Set-Cookie` header whose value is not `c.String()` or a
+  constant `__Host-` cookie, `r.Cookie` or `r.CookiesNamed` with a constant name that does not
+  start with `__Host-`, and `Add` and `Set` of a header, or `r.Cookie`, passed around as values.
+- `auth.Viewer(ctx).Subject` is at most 512 bytes: the app refuses a viewer token whose subject
+  is empty or longer. Store it in a `VARCHAR(512) COLLATE utf8mb4_0900_bin` column, as the
+  room-maintenance example and the `sqldb` examples now do.
 - On the platform, `auth.Viewer(ctx).Subject` is `<iss>|<sub>`, the issuer of the company login
   and the person's id there, the same on every visit; `Name` is the name the login shows, and
   `Groups` and `Roles` are empty for now. The runner serves the login under `/_aicoded/`, which no

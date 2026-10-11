@@ -835,11 +835,14 @@ func TestTemplate(t *testing.T) {
 func TestCookies(t *testing.T) {
 	const (
 		name   = "E-LINT-012: a cookie that app code sets must have a Name that is a constant starting with __Host-"
+		path   = `E-LINT-012: a cookie that app code sets must have Path: "/"`
 		secure = "E-LINT-012: a cookie that app code sets must have Secure: true"
 		domain = "E-LINT-012: a cookie that app code sets may not have a Domain"
-		zero   = "E-LINT-012: make a cookie with an http.Cookie literal that sets its Name, Secure: true and no Domain, not as an empty value"
-		header = "E-LINT-012: the value of a Set-Cookie header must be the String() of an http.Cookie, or a constant __Host- cookie with Secure and no Domain"
+		zero   = `E-LINT-012: make a cookie with an http.Cookie literal that sets its Name, Path: "/" and Secure: true, and no Domain, not as an empty value`
+		header = "E-LINT-012: the value of a Set-Cookie header must be the String() of an http.Cookie, or a constant __Host- cookie with Path=/, Secure and no Domain"
 		byKey  = `E-LINT-012: set a cookie with w.Header().Add("Set-Cookie", c.String()), not by its key in a header map`
+		read   = "E-LINT-012: app code reads only cookies whose name starts with __Host-, which no other app can set"
+		value  = " is used as a value: call it directly, so that lint reads the cookie it sets or reads"
 	)
 	assert.Equal(t, []string{
 		"bad/bad.go:19: " + name,
@@ -852,8 +855,8 @@ func TestCookies(t *testing.T) {
 		"bad/bad.go:27: " + name,
 		"bad/bad.go:28: " + secure,
 		"bad/bad.go:29: " + domain,
-		"bad/bad.go:30: E-LINT-012: set the Name, Secure and Domain of a cookie only with = and a constant, one field at a time",
-		"bad/bad.go:31: E-LINT-012: app code may not take the address of the Name, Secure or Domain of a cookie",
+		"bad/bad.go:30: E-LINT-012: set the Name, Path, Secure and Domain of a cookie only with = and a constant for each field",
+		"bad/bad.go:31: E-LINT-012: app code may not take the address of the Name, Path, Secure or Domain of a cookie",
 		"bad/bad.go:32: " + zero,
 		"bad/bad.go:33: " + zero,
 		"bad/bad.go:35: " + header,
@@ -865,5 +868,16 @@ func TestCookies(t *testing.T) {
 		"bad/bad.go:41: E-LINT-009: app code may not use http.SetCookie",
 		"bad/bad.go:43: " + secure,
 		"bad/bad.go:44: " + name,
-	}, run(t, "cookies"), "good sets __Host- cookies with Secure and no Domain, reads a cookie and sets other headers, also with a key lint cannot read")
+		"bad/bad.go:50: " + path,
+		"bad/bad.go:51: " + path,
+		"bad/bad.go:52: " + path,
+		"bad/bad.go:54: " + path,
+		"bad/bad.go:55: " + header,
+		"bad/bad.go:60: " + read,
+		"bad/bad.go:61: " + read,
+		"bad/bad.go:62: " + read,
+		"bad/bad.go:63: E-LINT-012: http.Request.Cookie" + value,
+		"bad/bad.go:65: E-LINT-012: http.Header.Add" + value,
+		"bad/bad.go:67: E-LINT-012: http.Header.Set" + value,
+	}, run(t, "cookies"), "good sets __Host- cookies with Path=/, Secure and no Domain, deletes one with MaxAge -1, reads __Host- cookies and one by a name lint cannot read, and sets other headers, also with a key lint cannot read")
 }

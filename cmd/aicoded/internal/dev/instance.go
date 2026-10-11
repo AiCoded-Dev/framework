@@ -196,7 +196,7 @@ func (i *Instance) serve(ctx context.Context, svc Services, signer *Signer) erro
 		Version:    "dev",
 		ViewerKeys: []ed25519.PublicKey{signer.Public()},
 		CSRFKey:    newCSRFKey(),
-		Providers:  providers(files, i.store, i.values, svc.Router),
+		Providers:  providers(m, files, i.store, i.values, svc.Router),
 	}
 	if m.SQLDB() {
 		up, err := svc.MySQL.Prepare(ctx, m.App, string(svc.env()))

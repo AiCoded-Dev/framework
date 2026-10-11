@@ -77,7 +77,7 @@ func NewRunner(ctx context.Context, m manifest.Manifest, opts RunnerOptions) (*R
 		ShareAppSocket:  opts.Share,
 		Database:        opts.Database,
 		OnDatabaseError: opts.OnDatabaseError,
-		Providers:       providers(files, st, opts.Values, nil),
+		Providers:       providers(m, files, st, opts.Values, nil),
 	})
 	if err != nil {
 		files.close()

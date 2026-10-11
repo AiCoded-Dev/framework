@@ -63,7 +63,7 @@ func serveDev(t *testing.T, m manifest.Manifest, v devconfig.AppValues, st *stor
 	t.Cleanup(files.close)
 	srv, err := server.New(t.Context(), server.Options{Dir: dir, Manifest: m, Env: server.EnvPreview,
 		ViewerKeys: []ed25519.PublicKey{make([]byte, ed25519.PublicKeySize)}, CSRFKey: newCSRFKey(),
-		Providers: providers(files, st, v, router)})
+		Providers: providers(m, files, st, v, router)})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = srv.Close() })
 	return socket.Client(filepath.Join(dir, runnerproto.RunnerSocket)), srv, filesDir

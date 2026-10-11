@@ -10,7 +10,9 @@
 // //ssr:access lines in rpc/ which functions they may call. Which records they may see is up to
 // the app:
 //
-//   - Store the viewer's Subject, a stable id, as a record's owner. Name is for showing only.
+//   - Store the viewer's Subject, a stable id of at most 512 bytes, as a record's owner, in a
+//     column that holds it whole and compares it exactly, such as VARCHAR(512) COLLATE
+//     utf8mb4_0900_bin. Name is for showing only.
 //   - Check ownership in the page's Guard, declared with guard="true": return web.Forbidden()
 //     for a record the viewer may not see, or web.NotFound() only when even its existence must
 //     stay hidden.

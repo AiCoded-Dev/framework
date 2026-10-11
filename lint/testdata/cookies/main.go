@@ -1,4 +1,4 @@
-// Command cookies is an app whose code sets cookies, some of which app code may not set.
+// Command cookies is an app whose code sets and reads cookies, some of which app code may not.
 package main
 
 import (

@@ -51,7 +51,9 @@ or, on your computer, the persona you chose.
 | `Groups`, `InGroup("lisbon")` | the groups the person is in |
 | `Authenticated()` | false for the zero viewer, which a context outside a request has |
 
-Decide ownership by `Subject`, never by `Name`, which two people can share.
+Decide ownership by `Subject`, never by `Name`, which two people can share. `Subject` is at most
+512 bytes: the app refuses a viewer token with an empty or a longer one. Store it in a column that
+holds it whole and compares it exactly, byte for byte: `VARCHAR(512) COLLATE utf8mb4_0900_bin`.
 
 On the platform, `Subject` is `<iss>|<sub>`: the issuer of the company login and the person's
 id there, such as `https://login.microsoftonline.com/<tenant>/v2.0|AAAAAAAAAAAAAAAAAAAAAIkzqFVr`.

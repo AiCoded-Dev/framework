@@ -106,6 +106,16 @@ func TestExportAndReady(t *testing.T) {
 	}
 }
 
+func TestDevValuesHandOutOnlyDeclaredNames(t *testing.T) {
+	v := devValues{m: rooms, v: roomsValues}
+	got, err := v.Secret(t.Context(), "api_key")
+	require.NoError(t, err)
+	assert.Equal(t, "s3cret", got)
+	_, err = v.Secret(t.Context(), "other")
+	require.Error(t, err, "a secret the app does not declare")
+	assert.Equal(t, map[string]string{"greeting": "hi"}, v.Settings())
+}
+
 func TestSigner(t *testing.T) {
 	s, err := NewSigner()
 	require.NoError(t, err)

@@ -120,7 +120,7 @@ its text. The database checks ownership too:
   ```
 
 The author is the viewer's `Subject`, never a value the form sends. The `author` column is
-`VARCHAR(255) COLLATE utf8mb4_0900_bin`: wide enough for any subject the company login issues,
+`VARCHAR(512) COLLATE utf8mb4_0900_bin`: wide enough for any subject, which is at most 512 bytes,
 with no case folding and no trailing-space padding, so the database, like the rules, tells
 `Alice` and `alice ` from `alice`.
 
@@ -200,7 +200,7 @@ func (p *DP) Subscribe(ctx context.Context, _ *web.Request, state *ReactiveState
   rooms.
 - `deps/deps_test.go` checks the tables against the MySQL server that `AICODED_TEST_MYSQL_DSN`
   names, skipping without it: the rooms, what each viewer's list holds, exact logins, a subject
-  of 255 characters, edits by the author and by anyone else, and status changes. A list asked
+  of 512 bytes, edits by the author and by anyone else, and status changes. A list asked
   for with no viewer and a status other than open, in progress and done are refused before the
   database is reached.
 - The end-to-end tests in `cmd/aicoded/internal/e2e` run it with the other examples under

@@ -92,9 +92,9 @@ var rules = []Rule{
 	{
 		Code:  "E-LINT-012",
 		Title: "cookie not __Host-",
-		Dont:  "Set a cookie whose name does not start with __Host-, that lacks Secure: true or that has a Domain, or write a Set-Cookie header that is not the String() of an http.Cookie.",
-		Do:    "Make each cookie with an http.Cookie literal whose constant Name starts with __Host-, with Path: \"/\", Secure: true and no Domain, and set it with w.Header().Add(\"Set-Cookie\", c.String()).",
-		Fix:   "name the cookie with a constant that starts with __Host-, set Path: \"/\" and Secure: true, leave out Domain, and set it with w.Header().Add(\"Set-Cookie\", c.String())",
+		Dont:  "Set a cookie whose name does not start with __Host-, that lacks Path: \"/\" or Secure: true or that has a Domain, write a Set-Cookie header that is not the String() of an http.Cookie, or read a cookie whose name does not start with __Host-.",
+		Do:    "Make each cookie with an http.Cookie literal whose constant Name starts with __Host-, with Path: \"/\", Secure: true and no Domain, set it with w.Header().Add(\"Set-Cookie\", c.String()), and read only __Host- cookies.",
+		Fix:   "name the cookie with a constant that starts with __Host-, set Path: \"/\" and Secure: true, leave out Domain, set it with w.Header().Add(\"Set-Cookie\", c.String()), and read only cookies whose name starts with __Host-",
 	},
 }
 

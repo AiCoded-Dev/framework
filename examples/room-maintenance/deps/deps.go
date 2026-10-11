@@ -63,9 +63,8 @@ func (d *Deps) Start(ctx context.Context) error {
 }
 
 // prepare creates the rooms and tickets tables and, when there are no rooms, adds the hotel's
-// rooms. An author is the viewer's Subject, which the company login issues with up to 255
-// characters, and compares exactly, with no case folding and no trailing-space padding, so
-// "Alice" and "alice " are not "alice".
+// rooms. An author is the viewer's Subject, of at most 512 bytes, and compares exactly, with no
+// case folding and no trailing-space padding, so "Alice" and "alice " are not "alice".
 func prepare(ctx context.Context, db *sql.DB) error {
 	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS rooms (
 		number SMALLINT UNSIGNED PRIMARY KEY,
@@ -79,7 +78,7 @@ func prepare(ctx context.Context, db *sql.DB) error {
 		title VARCHAR(100) NOT NULL,
 		details TEXT NOT NULL,
 		status ENUM('open', 'in_progress', 'done') NOT NULL,
-		author VARCHAR(255) COLLATE utf8mb4_0900_bin NOT NULL,
+		author VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL,
 		created DATETIME NOT NULL,
 		updated DATETIME NOT NULL,
 		KEY (author),
