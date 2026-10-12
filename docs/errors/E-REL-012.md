@@ -6,4 +6,4 @@ ending with a letter or digit. Certificate authorities also refuse a label with 
 and fourth characters, which are kept for international names. The app's name or its
 organisation's slug is not such a label, so the app has no host. Nothing was released.
 
-**Fix:** rename the app with `admin apps rename <org> <app> <name>` to a name without `--` as its third and fourth characters; the apps of an organisation whose slug ends with `-` cannot be released, so ask the platform's operator for an organisation with another slug
+**Fix:** when the message names the app's name, rename the app with `admin apps rename <org> <app> <name>` to a name without `--` as its third and fourth characters; when it names the organisation's slug, which never changes, the organisation's apps cannot be released, so ask the platform's operator for an organisation with another slug
