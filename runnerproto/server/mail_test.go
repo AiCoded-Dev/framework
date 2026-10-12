@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto/mailrules"
 	"aicoded.dev/framework/runnerproto/runnerv1"
@@ -143,10 +144,14 @@ func TestMailbox(t *testing.T) {
 
 func TestMailProviderErrors(t *testing.T) {
 	c, f := serve(t)
-	f.mail.fail(connect.NewError(connect.CodeUnimplemented, errors.New("E-MAIL-008: this target keeps no mailbox")))
+	f.mail.fail(CodedError(connect.CodeUnimplemented, "E-MAIL-008", "this target keeps no mailbox", "only send mail here"))
 	_, err := c.mail.List(t.Context(), connect.NewRequest(&runnerv1.ListRequest{Folder: "inbox"}))
 	assert.Equal(t, connect.CodeUnimplemented, connect.CodeOf(err))
-	require.ErrorContains(t, err, "E-MAIL-008", "a target's refusal reaches the app")
+	var ce *connect.Error
+	require.ErrorAs(t, err, &ce, "a target's refusal reaches the app")
+	e, ok := errs.Parse(ce.Message())
+	require.True(t, ok, ce.Message())
+	assert.Equal(t, errs.New("E-MAIL-008", "this target keeps no mailbox", "only send mail here"), e)
 
 	f.mail.fail(errors.New("smtp 10.0.0.9:587: 535 bad password for ops@acme.example"))
 	_, err = c.mail.Send(t.Context(), connect.NewRequest(msg("ana@acme.example")))

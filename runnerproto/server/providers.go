@@ -6,10 +6,20 @@ import (
 	"io"
 	"time"
 
+	"connectrpc.com/connect"
+
+	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto/runnerv1"
 	"aicoded.dev/framework/runnerproto/viewer"
 )
+
+// CodedError returns the error a provider gives the app for a problem of the error catalogue: a
+// *connect.Error of c whose message is the code, such as E-MAIL-008, msg, the one-line fix and the
+// code's docs link, as the framework's own coded errors print them.
+func CodedError(c connect.Code, code, msg, fix string) error {
+	return connect.NewError(c, errs.New(code, msg, fix))
+}
 
 // Providers do the work of the building blocks on the target the app runs on. The server calls
 // them only with what passed its checks.

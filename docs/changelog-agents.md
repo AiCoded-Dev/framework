@@ -4,6 +4,8 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- For runners: `runnerproto/server.CodedError` makes a provider's coded error, which reaches the app
+  as the framework's own coded errors do.
 - E-RUN-005: a call to a building block that the runner where the app runs does not provide, such
   as file stores or sending mail on a target that has none yet. Nothing is read, written or sent.
 - A new lint rule, E-LINT-012: app code sets only `__Host-` cookies with `Path: "/"`,
