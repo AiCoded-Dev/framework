@@ -107,6 +107,9 @@ E-REL-009 refuses the operator's purge of a publish that a live or pending relea
 E-MAIL-009 refuses the operator's adding or verifying a mail domain on a control plane with no
 hosting for mail.
 
+E-RUN-005 refuses an app's call to a building block that the runner where the app runs does not
+provide.
+
 E-LOGIN-001 refuses to sign a person in to an app when the sign-in provider gives them an identity
 of more than 512 bytes.
 
