@@ -86,13 +86,18 @@ Publishing uses these codes:
 
 Releasing uses these codes, each a release that the platform refuses before anything runs:
 
-- E-REL-001: a publish that did not pass the delivery pipeline, or has no built app.
+- E-REL-001: a publish that did not pass the delivery pipeline, has no built app, or has a
+  permission list that the platform cannot read.
 - E-REL-002: an organisation that the platform's operator has not placed on a server.
 - E-REL-003: an app built with a framework older than v0.4.0.
 - E-REL-004, E-REL-005 and E-REL-007: what the platform does not run yet: an audience other than
   everyone in the organisation, settings and secrets, and calls between apps.
-- E-REL-006 and E-REL-008: an `email.from` address in a domain that the organisation has not
-  verified, or that another app of the organisation has.
+- E-REL-006, E-REL-008 and E-REL-013: an `email.from` address in a domain that the organisation
+  has not verified, that another app of the organisation has, or of which the hosting makes no
+  mailbox.
+- E-REL-010: an app that has a release pending already.
+- E-REL-011: a control plane with no hosting for the apps' resources.
+- E-REL-012: an app whose name, or whose organisation's slug, cannot be a label of its host.
 
 E-REL-009 refuses the operator's purge of a publish that a live or pending release runs.
 
