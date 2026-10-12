@@ -19,7 +19,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | REL | the platform's release of a publish to production |
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
-| MAIL | mail rules, and the mailbox where a target keeps none |
+| MAIL | mail rules, the mailbox where a target keeps none, and the operator's mail domains |
 
 Calls between apps use these codes:
 
@@ -95,6 +95,9 @@ Releasing uses these codes, each a release that the platform refuses before anyt
   verified, or that another app of the organisation has.
 
 E-REL-009 refuses the operator's purge of a publish that a live or pending release runs.
+
+E-MAIL-009 refuses the operator's adding or verifying a mail domain on a control plane with no
+hosting for mail.
 
 `aicoded explain <CODE>` prints the page.
 
