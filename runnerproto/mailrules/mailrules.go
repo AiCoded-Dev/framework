@@ -44,7 +44,8 @@ const (
 // Folders are the folders of an app's mailbox.
 var Folders = []string{"inbox", "archive", "trash"}
 
-// headers are the only headers a message may set besides the ones the runner writes.
+// headers are the only headers a message may set besides the ones the runner writes. Each holds
+// message ids, addresses or tokens, which are never encoded, so its value is printable ASCII.
 var headers = []string{"auto-submitted", "in-reply-to", "list-id", "list-unsubscribe", "list-unsubscribe-post", "precedence", "references"}
 
 // domainName is the grammar of a domain in the email section of aicoded.yaml.
@@ -91,6 +92,10 @@ func Check(msg *runnerv1.SendRequest) error {
 		seen[name] = true
 		if err := field("the header "+h.GetName(), h.GetValue(), maxLine); err != nil {
 			return err
+		}
+		if strings.ContainsFunc(h.GetValue(), func(r rune) bool { return r < 0x20 || r > 0x7e }) {
+			return errs.New("E-MAIL-004", fmt.Sprintf("the header %s holds a character that is not printable ASCII", h.GetName()),
+				"write the header's value in printable ASCII, such as <invoice-42@acme.example>, and put other text in the subject or the body")
 		}
 	}
 	if n := len(msg.GetAttachments()); n > MaxAttachments {

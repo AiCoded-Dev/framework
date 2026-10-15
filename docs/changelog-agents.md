@@ -4,6 +4,10 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- The headers a message may set, `In-Reply-To`, `References`, `List-Id`, `List-Unsubscribe`,
+  `List-Unsubscribe-Post`, `Auto-Submitted` and `Precedence`, take printable ASCII only, from space
+  to `~`: any other character, a tab or a letter such as `é` among them, is E-MAIL-004, in
+  `aicoded dev` and on the platform alike.
 - On the platform, the runner remembers a message's `IdempotencyKey` for 24 hours and until it
   restarts: a retry within that time sends nothing again, and one after it sends the message
   again, as a retry after `aicoded dev` restarts does. The mail guide, `mailer.Message` and

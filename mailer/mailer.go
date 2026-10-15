@@ -53,7 +53,7 @@ type Message struct {
 	Text, HTML     string
 	Attachments    []Attachment
 	// Headers may set only In-Reply-To, References, List-Id, List-Unsubscribe,
-	// List-Unsubscribe-Post, Auto-Submitted and Precedence.
+	// List-Unsubscribe-Post, Auto-Submitted and Precedence, each with printable ASCII only.
 	Headers []Header
 }
 

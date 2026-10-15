@@ -37,10 +37,10 @@ _, err := mailer.Send(ctx, mailer.Message{
 - A message has `Text`, `HTML` or both (E-MAIL-006), and may carry `Attachments`, each with a
   `Filename`, a `ContentType` and its `Data`.
 - `Headers` may set only `In-Reply-To`, `References`, `List-Id`, `List-Unsubscribe`,
-  `List-Unsubscribe-Post`, `Auto-Submitted` and `Precedence`; the runner writes the envelope
-  headers, such as `From`, `To` and `Subject`, from the message's fields. A line break or other
-  control character in a header field, a name or an attachment's name is refused, so no one can
-  add hidden recipients (E-MAIL-004).
+  `List-Unsubscribe-Post`, `Auto-Submitted` and `Precedence`, each with printable ASCII only, which
+  is sent as it is; the runner writes the envelope headers, such as `From`, `To` and `Subject`,
+  from the message's fields. A line break or other control character in a header field, a name or
+  an attachment's name is refused, so no one can add hidden recipients (E-MAIL-004).
 - One message goes to at most 50 recipients, carries at most 20 attachments and is at most
   10 MiB (E-MAIL-005). Save large files in a file store instead.
 
