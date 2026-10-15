@@ -178,6 +178,9 @@ func call(ctx context.Context, name string, f func(context.Context, runnerv1conn
 	return nil
 }
 
+// mailErr turns the runner's refusal into the app's error: E-MAN-012 for an app without an email
+// section, ErrNotFound for a message that is not there, and a coded refusal of any status, such as
+// E-MAIL-008, as the coded error it carries.
 func mailErr(err error) error {
 	switch connect.CodeOf(err) {
 	case connect.CodeFailedPrecondition:
@@ -185,12 +188,11 @@ func mailErr(err error) error {
 			"add email: with from and to_domains to aicoded.yaml")
 	case connect.CodeNotFound:
 		return ErrNotFound
-	case connect.CodeInvalidArgument:
-		var ce *connect.Error
-		if errors.As(err, &ce) {
-			if e, ok := errs.Parse(ce.Message()); ok {
-				return e
-			}
+	}
+	var ce *connect.Error
+	if errors.As(err, &ce) {
+		if e, ok := errs.Parse(ce.Message()); ok {
+			return e
 		}
 	}
 	return fmt.Errorf("mailer: %w", err)

@@ -181,6 +181,15 @@ func TestMapErr(t *testing.T) {
 	assert.Equal(t, `"a.bin" is too large`, tooLarge.Msg)
 	unavailable := connect.NewError(connect.CodeUnavailable, errors.New("x"))
 	assert.Equal(t, unavailable, mapErr(unavailable))
+
+	// wire is a coded refusal as it crosses the socket: its text alone.
+	wire := errors.New(errs.New("E-RUN-005", "no file stores here", "keep them out").Error())
+	var coded *errs.Error
+	require.ErrorAs(t, mapErr(connect.NewError(connect.CodeUnimplemented, wire)), &coded)
+	assert.Equal(t, []string{"E-RUN-005", "no file stores here", "keep them out"}, []string{coded.Code, coded.Msg, coded.Fix})
+	refused := mapErr(connect.NewError(connect.CodeFailedPrecondition, wire))
+	require.ErrorIs(t, refused, fs.ErrInvalid)
+	assert.Equal(t, "E-RUN-005", errs.Code(refused))
 }
 
 func TestSpans(t *testing.T) {

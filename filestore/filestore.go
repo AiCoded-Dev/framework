@@ -213,26 +213,39 @@ func badName(op, name string) error {
 
 // mapErr turns the runner's status codes into the io/fs errors callers test with errors.Is.
 // A name the runner refuses is E-FILE-001, as one the client refuses, and a file it refuses as
-// too large E-FILE-002.
+// too large E-FILE-002. Any other coded refusal, such as E-RUN-005, is the coded error it carries,
+// wrapped in the io/fs error of its status when there is one.
 func mapErr(err error) error {
 	var ce *connect.Error
 	if !errors.As(err, &ce) {
 		return err
 	}
+	var is error
 	switch ce.Code() {
 	case connect.CodeNotFound:
-		return fs.ErrNotExist
+		is = fs.ErrNotExist
 	case connect.CodeAlreadyExists:
-		return fs.ErrExist
+		is = fs.ErrExist
 	case connect.CodePermissionDenied:
-		return fs.ErrPermission
+		is = fs.ErrPermission
 	case connect.CodeInvalidArgument:
 		return fmt.Errorf("%w: %w", fs.ErrInvalid, errs.New("E-FILE-001", strings.TrimPrefix(ce.Message(), "E-FILE-001: "), badNameFix))
 	case connect.CodeResourceExhausted:
 		return fmt.Errorf("%w: %w", fs.ErrInvalid, errs.New("E-FILE-002", strings.TrimPrefix(ce.Message(), "E-FILE-002: "),
 			"split the content into several files, or keep large media outside the app"))
 	case connect.CodeFailedPrecondition:
+		is = fs.ErrInvalid
+	}
+	coded, ok := errs.Parse(ce.Message())
+	switch {
+	case ok && is != nil:
+		return fmt.Errorf("%w: %w", is, coded)
+	case ok:
+		return coded
+	case ce.Code() == connect.CodeFailedPrecondition:
 		return fmt.Errorf("%w: %s", fs.ErrInvalid, ce.Message())
+	case is != nil:
+		return is
 	}
 	return err
 }

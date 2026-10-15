@@ -4,6 +4,9 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- A coded refusal of the runner, whatever its status, such as E-MAIL-008 or E-MAIL-010, reaches
+  the app from `mailer` and `filestore` as that coded error, with its fix and docs lines; a file
+  store's keeps the `io/fs` error of its status, such as `fs.ErrInvalid`.
 - E-MAIL-010: on the platform, a message with a new `IdempotencyKey` while 10 000 of the app's
   messages are still being sent, as many as the runner remembers. Nothing is sent; send it again
   once the sends under way end.

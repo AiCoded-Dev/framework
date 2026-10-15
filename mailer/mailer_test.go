@@ -28,9 +28,11 @@ import (
 )
 
 // fake is the MailService of an app whose email.to_domains is [acme.example]. Its mailbox holds
-// the one message m1. With undeclared set, it answers as for an app without an email section.
+// the one message m1. With undeclared set, it answers as for an app without an email section, and
+// with noMailbox as a runner that keeps no mailbox.
 type fake struct {
 	undeclared atomic.Bool
+	noMailbox  atomic.Bool
 	mu         sync.Mutex
 	requests   []*runnerv1.SendRequest
 	list       *runnerv1.ListRequest
@@ -90,8 +92,16 @@ func (f *fake) declared() error {
 	return nil
 }
 
+func (f *fake) mailbox() error {
+	if f.noMailbox.Load() {
+		return connect.NewError(connect.CodeUnimplemented, errs.New("E-MAIL-008", "the platform keeps no mailbox for the app where it runs",
+			"only send mail on this target"))
+	}
+	return f.declared()
+}
+
 func (f *fake) find(id string) error {
-	if err := f.declared(); err != nil || id == "m1" {
+	if err := f.mailbox(); err != nil || id == "m1" {
 		return err
 	}
 	return connect.NewError(connect.CodeNotFound, errors.New("no such message"))
@@ -117,7 +127,7 @@ func (f *fake) List(_ context.Context, r *connect.Request[runnerv1.ListRequest])
 	f.mu.Lock()
 	f.list = r.Msg
 	f.mu.Unlock()
-	if err := f.declared(); err != nil {
+	if err := f.mailbox(); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&runnerv1.ListResponse{Messages: []*runnerv1.MessageSummary{m1.GetSummary()}, Total: 1}), nil
@@ -242,6 +252,21 @@ func TestUndeclared(t *testing.T) {
 	assert.Equal(t, "E-RUN-004", errs.Code(Delete(context.Background(), "m1")))
 }
 
+// A runner's coded refusal of any status reaches the app as its coded error.
+func TestNoMailbox(t *testing.T) {
+	ctx, fake := fakeRunner(t)
+	fake.noMailbox.Store(true)
+	_, _, err := List(ctx, Inbox, 0, 10)
+	var coded *errs.Error
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, []string{"E-MAIL-008", "the platform keeps no mailbox for the app where it runs", "only send mail on this target"},
+		[]string{coded.Code, coded.Msg, coded.Fix})
+	_, err = Get(ctx, "m1")
+	assert.Equal(t, "E-MAIL-008", errs.Code(err))
+	assert.Equal(t, "E-MAIL-008", errs.Code(Delete(ctx, "m1")))
+	assert.Equal(t, "E-MAIL-008", errs.Code(Move(ctx, "m1", Archive)))
+}
+
 func TestMailbox(t *testing.T) {
 	ctx, _ := fakeRunner(t)
 	list, total, err := List(ctx, Inbox, 0, 10)
@@ -325,10 +350,12 @@ func TestMailErr(t *testing.T) {
 	assert.Equal(t, want, e.Error())
 	e = mailErr(connect.NewError(connect.CodeInvalidArgument, errors.New("E-MAIL-005: the message is too large\n  docs: https://runner.example/E-MAIL-005")))
 	assert.Equal(t, want, e.Error(), "a docs line without a fix line")
+	e = mailErr(connect.NewError(connect.CodeResourceExhausted, errors.New("E-MAIL-010: too many messages")))
+	assert.Equal(t, "E-MAIL-010", errs.Code(e), "a coded refusal of any status")
 	for _, err := range []error{
 		connect.NewError(connect.CodeInvalidArgument, errors.New("the request is invalid")),
 		connect.NewError(connect.CodeInvalidArgument, errors.New("e-mail-005: lower case")),
-		connect.NewError(connect.CodeUnavailable, errors.New("E-MAIL-005: not a refusal")),
+		connect.NewError(connect.CodeUnavailable, errors.New("connection refused")),
 	} {
 		require.ErrorIs(t, mailErr(err), err)
 		assert.Empty(t, errs.Code(mailErr(err)), err.Error())
