@@ -93,6 +93,33 @@ func TestLoadKeepsValuesOutOfErrors(t *testing.T) {
 	assert.NotContains(t, err.Error(), "superse")
 }
 
+// A persona may be an alias of another or merge others, and its name is checked as the decoder
+// reads it.
+func TestLoadReadsPersonaAliases(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dev.yaml")
+	yml := `workspaces:
+  /src/other:
+    personas:
+      - &alice {name: alice, roles: [staff]}
+      - &carol {name: carol}
+  /src/apps:
+    personas:
+      - *alice
+      - {<<: *alice, name: bob}
+      - {<<: [*carol, *alice]}
+`
+	require.NoError(t, os.WriteFile(path, []byte(yml), 0o600))
+	ws, err := devconfig.Load(path, "/src/apps")
+	require.NoError(t, err)
+	assert.Equal(t, []devconfig.Persona{{Name: "alice", Roles: []string{"staff"}}, {Name: "bob", Roles: []string{"staff"}},
+		{Name: "carol", Roles: []string{"staff"}}}, ws.Personas)
+
+	require.NoError(t, os.WriteFile(path, []byte(yml+"      - {<<: *alice, name: \"\"}\n"), 0o600))
+	_, err = devconfig.Load(path, "/src/apps")
+	assert.Equal(t, "E-DEV-021", errs.Code(err))
+	require.ErrorContains(t, err, "dev.yaml:11")
+}
+
 func TestLoadRefusesPersonaNames(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "dev.yaml")
 	long := strings.Repeat("a", 513)

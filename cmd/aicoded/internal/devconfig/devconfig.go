@@ -135,7 +135,8 @@ func Load(path, root string) (Workspace, error) {
 }
 
 // badPersona returns the line of the first persona in doc, in any workspace, whose name is empty
-// or longer than viewer.MaxSubject bytes, or 0 when there is none.
+// or longer than viewer.MaxSubject bytes, or 0 when there is none. It reads aliases and merge keys
+// as the decoder does.
 func badPersona(doc *yaml.Node) int {
 	for _, ws := range values(value(root(doc), "workspaces")) {
 		personas := value(ws, "personas")
@@ -143,6 +144,7 @@ func badPersona(doc *yaml.Node) int {
 			continue
 		}
 		for _, p := range personas.Content {
+			p = resolve(p)
 			name := value(p, "name")
 			switch {
 			case name == nil:
@@ -163,14 +165,35 @@ func root(doc *yaml.Node) *yaml.Node {
 	return nil
 }
 
-// value returns the value of key in the mapping n, or nil.
+// resolve returns the node that n names when it is an alias, or n.
+func resolve(n *yaml.Node) *yaml.Node {
+	if n != nil && n.Kind == yaml.AliasNode {
+		return n.Alias
+	}
+	return n
+}
+
+// value returns the value of key in the mapping n, or in the mappings it merges, or nil.
 func value(n *yaml.Node, key string) *yaml.Node {
+	n = resolve(n)
 	if n == nil || n.Kind != yaml.MappingNode {
 		return nil
 	}
+	var merged []*yaml.Node
 	for i := 0; i+1 < len(n.Content); i += 2 {
-		if n.Content[i].Value == key {
-			return n.Content[i+1]
+		k, v := n.Content[i], resolve(n.Content[i+1])
+		switch {
+		case k.ShortTag() == "!!merge" && v.Kind == yaml.SequenceNode:
+			merged = append(merged, v.Content...)
+		case k.ShortTag() == "!!merge":
+			merged = append(merged, v)
+		case k.Value == key:
+			return v
+		}
+	}
+	for _, m := range merged {
+		if v := value(m, key); v != nil {
+			return v
 		}
 	}
 	return nil
@@ -178,12 +201,13 @@ func value(n *yaml.Node, key string) *yaml.Node {
 
 // values returns the values of the mapping n.
 func values(n *yaml.Node) []*yaml.Node {
+	n = resolve(n)
 	if n == nil || n.Kind != yaml.MappingNode {
 		return nil
 	}
 	var out []*yaml.Node
 	for i := 1; i < len(n.Content); i += 2 {
-		out = append(out, n.Content[i])
+		out = append(out, resolve(n.Content[i]))
 	}
 	return out
 }
