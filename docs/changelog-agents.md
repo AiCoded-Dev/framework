@@ -4,6 +4,9 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- E-REL-017: the platform does not run outside services or schedules yet, so it refuses to release
+  an app whose permission list declares `egress` hosts or `schedule` jobs, and its runner refuses
+  to start one. Keep both out of aicoded.yaml, and the code that uses them, until it runs them.
 - A coded refusal of the runner, whatever its status, such as E-MAIL-008 or E-MAIL-010, reaches
   the app from `mailer` and `filestore` as that coded error, with its fix and docs lines; a file
   store's keeps the `io/fs` error of its status, such as `fs.ErrInvalid`.

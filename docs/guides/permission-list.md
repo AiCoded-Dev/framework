@@ -176,7 +176,9 @@ without reading its code.
 - In this version the platform records the other fields, `class`, `owner`, `audience`, `egress`,
   `schedule`, `size`, `resources` and `ttl`, and shows each change to the permission list in the
   app's change record.
-- Holding the app to them comes later, with app types, limits and production.
+- Holding the app to them comes later, with app types, limits and production. Until the platform
+  runs outside services and schedules, a release to production refuses a permission list with
+  `egress` hosts or `schedule` jobs (E-REL-017).
 
 ## See also
 
