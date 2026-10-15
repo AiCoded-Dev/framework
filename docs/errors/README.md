@@ -115,8 +115,8 @@ provide.
 
 E-RUN-006 is the page a runner shows, to everyone, for an app whose audience it cannot check.
 
-E-LOGIN-001 refuses to sign a person in to an app when the sign-in provider gives them an identity
-of more than 512 bytes.
+E-LOGIN-001 refuses to sign a person in to an app when the sign-in provider gives them an issuer or
+a subject of more than 255 characters, or an identity of more than 512 bytes joined.
 
 `aicoded explain <CODE>` prints the page.
 
