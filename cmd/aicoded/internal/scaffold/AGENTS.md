@@ -37,8 +37,8 @@ not for changing the framework itself. Follow them in every change.
 - Check ownership again in every function of `rpc/` that returns a viewer's records, and refuse
   anyone else with the code `PermissionDenied`.
 - Store `auth.Viewer(ctx).Subject` as a record's owner, never the viewer's name.
-- Give every mail an `IdempotencyKey` that names what it is about, such as `invoice-42-reminder`,
-  so that a retried request never mails twice. Send it after the data it reports is committed.
+- Give every mail an `IdempotencyKey` that names what it is about, such as `invoice-42-reminder`:
+  a retry within 24 hours sends nothing again. Send it after the data it reports is committed.
 - Declare in `aicoded.yaml` every data source, mail address, setting, secret and third-party
   module the app uses.
 - Open the database and file stores once, in `OnStart`. Use the context of the request or call

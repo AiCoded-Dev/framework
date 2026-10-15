@@ -41,7 +41,9 @@ type Header struct{ Name, Value string }
 
 // Message is one outbound email. The sender is always the app's address; FromName sets the
 // name shown with it. IdempotencyKey is required: sending the same key again returns the first
-// message's id and sends nothing, so a retried request never mails twice.
+// message's id and sends nothing while the runner remembers the key. On the platform it remembers
+// a key for 24 hours and until it restarts, and aicoded dev until it restarts; a retry after that
+// sends the message again.
 type Message struct {
 	IdempotencyKey string
 	FromName       string

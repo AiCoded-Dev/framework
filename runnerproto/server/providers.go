@@ -86,8 +86,9 @@ type Files interface {
 // names. A target that keeps no mailbox answers List, Get, Delete and Move with a
 // *connect.Error, E-MAIL-008 with the code Unimplemented.
 type Mail interface {
-	// Send sends msg from the address from, the app's email.from, at most once for each
-	// idempotency key, and returns the message's id.
+	// Send sends msg from the address from, the app's email.from, once for each idempotency key
+	// it remembers, and returns the message's id; a repeated key it remembers returns the first
+	// message's id.
 	Send(ctx context.Context, from string, msg *runnerv1.SendRequest) (string, error)
 	// List returns a page of the messages in folder, newest first, and how many it holds.
 	List(ctx context.Context, folder string, offset, limit int) ([]*runnerv1.MessageSummary, int, error)

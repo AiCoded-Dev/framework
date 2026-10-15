@@ -89,8 +89,8 @@ func plainAddress(s string) bool {
 	return err == nil && a.Name == "" && a.Address == s
 }
 
-// contactKey names a message by its sender, topic and text, so that a message sent twice is
-// mailed once.
+// contactKey names a message by its sender, topic and text, so that a message sent twice within
+// a day is mailed once.
 func contactKey(subject, topic, message string) string {
 	sum := sha256.Sum256([]byte(subject + "\x00" + topic + "\x00" + message))
 	return "contact-" + hex.EncodeToString(sum[:16])

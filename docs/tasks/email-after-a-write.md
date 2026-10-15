@@ -110,19 +110,20 @@ example and mails the team.
    ```
 
    - The key names what the mail is about, `user-<login>`. Sending the same key again sends
-     nothing and returns the first message's id, so a retried request never mails twice. A
-     message without a key is refused (E-MAIL-001).
+     nothing and returns the first message's id while the runner remembers the key: on the
+     platform for 24 hours and until the runner restarts, and in `aicoded dev` until it restarts.
+     A retry after that sends the mail again. A message without a key is refused (E-MAIL-001).
    - A transaction that fails sends nothing, since the mail goes only after the commit.
    - The sender is always `email.from`, and the domain of every recipient must be one of
      `to_domains` exactly (E-MAIL-003).
 4. When the mail is about what the viewer wrote rather than about a record, make the key from
    what was written. The contact form hashes the viewer, the topic and the message, so a message
-   sent twice is mailed once:
+   sent twice within a day is mailed once:
 
    <!-- code: examples/people/pages/contact/dataprovider.go contactKey -->
    ```go
-   // contactKey names a message by its sender, topic and text, so that a message sent twice is
-   // mailed once.
+   // contactKey names a message by its sender, topic and text, so that a message sent twice within
+   // a day is mailed once.
    func contactKey(subject, topic, message string) string {
    	sum := sha256.Sum256([]byte(subject + "\x00" + topic + "\x00" + message))
    	return "contact-" + hex.EncodeToString(sum[:16])

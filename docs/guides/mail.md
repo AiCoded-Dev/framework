@@ -2,8 +2,8 @@
 
 `mailer.Send` sends a message from the app's one address to the domains its permission list
 allows, and `mailer.List` and `mailer.Get` read the app's mailbox. The runner checks every message
-against the mail rules, and every message carries an idempotency key, so a retried request never
-mails twice.
+against the mail rules, and every message carries an idempotency key, so a retried request does not
+mail again while the runner remembers the key: on the platform for 24 hours.
 
 ## Declaring mail
 
@@ -48,20 +48,24 @@ _, err := mailer.Send(ctx, mailer.Message{
 
 `IdempotencyKey` is required: a stable name of what the message is about, 1 to 128 visible ASCII
 characters without spaces, such as `invoice-42-reminder` (E-MAIL-001). Sending the same key again
-sends nothing and returns the first message's id.
+sends nothing and returns the first message's id, as long as the runner remembers the key: on the
+platform for 24 hours and until the runner restarts, and in `aicoded dev` until it restarts. A
+retry after that sends the message again, and so does the retry of a send that failed. Rarely, when
+the runner cannot tell whether a message went out, as when the mail server's answer is lost, its
+retry sends it a second time.
 
 - Name the event, not the attempt: `user-alice` for "alice was added", never a random value or
   the time.
 - When the key must come from what a viewer wrote, hash it: the contact form of the people
   example uses the first 32 hex digits of the SHA-256 of the viewer, the topic and the message,
-  so the same message sent twice is mailed once and the key holds no personal data.
+  so the same message sent twice within a day is mailed once and the key holds no personal data.
 
 ## After a write
 
 Send the mail after the data it tells about is committed. `ProcessAdd` in the people example
 commits the new user and its photos first, then mails the team. If the mail fails, the user stays
 added, and the key `user-<login>` makes sure the team hears of each user once, however often it is
-sent.
+sent while the runner remembers the key.
 
 ## The mailbox
 
