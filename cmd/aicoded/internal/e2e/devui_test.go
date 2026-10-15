@@ -217,7 +217,8 @@ func TestDevUI(t *testing.T) {
 	t.Run("live log line", func(t *testing.T) {
 		ctx := browser(t)
 		msg := "live " + rand.Text()
-		require.NoError(t, chromedp.Run(ctx, chromedp.Navigate(d.login), chromedp.Navigate(d.base+"/logs?app=desk")))
+		require.NoError(t, chromedp.Run(ctx, chromedp.Navigate(d.login), chromedp.Navigate(d.base+"/logs?app=desk"),
+			chromedp.WaitReady("#entries")))
 		d.call(t, "/say?msg="+url.QueryEscape(msg))
 		require.NoError(t, chromedp.Run(ctx, until(rowWith("#entries", msg))))
 		noViolations(t, ctx)
