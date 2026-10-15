@@ -30,7 +30,7 @@ constant, a cookie value taken from the request or from decoded data and set aga
 `.String()`, the cookies that `r.Cookies()` or the `Cookie` header hand out, empty cookies inside
 containers (`make([]http.Cookie, n)`, arrays, struct fields), or cookies that the page's
 JavaScript sets; on the platform the runner is the boundary. It takes `Domain` off every cookie an
-app sets and refuses one without `Secure`.
+app sets and drops one without `Secure`.
 
 ```go
 c := &http.Cookie{Name: "__Host-theme", Value: theme, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode}
