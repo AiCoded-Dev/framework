@@ -4,6 +4,9 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- E-REL-016: the platform's operator cannot rename or archive an app that has a release live or
+  pending. Such an app keeps its name and stays active until releases can be stopped, so publish
+  under another name as a new app.
 - The headers a message may set, `In-Reply-To`, `References`, `List-Id`, `List-Unsubscribe`,
   `List-Unsubscribe-Post`, `Auto-Submitted` and `Precedence`, take printable ASCII only, from space
   to `~`: any other character, a tab or a letter such as `é` among them, is E-MAIL-004, in

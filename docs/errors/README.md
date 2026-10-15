@@ -104,6 +104,9 @@ Releasing uses these codes, each a release that the platform refuses before anyt
 
 E-REL-009 refuses the operator's purge of a publish that a live or pending release runs.
 
+E-REL-016 refuses the operator's renaming or archiving of an app that has a release live or
+pending: such an app keeps its name and stays active until releases can be stopped.
+
 E-MAIL-009 refuses the operator's adding or verifying a mail domain on a control plane with no
 hosting for mail.
 
