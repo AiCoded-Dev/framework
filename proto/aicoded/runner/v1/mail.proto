@@ -9,8 +9,9 @@ option go_package = "aicoded.dev/framework/runnerproto/runnerv1;runnerv1";
 // or be email.from. An app without an email section gets FAILED_PRECONDITION; a message the rules
 // refuse INVALID_ARGUMENT with a coded message; an unknown message id NOT_FOUND.
 service MailService {
-  // Send is idempotent per idempotency_key: a repeated key returns the first message's id and
-  // sends nothing.
+  // Send sends a message once for each idempotency_key the runner remembers: a repeated key it
+  // remembers returns the first message's id and sends nothing. How long a runner remembers a key
+  // is its own; a repeated key it no longer remembers sends again.
   rpc Send(SendRequest) returns (SendResponse);
   rpc List(ListRequest) returns (ListResponse);
   rpc Get(GetRequest) returns (GetResponse);

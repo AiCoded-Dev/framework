@@ -47,8 +47,9 @@ const (
 
 // MailServiceClient is a client for the aicoded.runner.v1.MailService service.
 type MailServiceClient interface {
-	// Send is idempotent per idempotency_key: a repeated key returns the first message's id and
-	// sends nothing.
+	// Send sends a message once for each idempotency_key the runner remembers: a repeated key it
+	// remembers returns the first message's id and sends nothing. How long a runner remembers a key
+	// is its own; a repeated key it no longer remembers sends again.
 	Send(context.Context, *connect.Request[runnerv1.SendRequest]) (*connect.Response[runnerv1.SendResponse], error)
 	List(context.Context, *connect.Request[runnerv1.ListRequest]) (*connect.Response[runnerv1.ListResponse], error)
 	Get(context.Context, *connect.Request[runnerv1.GetRequest]) (*connect.Response[runnerv1.GetResponse], error)
@@ -136,8 +137,9 @@ func (c *mailServiceClient) Move(ctx context.Context, req *connect.Request[runne
 
 // MailServiceHandler is an implementation of the aicoded.runner.v1.MailService service.
 type MailServiceHandler interface {
-	// Send is idempotent per idempotency_key: a repeated key returns the first message's id and
-	// sends nothing.
+	// Send sends a message once for each idempotency_key the runner remembers: a repeated key it
+	// remembers returns the first message's id and sends nothing. How long a runner remembers a key
+	// is its own; a repeated key it no longer remembers sends again.
 	Send(context.Context, *connect.Request[runnerv1.SendRequest]) (*connect.Response[runnerv1.SendResponse], error)
 	List(context.Context, *connect.Request[runnerv1.ListRequest]) (*connect.Response[runnerv1.ListResponse], error)
 	Get(context.Context, *connect.Request[runnerv1.GetRequest]) (*connect.Response[runnerv1.GetResponse], error)
