@@ -17,10 +17,10 @@ Changes to the API that AI assistants build apps with. Newest first.
   `List-Unsubscribe-Post`, `Auto-Submitted` and `Precedence`, take printable ASCII only, from space
   to `~`: any other character, a tab or a letter such as `é` among them, is E-MAIL-004, in
   `aicoded dev` and on the platform alike.
-- On the platform, the runner remembers a message's `IdempotencyKey` for 24 hours and until it
-  restarts: a retry within that time sends nothing again, and one after it sends the message
-  again, as a retry after `aicoded dev` restarts does. The mail guide, `mailer.Message` and
-  E-MAIL-001 say so.
+- On the platform, the runner remembers the app's last 10 000 `IdempotencyKey`s within 24 hours,
+  until it restarts: a retry of a key it remembers sends nothing again, and one of a key it forgot
+  sends the message again, as a retry after `aicoded dev` restarts does. The mail guide,
+  `mailer.Message` and E-MAIL-001 say so.
 - E-RUN-006: on the platform, the runner shows an app only to `audience.internal: [everyone]` with
   no `external`; for any other audience every page of the app is this error, although a release
   refuses such a permission list already (E-REL-004). The runner serves the login under

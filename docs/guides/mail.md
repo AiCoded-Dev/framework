@@ -3,7 +3,8 @@
 `mailer.Send` sends a message from the app's one address to the domains its permission list
 allows, and `mailer.List` and `mailer.Get` read the app's mailbox. The runner checks every message
 against the mail rules, and every message carries an idempotency key, so a retried request does not
-mail again while the runner remembers the key: on the platform for 24 hours.
+mail again while the runner remembers the key: on the platform, the app's last 10 000 keys within
+24 hours.
 
 ## Declaring mail
 
@@ -49,10 +50,11 @@ _, err := mailer.Send(ctx, mailer.Message{
 `IdempotencyKey` is required: a stable name of what the message is about, 1 to 128 visible ASCII
 characters without spaces, such as `invoice-42-reminder` (E-MAIL-001). Sending the same key again
 sends nothing and returns the first message's id, as long as the runner remembers the key: on the
-platform for 24 hours and until the runner restarts, and in `aicoded dev` until it restarts. A
-retry after that sends the message again, and so does the retry of a send that failed. Rarely, when
-the runner cannot tell whether a message went out, as when the mail server's answer is lost, its
-retry sends it a second time.
+platform, the app's last 10 000 keys within 24 hours, until the runner restarts, and in
+`aicoded dev` until it restarts. A retry after that sends the message again, and so does the retry
+of a send that failed. Rarely, when the runner cannot tell whether a message went out, as when the
+mail server's answer is lost, its retry sends it a second time. While 10 000 of the app's messages
+are still being sent, a message with a new key is refused (E-MAIL-010).
 
 - Name the event, not the attempt: `user-alice` for "alice was added", never a random value or
   the time.
