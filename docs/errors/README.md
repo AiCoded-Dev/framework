@@ -19,7 +19,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | REL | the platform's release of a publish to production |
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
-| MAIL | mail rules, the mailbox where a target keeps none, and the operator's mail domains |
+| MAIL | mail rules, the mailbox where a target keeps none, the messages a runner takes at once, and the operator's mail domains |
 | LOGIN | company login, which signs people in to the apps of their organisation |
 
 Calls between apps use these codes:
@@ -109,6 +109,9 @@ pending: such an app keeps its name and stays active until releases can be stopp
 
 E-MAIL-009 refuses the operator's adding or verifying a mail domain on a control plane with no
 hosting for mail.
+
+E-MAIL-010 refuses, on the platform, a message with a new idempotency key while 10 000 of the app's
+messages are being sent.
 
 E-RUN-005 refuses an app's call to a building block that the runner where the app runs does not
 provide.
