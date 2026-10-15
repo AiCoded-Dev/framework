@@ -113,8 +113,8 @@ hosting for mail.
 E-MAIL-010 refuses, on the platform, a message with a new idempotency key while 10 000 of the app's
 messages are being sent.
 
-E-RUN-005 refuses an app's call to a building block that the runner where the app runs does not
-provide.
+E-RUN-005 refuses an app's call to a building block the runner does not provide; none on the
+platform today.
 
 E-RUN-006 is the page a runner shows, to everyone, for an app whose audience it cannot check.
 

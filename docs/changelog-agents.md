@@ -25,8 +25,8 @@ Changes to the API that AI assistants build apps with. Newest first.
   no `external`; for any other audience every page of the app is this error, although a release
   refuses such a permission list already (E-REL-004). The runner serves the login under
   `/_aicoded/` and answers every path there itself, but the app's assets under `/_aicoded/assets/`.
-- E-RUN-005: a call to a building block that the runner where the app runs does not provide, such
-  as file stores or sending mail on a target that has none yet. Nothing is read, written or sent.
+- E-RUN-005: a call to a building block the runner does not provide; none on the platform today.
+  Nothing is read, written or sent.
 - A new lint rule, E-LINT-012: app code sets only `__Host-` cookies with `Path: "/"`,
   `Secure: true` and no `Domain`, and reads only `__Host-` cookies. Make each cookie with an
   `http.Cookie` literal whose `Name` is a constant starting with `__Host-`, and set it with
