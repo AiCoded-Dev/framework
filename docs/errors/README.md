@@ -100,6 +100,8 @@ Releasing uses these codes, each a release that the platform refuses before anyt
 - E-REL-014: an `email.from` other than the address the app sends from already.
 - E-REL-010: an app that has a release pending already.
 - E-REL-011: a building block that the target of the organisation's server does not offer.
+- E-REL-018: an app whose resources were made at another target than the one of its organisation's
+  server.
 - E-REL-012: an app whose name, or whose organisation's slug, cannot be a label of its host.
 - E-REL-015: an app that the platform's operator archived.
 

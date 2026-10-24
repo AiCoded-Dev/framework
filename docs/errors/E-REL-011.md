@@ -6,4 +6,4 @@ target does not offer one of the building blocks the app's permission list decla
 platform cannot reach the target at all, and then it offers none. Rather than release an app that
 would miss a building block, the platform refuses the release. Nothing was released.
 
-**Fix:** remove the building block from aicoded.yaml and the code that uses it, run aicoded check, commit and publish again; or ask the platform's operator to place the organisation on a server whose target offers it, then release again
+**Fix:** remove the building block from aicoded.yaml and the code that uses it, run aicoded check, commit and publish again; or ask the platform's operator to place the organisation on a server whose target offers it, or to make the target reachable, then release again
