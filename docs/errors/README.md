@@ -122,6 +122,9 @@ platform today.
 
 E-RUN-006 is the page a runner shows, to everyone, for an app whose audience it cannot check.
 
+E-RUN-009 is the reason a runner reports for a release whose grants it cannot tell the resources
+of: a grant of a kind it does not know, or two of one kind.
+
 E-LOGIN-001 refuses to sign a person in to an app when the sign-in provider gives them an issuer or
 a subject of more than 255 characters, or an identity of more than 512 bytes joined.
 
