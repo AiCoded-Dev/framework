@@ -42,12 +42,21 @@ type anyAppIn struct {
 	App string `json:"app,omitempty" jsonschema:"only this app; leave it out for every app"`
 }
 
+// onPlatform are the fields of the telemetry tools that read an app on the platform, not in
+// aicoded dev: its environment, preview or production, and the times to read between.
+type onPlatform struct {
+	Env   string `json:"env,omitempty"`
+	Since string `json:"since,omitempty"`
+	Until string `json:"until,omitempty"`
+}
+
 type logsIn struct {
 	App      string `json:"app,omitempty"`
 	Level    string `json:"level,omitempty"`
 	TraceID  string `json:"trace_id,omitempty"`
 	Contains string `json:"contains,omitempty"`
 	Limit    int    `json:"limit,omitempty"`
+	onPlatform
 }
 
 type logsOut struct {
@@ -58,6 +67,7 @@ type tracesIn struct {
 	App        string `json:"app,omitempty"`
 	ErrorsOnly bool   `json:"errors_only,omitempty"`
 	Limit      int    `json:"limit,omitempty"`
+	onPlatform
 }
 
 type tracesOut struct {
@@ -65,7 +75,9 @@ type tracesOut struct {
 }
 
 type traceIn struct {
+	App     string `json:"app,omitempty"`
 	TraceID string `json:"trace_id"`
+	onPlatform
 }
 
 type mailListOut struct {
@@ -105,32 +117,41 @@ type releaseStatusIn struct {
 	ID string `json:"id"`
 }
 
+// envProps are the properties of the telemetry tools' schemas that onPlatform holds.
+const envProps = `"env": {"type": "string", "enum": ["dev", "preview", "production"], "description": "dev, the default, reads aicoded dev on this computer; preview or production reads the app on the platform, with the person's sign-in, which needs app"},
+    "since": {"type": "string", "description": "on the platform, read from this time on: RFC 3339, or a while ago such as 30m, 6h or 2d; an hour before until by default, at most 7 days before it"},
+    "until": {"type": "string", "description": "on the platform, read up to this time, as since takes it; now by default"}`
+
 // The schemas of the tools whose inputs have limits the Go types cannot state.
 var (
 	logsSchema = json.RawMessage(`{
   "type": "object",
   "properties": {
-    "app": {"type": "string", "description": "only this app; leave it out for every app"},
+    "app": {"type": "string", "description": "only this app; leave it out for every app in aicoded dev; on the platform, the app to read"},
     "level": {"type": "string", "enum": ["DEBUG", "INFO", "WARN", "ERROR"], "description": "the lowest level shown; lines that are not JSON count as INFO"},
     "trace_id": {"type": "string", "pattern": "^[0-9a-f]{32}$", "description": "only the lines of this trace"},
-    "contains": {"type": "string", "description": "only lines whose message contains this text, in any case"},
-    "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "description": "the newest lines to return; 100 when left out"}
+    "contains": {"type": "string", "description": "only lines whose message contains this text, in any case; in aicoded dev only"},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "description": "the newest lines to return; 100 when left out"},
+    ` + envProps + `
   },
   "additionalProperties": false
 }`)
 	tracesSchema = json.RawMessage(`{
   "type": "object",
   "properties": {
-    "app": {"type": "string", "description": "only traces this app has spans in; leave it out for every app"},
+    "app": {"type": "string", "description": "only traces this app has spans in; leave it out for every app in aicoded dev; on the platform, the app to read"},
     "errors_only": {"type": "boolean", "description": "only traces with a failed span"},
-    "limit": {"type": "integer", "minimum": 1, "maximum": 200, "description": "the newest traces to return; 20 when left out"}
+    "limit": {"type": "integer", "minimum": 1, "maximum": 200, "description": "the newest traces to return; 20 when left out"},
+    ` + envProps + `
   },
   "additionalProperties": false
 }`)
 	traceSchema = json.RawMessage(`{
   "type": "object",
   "properties": {
-    "trace_id": {"type": "string", "pattern": "^[0-9a-f]{32}$", "description": "a trace id from traces or logs"}
+    "trace_id": {"type": "string", "pattern": "^[0-9a-f]{32}$", "description": "a trace id from traces or logs"},
+    "app": {"type": "string", "description": "on the platform, the app whose spans of the trace to show; aicoded dev shows every app's"},
+    ` + envProps + `
   },
   "required": ["trace_id"],
   "additionalProperties": false
@@ -194,9 +215,17 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 	tool(srv, &mcpsdk.Tool{Name: "howto", Annotations: readOnly,
 		Description: "Show a page of the docs: a guide such as guides/overview, a task recipe such as tasks/add-form, the changelog for AI assistants, or the page of an error code such as E-DEV-001. Without a topic, list every page with its summary."},
 		howto)
-	tool(srv, &mcpsdk.Tool{Name: "logs", Annotations: readOnly, InputSchema: logsSchema,
-		Description: "Show the newest log lines of the apps in aicoded dev, oldest first. Secret values are hidden."},
+	reads := &mcpsdk.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &yes}
+	tool(srv, &mcpsdk.Tool{Name: "logs", Annotations: reads, InputSchema: logsSchema,
+		Description: "Show the newest log lines of the apps in aicoded dev, oldest first, with secret values hidden; or, with env preview or production, those of one app on the platform, which in production may hold what the app's users entered."},
 		func(ctx context.Context, in logsIn) (logsOut, error) {
+			if in.platform() {
+				es, err := s.platformLogs(ctx, in)
+				return logsOut{Entries: es}, err
+			}
+			if err := in.dev(); err != nil {
+				return logsOut{}, err
+			}
 			if err := validApp(in.App, true); err != nil {
 				return logsOut{}, err
 			}
@@ -204,9 +233,16 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 			es, err := withDev(ctx, s, func(b devapi.Backend) ([]devapi.LogEntry, error) { return b.Logs(ctx, q) })
 			return logsOut{Entries: es}, err
 		})
-	tool(srv, &mcpsdk.Tool{Name: "traces", Annotations: readOnly, InputSchema: tracesSchema,
-		Description: "List the newest traces in aicoded dev: each request or call across the apps, with its root span, apps, span count and duration."},
+	tool(srv, &mcpsdk.Tool{Name: "traces", Annotations: reads, InputSchema: tracesSchema,
+		Description: "List the newest traces in aicoded dev, or, with env preview or production, of one app on the platform: each request or call, with its root span, apps, span count and duration."},
 		func(ctx context.Context, in tracesIn) (tracesOut, error) {
+			if in.platform() {
+				ts, err := s.platformTraces(ctx, in)
+				return tracesOut{Traces: ts}, err
+			}
+			if err := in.dev(); err != nil {
+				return tracesOut{}, err
+			}
 			if err := validApp(in.App, true); err != nil {
 				return tracesOut{}, err
 			}
@@ -214,9 +250,15 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 			ts, err := withDev(ctx, s, func(b devapi.Backend) ([]devapi.TraceSummary, error) { return b.Traces(ctx, q) })
 			return tracesOut{Traces: ts}, err
 		})
-	tool(srv, &mcpsdk.Tool{Name: "trace", Annotations: readOnly, InputSchema: traceSchema,
-		Description: "Show every span of one trace, in start order."},
+	tool(srv, &mcpsdk.Tool{Name: "trace", Annotations: reads, InputSchema: traceSchema,
+		Description: "Show every span of one trace in aicoded dev, or, with env preview or production, the spans of one app in it on the platform, in start order."},
 		func(ctx context.Context, in traceIn) (devapi.Trace, error) {
+			if in.platform() {
+				return s.platformTrace(ctx, in)
+			}
+			if err := in.dev(); err != nil {
+				return devapi.Trace{}, err
+			}
 			return withDev(ctx, s, func(b devapi.Backend) (devapi.Trace, error) { return b.Trace(ctx, in.TraceID) })
 		})
 	tool(srv, &mcpsdk.Tool{Name: "mail_list", Annotations: readOnly,

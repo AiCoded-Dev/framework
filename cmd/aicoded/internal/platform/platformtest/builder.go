@@ -105,6 +105,11 @@ type builder struct {
 	newApps  int
 	uploads  []Upload
 	requests map[string]int
+	// telemetry holds the rows each telemetry path answers, reads the queries it got, and
+	// unavailable whether it answers 503.
+	telemetry   map[string][]map[string]any
+	reads       []string
+	unavailable bool
 }
 
 type fakeApp struct {
@@ -137,7 +142,7 @@ type uploadMeta struct {
 }
 
 func newBuilder() builder {
-	return builder{newApps: 10, answers: []Publish{Passed()}, requests: map[string]int{}}
+	return builder{newApps: 10, answers: []Publish{Passed()}, requests: map[string]int{}, telemetry: map[string][]map[string]any{}}
 }
 
 // SignIn keeps a sign-in to the fake in the test's home, as aicoded login does.
@@ -207,6 +212,28 @@ func (p *Platform) RefuseUpload(status int, errorCode, code string) {
 	p.refused = &refusal{status, errorCode, code}
 }
 
+// Telemetry makes the read of path, such as /v1/apps/demo/logs, answer the rows whose env is the
+// query's, whatever the rest of its query.
+func (p *Platform) Telemetry(path string, rows ...map[string]any) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.telemetry[path] = rows
+}
+
+// TelemetryDown makes every read of telemetry answer 503 with E-PUB-018, or none again.
+func (p *Platform) TelemetryDown(down bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.unavailable = down
+}
+
+// Reads returns the reads of telemetry the fake answered, each its path and query, oldest first.
+func (p *Platform) Reads() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.reads)
+}
+
 // Uploads returns the publishes the fake took, oldest first.
 func (p *Platform) Uploads() []Upload {
 	p.mu.Lock()
@@ -226,7 +253,8 @@ func (p *Platform) scopes() []string {
 	scopes := []string{"app:create"}
 	for _, a := range p.apps {
 		if a.owner == Email && !a.archived {
-			scopes = append(scopes, fmt.Sprintf("app:%d:release:request", a.id), fmt.Sprintf("app:%d:status", a.id))
+			scopes = append(scopes, fmt.Sprintf("app:%d:release:request", a.id), fmt.Sprintf("app:%d:status", a.id),
+				fmt.Sprintf("app:%d:logs", a.id))
 		}
 	}
 	return scopes
@@ -344,6 +372,37 @@ func (p *Platform) getPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	apiError(w, http.StatusNotFound, "not_found", "E-PUB-013", "no publish has that id")
+}
+
+// readTelemetry answers a read of an app's logs, spans or trace as the platform does: the app must be
+// one the token carries the logs scope of, and env preview or production.
+func (p *Platform) readTelemetry(w http.ResponseWriter, r *http.Request) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	s, ok := p.builderCall(w, r, nil)
+	if !ok {
+		return
+	}
+	a := p.app(r.PathValue("app"))
+	switch env := r.URL.Query().Get("env"); {
+	case a == nil:
+		apiError(w, http.StatusNotFound, "not_found", "E-PUB-019", "your organisation has no app of that name")
+	case !may(s, a, "logs"):
+		apiError(w, http.StatusForbidden, "insufficient_scope", "E-PUB-005", "the app belongs to another builder, or your sign-in does not carry it yet")
+	case env != "preview" && env != "production":
+		apiError(w, http.StatusBadRequest, "invalid_request", "E-PUB-017", "env must be preview or production")
+	case p.unavailable:
+		apiError(w, http.StatusServiceUnavailable, "temporarily_unavailable", "E-PUB-018", "logs and traces cannot be read right now")
+	default:
+		p.reads = append(p.reads, r.URL.RequestURI())
+		rows := []map[string]any{}
+		for _, row := range p.telemetry[r.URL.Path] {
+			if row["env"] == env {
+				rows = append(rows, row)
+			}
+		}
+		writeJSON(w, http.StatusOK, rows)
+	}
 }
 
 // may reports whether the session may use the app with the scope app:<id>:<scope>: the person owns

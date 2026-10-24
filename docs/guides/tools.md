@@ -21,6 +21,8 @@ aicoded logout
 aicoded whoami [--json]
 aicoded publish [--app <name>] [-m <summary>] [--no-wait] [dir]
 aicoded status [--json] <id>
+aicoded logs --env <env> [--app <name>] [--since <time>] [--until <time>] [--level <level>] [--trace <id>] [--limit <n>] [--json] [dir]
+aicoded traces --env <env> [--app <name>] [--since <time>] [--until <time>] [--trace <id>] [--limit <n>] [--json] [dir]
 aicoded version
 ```
 
@@ -268,6 +270,50 @@ failed, was refused or ended in error. An id is `pub_` and 26 lowercase letters 
 exits with 2. An id the platform does not know in your organisation is E-PUB-013, a publish of
 another builder's app E-PUB-005, and one of an app of yours that was archived E-PUB-006.
 
+## aicoded logs
+
+`aicoded logs --env <env> [dir]` prints the log lines of an app on the platform, oldest first, as
+`<time> <level> <text>`, with `trace <id>` after a line that has a trace. It reads the app that
+`aicoded.yaml` in `dir` names, or the one `--app` names, with your sign-in, which must carry the
+app: you must own it.
+
+- `--env` is `preview` or `production`, and must be given; without it `aicoded logs` exits with 2.
+  Production logs hold what the app logged while people used it: read them only to find out why
+  something fails, and never copy them anywhere else.
+- `--since` and `--until` bound the time read: a time in RFC 3339, such as
+  `2026-10-24T09:00:00Z`, or a while ago, such as `30m`, `6h` or `2d`. By default it reads the
+  hour up to now. They may be at most 7 days apart (E-PUB-015), and the platform keeps 30 days.
+- `--level` keeps the lines of that level or higher: `DEBUG`, `INFO`, `WARN` or `ERROR`. `--trace`
+  keeps the lines of one trace.
+- `--limit` is how many of the newest lines to read: 100 by default, at most 1000 (E-PUB-016).
+- `--json` prints the lines as JSON, newest first, each with its `time`, `level`, `body`,
+  `trace_id`, `span_id`, `release`, `env` and `attributes`.
+- A value that is not valid is E-PUB-017, an app of another builder E-PUB-005, an app that is not
+  on the platform E-PUB-019, and a platform that cannot read logs right now E-PUB-018. Like
+  `aicoded status`, it refreshes your sign-in once when it lacks the app's scope.
+
+Every read is written to the platform's audit log: who read which app, and the range and filters,
+never the lines.
+
+```text
+2026-10-24T09:12:03.120Z INFO  page served
+2026-10-24T09:12:04.007Z ERROR form failed: E-SQL-001  trace 4bf92f3577b34da6a3ce929d0e0e4736
+```
+
+## aicoded traces
+
+`aicoded traces --env <env> [dir]` prints the spans of an app on the platform, oldest first, each
+with its name, duration, `failed` and its status message when it failed, and its trace. With
+`--trace <id>` it prints the spans of that trace instead, indented below the span that holds
+them. It takes `--app`, `--since`, `--until`, `--limit` and `--json` as `aicoded logs` does, and
+refuses the same way; `--limit` does not apply to `--trace`, which reads at most 1000 spans. With
+`--trace 4bf92f3577b34da6a3ce929d0e0e4736` it prints:
+
+```text
+2026-10-24T09:12:04.001Z HTTP POST  12.4ms  failed: E-SQL-001
+2026-10-24T09:12:04.003Z   sql.exec  9.1ms  failed: E-SQL-001
+```
+
 ## The control socket
 
 One `aicoded dev` runs per workspace. It serves a control socket, `control.sock` with mode 600,
@@ -287,4 +333,5 @@ checkout built in for `aicoded init`.
 - [aicoded dev](dev.md): running the apps.
 - [MCP](mcp.md): these tools for your AI assistant.
 - [Publishing](publishing.md): sending an app to the platform, and reading the outcome.
+- [Telemetry](telemetry.md): what the logs and traces hold.
 - [The error catalogue](../errors/README.md): every code with its page.

@@ -1,9 +1,9 @@
 # MCP: the tools for your AI assistant
 
 `aicoded mcp` gives your AI assistant the tools of `aicoded` over MCP: it creates apps, checks
-them, previews them in `aicoded dev`, reads what went wrong, publishes them, and reads these docs
-offline. No tool runs a shell command or takes a file path, and nothing a tool returns holds a
-secret value.
+them, previews them in `aicoded dev`, reads what went wrong, publishes them, reads their logs and
+traces on the platform, and reads these docs offline. No tool runs a shell command or takes a file
+path, and nothing a tool returns of `aicoded dev` holds a secret value.
 
 ## Setting it up
 
@@ -27,17 +27,22 @@ The MCP setup page of the dev UI shows the commands for Claude Code and Codex, a
 | `what_broke` | lists what went wrong: the problems of failed apps, the last error log lines and the last failed spans |
 | `describe` | summarises the apps, as `aicoded describe` does |
 | `howto` | shows a page of the docs, or lists them all with their summaries |
-| `logs` | the newest log lines of the apps, by app, lowest level, trace or text |
-| `traces` | the newest traces, each request or call across the apps, by app or with an error only |
-| `trace` | every span of one trace, in start order |
+| `logs` | the newest log lines of the apps, by app, lowest level, trace or text; with `env` `preview` or `production`, those of one app on the platform, as `aicoded logs` reads them |
+| `traces` | the newest traces, each request or call across the apps, by app or with an error only; with `env`, those of one app on the platform, from its newest 1000 spans |
+| `trace` | every span of one trace, in start order; with `env` and `app`, that app's spans of the trace on the platform |
 | `mail_list` | the mail an app sent, which `aicoded dev` caught, and its mailbox, newest first |
 | `mail_get` | one message from `mail_list` |
 | `mail_receive` | delivers a test message to an app's inbox, as if it had arrived by mail |
 | `publish` | does what `aicoded publish --no-wait` does for an app, with a summary of the change, and returns the publish's id, app and commit, whether it created the app, and what to do next |
 | `release_status` | shows a publish by its id, as `aicoded status --json` does: its status, steps, problems and notes |
 
-All but `app_create`, `check`, `preview`, `mail_receive` and `publish` only read. `publish` and
-`release_status` reach the platform, with your sign-in; the other tools stay on this computer.
+All but `app_create`, `check`, `preview`, `mail_receive` and `publish` only read. `publish`,
+`release_status`, and `logs`, `traces` and `trace` with `env` set to `preview` or `production`,
+reach the platform, with your sign-in; the other tools stay on this computer. On the platform,
+`logs`, `traces` and `trace` also take `since` and `until`, as `aicoded logs` does, read one app,
+which you must own, and refuse `contains`; their answers have the shape of those of
+`aicoded dev`. Production logs hold what the app logged while people used it, which can be
+personal data: the server tells the assistant to read them only when you ask.
 Tools name apps by the `app:` line of their `aicoded.yaml`, never by a folder or a path
 (E-DEV-014).
 

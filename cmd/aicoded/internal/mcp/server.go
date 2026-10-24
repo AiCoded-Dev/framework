@@ -1,6 +1,7 @@
 // Package mcp is aicoded mcp: the local MCP server through which an AI assistant creates,
-// checks, previews, debugs and publishes the apps of one workspace. It has no shell tool, no
-// tool takes a path, and nothing it returns holds a secret value.
+// checks, previews, debugs and publishes the apps of one workspace, and reads their logs and
+// traces on the platform. It has no shell tool, no tool takes a path, and nothing it returns of
+// aicoded dev holds a secret value; an app's logs on the platform hold what the app wrote.
 package mcp
 
 import (
@@ -42,7 +43,10 @@ and modules by hand.
 aicoded generate writes its access and services sections, every *_gen.go and *_gen.ts file,
 pages/assets_gen/ and .aicoded/. Never edit them.
 describe summarises the apps, and howto with an error code such as E-DEV-001 explains it.
-logs, traces, trace, mail_list and mail_get show what aicoded dev saw; mail_receive delivers a test mail.`
+logs, traces, trace, mail_list and mail_get show what aicoded dev saw; mail_receive delivers a test mail.
+With env preview or production, logs, traces and trace read one app on the platform with the
+person's sign-in. Read them only when the person asks, such as to find why a published app fails:
+production logs may hold what the app's users entered.`
 
 // Serve runs the MCP server for the workspace dir over t until the client leaves or ctx ends.
 // An aicoded dev it hosts itself writes its lines to logs.

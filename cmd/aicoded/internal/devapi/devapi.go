@@ -4,6 +4,7 @@ package devapi
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
@@ -84,6 +85,33 @@ type TraceSummary struct {
 	Start      time.Time `json:"start"`
 	DurationMS float64   `json:"duration_ms"`
 	Error      bool      `json:"error,omitempty"`
+}
+
+// Summarize sums up spans, the spans of the trace id. Its root is the earliest span whose parent
+// is not in the trace.
+func Summarize(id string, spans []Span) TraceSummary {
+	slices.SortStableFunc(spans, func(a, b Span) int { return a.Start.Compare(b.Start) })
+	ids := map[string]bool{}
+	for _, sp := range spans {
+		ids[sp.SpanID] = true
+	}
+	sum := TraceSummary{TraceID: id, Root: spans[0].Name, Apps: []string{}, Spans: len(spans), Start: spans[0].Start}
+	if i := slices.IndexFunc(spans, func(sp Span) bool { return !ids[sp.ParentID] }); i >= 0 {
+		sum.Root = spans[i].Name
+	}
+	end := sum.Start
+	for _, sp := range spans {
+		if e := sp.Start.Add(time.Duration(sp.DurationMS * float64(time.Millisecond))); e.After(end) {
+			end = e
+		}
+		if !slices.Contains(sum.Apps, sp.App) {
+			sum.Apps = append(sum.Apps, sp.App)
+		}
+		sum.Error = sum.Error || sp.Error != ""
+	}
+	slices.Sort(sum.Apps)
+	sum.DurationMS = float64(end.Sub(sum.Start)) / float64(time.Millisecond)
+	return sum
 }
 
 // TraceQuery selects traces.

@@ -28,7 +28,7 @@ const (
 )
 
 // Platform is a fake platform. Everyone who signs in gets the scope app:create, and the scopes
-// app:<id>:release:request and app:<id>:status of each app they own that is not archived, as they
+// app:<id>:release:request, app:<id>:status and app:<id>:logs of each app they own that is not archived, as they
 // are when the token is issued.
 type Platform struct {
 	// URL is its address, http://127.0.0.1:<port>.
@@ -77,6 +77,9 @@ func New(t testing.TB) *Platform {
 	mux.HandleFunc("POST /v1/apps/get", p.getApp)
 	mux.HandleFunc("POST /v1/publishes/create", p.createPublish)
 	mux.HandleFunc("POST /v1/publishes/get", p.getPublish)
+	mux.HandleFunc("GET /v1/apps/{app}/logs", p.readTelemetry)
+	mux.HandleFunc("GET /v1/apps/{app}/spans", p.readTelemetry)
+	mux.HandleFunc("GET /v1/apps/{app}/traces/{trace}", p.readTelemetry)
 	p.srv = httptest.NewServer(mux)
 	t.Cleanup(p.srv.Close)
 	p.URL = p.srv.URL

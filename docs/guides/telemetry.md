@@ -65,6 +65,23 @@ defer func() {
 as a tree with their timing, attributes and errors, and through the `traces` and `trace` tools of
 `aicoded mcp`. Exporting the spans to the company's tools comes later, and so do metrics.
 
+## On the platform
+
+On the platform, the runner sends each app's output lines and spans to the platform's store, which
+keeps them 30 days, marked with the app's organisation, name, release and environment, `preview`
+or `production`, whatever the app sets. A line that is JSON keeps its level, trace and span; any
+other line counts as `INFO`. You read them with your sign-in, for an app you own:
+
+- `aicoded logs --env production` prints the newest log lines, and `aicoded traces --env
+  production` the newest spans, or with `--trace <id>` those of one trace; see
+  [the tools](tools.md);
+- the `logs`, `traces` and `trace` tools of `aicoded mcp` read the same with `env` set to
+  `preview` or `production`; see [MCP](mcp.md).
+
+One read covers at most 7 days and 1000 rows, and the platform writes it to its audit log: who read
+which app, the range and the filters, never the rows. On the platform, secret values are not
+hidden from the logs: never log one.
+
 ## No personal data
 
 Logs and spans reach more tools and more people than the app's data does. Never put personal

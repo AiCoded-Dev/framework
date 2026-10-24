@@ -234,7 +234,7 @@ func TestToolsListed(t *testing.T) {
 		"what_broke": true, "describe": true, "howto": true, "logs": true, "traces": true, "trace": true,
 		"mail_list": true, "mail_get": true, "release_status": true,
 	}, readOnly)
-	assert.ElementsMatch(t, []string{"publish", "release_status"}, openWorld, "only these reach the platform")
+	assert.ElementsMatch(t, []string{"publish", "release_status", "logs", "traces", "trace"}, openWorld, "only these reach the platform")
 }
 
 func TestHowto(t *testing.T) {
@@ -585,4 +585,68 @@ func TestPublishTools(t *testing.T) {
 		assert.NotRegexp(t, `aicoded_(at|rt)_`, string(data))
 	}
 	assert.NotRegexp(t, `aicoded_(at|rt)_`, logs.String())
+}
+
+func TestTelemetryToolsReadThePlatform(t *testing.T) {
+	home := testhome.Set(t)
+	p := platformtest.New(t)
+	t.Setenv("AICODED_PLATFORM", p.URL)
+	p.SignIn(t)
+	p.AddApp("demo", platformtest.Email)
+	p.AddApp("payroll", "bo@acme.example")
+	trace := strings.Repeat("ab", 16)
+	root := map[string]any{"time": "2026-10-24T12:00:00Z", "trace_id": trace, "span_id": "1111111111111111", "name": "HTTP GET",
+		"duration_ns": 3000000, "status": "Error", "env": "production"}
+	child := map[string]any{"time": "2026-10-24T12:00:00.001Z", "trace_id": trace, "span_id": "2222222222222222",
+		"parent_span_id": "1111111111111111", "name": "sql.query", "duration_ns": 1000000, "status": "Ok", "env": "production"}
+	p.Telemetry("/v1/apps/demo/spans", child, root)
+	p.Telemetry("/v1/apps/demo/traces/"+trace, child, root)
+	p.Telemetry("/v1/apps/demo/logs",
+		map[string]any{"time": "2026-10-24T12:00:01Z", "level": "ERROR", "body": "failed", "trace_id": trace, "env": "production"},
+		map[string]any{"time": "2026-10-24T12:00:00Z", "level": "INFO", "body": "started", "env": "production"})
+	cs := connect(t, t.TempDir(), io.Discard)
+	var answers []*mcpsdk.CallToolResult
+	callTool := func(tool string, args map[string]any) *mcpsdk.CallToolResult {
+		res := call(t, cs, tool, args)
+		answers = append(answers, res)
+		return res
+	}
+
+	logs := result[logsOut](t, callTool("logs", map[string]any{"app": "demo", "env": "production", "since": "2h", "level": "INFO"}))
+	at := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
+	assert.Equal(t, []devapi.LogEntry{{Time: at, App: "demo", Source: "app", Level: "INFO", Message: "started"},
+		{Time: at.Add(time.Second), App: "demo", Source: "app", Level: "ERROR", Message: "failed", TraceID: trace}}, logs.Entries, "oldest first")
+	traces := result[tracesOut](t, callTool("traces", map[string]any{"app": "demo", "env": "production", "errors_only": true}))
+	assert.Equal(t, []devapi.TraceSummary{{TraceID: trace, Root: "HTTP GET", Apps: []string{"demo"}, Spans: 2, Start: at, DurationMS: 3,
+		Error: true}}, traces.Traces)
+	got := result[devapi.Trace](t, callTool("trace", map[string]any{"app": "demo", "env": "production", "trace_id": trace}))
+	assert.Equal(t, devapi.Trace{TraceID: trace, Spans: []devapi.Span{
+		{TraceID: trace, SpanID: "1111111111111111", App: "demo", Name: "HTTP GET", Start: at, DurationMS: 3, Error: "failed"},
+		{TraceID: trace, SpanID: "2222222222222222", ParentID: "1111111111111111", App: "demo", Name: "sql.query",
+			Start: at.Add(time.Millisecond), DurationMS: 1}}}, got, "in start order")
+	reads := p.Reads()
+	require.Len(t, reads, 3)
+	assert.Regexp(t, `^/v1/apps/demo/logs\?env=production&level=INFO&since=`, reads[0])
+	assert.Equal(t, "/v1/apps/demo/spans?env=production&limit=1000", reads[1])
+
+	for want, args := range map[string]map[string]any{
+		"E-DEV-014":          {"env": "production"},
+		"E-PUB-005":          {"app": "payroll", "env": "production"},
+		"E-PUB-019":          {"app": "nope", "env": "preview"},
+		"E-PUB-017":          {"app": "demo", "env": "production", "since": "yesterday"},
+		"contains works in":  {"app": "demo", "env": "production", "contains": "x"},
+		"since and until":    {"since": "1h"},
+		`validating "argume`: {"app": "demo", "env": "staging"},
+	} {
+		res := callTool("logs", args)
+		assert.True(t, res.IsError, want)
+		assert.Contains(t, text(res), want)
+	}
+	assert.Len(t, p.Reads(), 3)
+	assert.NoDirExists(t, filepath.Join(home, ".local", "state"), "no aicoded dev was started")
+	for _, res := range answers {
+		data, err := json.Marshal(res)
+		require.NoError(t, err)
+		assert.NotRegexp(t, `aicoded_(at|rt)_`, string(data))
+	}
 }

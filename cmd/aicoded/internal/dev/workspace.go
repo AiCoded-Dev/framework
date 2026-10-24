@@ -433,7 +433,7 @@ func (w *Workspace) Traces(_ context.Context, q devapi.TraceQuery) ([]devapi.Tra
 	}
 	out := []devapi.TraceSummary{}
 	for id, spans := range byTrace {
-		if sum := summarize(id, spans); sum.Error || !q.ErrorsOnly {
+		if sum := devapi.Summarize(id, spans); sum.Error || !q.ErrorsOnly {
 			out = append(out, sum)
 		}
 	}
@@ -565,33 +565,6 @@ func spansOf(slots []*slot, keep func(devapi.Span) bool) []devapi.Span {
 // newest returns the last n entries of es.
 func newest(es []devapi.LogEntry, n int) []devapi.LogEntry {
 	return es[max(0, len(es)-n):]
-}
-
-// summarize sums up spans, the spans of the trace id. Its root is the earliest span whose parent
-// is not in the trace.
-func summarize(id string, spans []devapi.Span) devapi.TraceSummary {
-	slices.SortStableFunc(spans, func(a, b devapi.Span) int { return a.Start.Compare(b.Start) })
-	ids := map[string]bool{}
-	for _, sp := range spans {
-		ids[sp.SpanID] = true
-	}
-	sum := devapi.TraceSummary{TraceID: id, Root: spans[0].Name, Apps: []string{}, Spans: len(spans), Start: spans[0].Start}
-	if i := slices.IndexFunc(spans, func(sp devapi.Span) bool { return !ids[sp.ParentID] }); i >= 0 {
-		sum.Root = spans[i].Name
-	}
-	end := sum.Start
-	for _, sp := range spans {
-		if e := sp.Start.Add(time.Duration(sp.DurationMS * float64(time.Millisecond))); e.After(end) {
-			end = e
-		}
-		if !slices.Contains(sum.Apps, sp.App) {
-			sum.Apps = append(sum.Apps, sp.App)
-		}
-		sum.Error = sum.Error || sp.Error != ""
-	}
-	slices.Sort(sum.Apps)
-	sum.DurationMS = float64(end.Sub(sum.Start)) / float64(time.Millisecond)
-	return sum
 }
 
 // maxQuote bounds the part of a string the developer sent that an error message repeats.

@@ -4,6 +4,15 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `aicoded logs` and `aicoded traces` read an app's log lines and spans on the platform, with
+  `--env preview` or `--env production`, which must be given, and `--since`, `--until`, `--level`,
+  `--trace` and `--limit`; and the `logs`, `traces` and `trace` tools of `aicoded mcp` take `env`,
+  `since` and `until` to do the same, in the shape of their answers from `aicoded dev`. A sign-in
+  reads only apps it owns, at most 7 days and 1000 rows at once. New codes: E-PUB-015 (over 7
+  days), E-PUB-016 (over 1000 rows), E-PUB-017 (a value that is not valid), E-PUB-018 (logs and
+  traces cannot be read right now) and E-PUB-019 (no app of that name on the platform). Read
+  production only when the developer asks: its logs hold what the app's users entered. See
+  `tasks/find-why-a-published-app-fails`.
 - For runners: `(*runnerproto/server.Server).SetDatabase` and `(*mysqlproxy.Proxy).SetUpstream`
   change where `mysql.sock` logs in from the next connection the app opens; open sessions keep
   their login. Nothing changes for apps.

@@ -36,10 +36,12 @@ commands:
   init <name>     create the app <name> in a new folder of that name in the current directory
   login           sign in to the platform, in the browser or with a code (--org <organisation>, --device)
   logout          revoke the sign-in to the platform and forget it
+  logs [dir]      print the log lines of the app in dir on the platform (--env preview|production, --app, --since, --until, --level, --trace, --limit, --json)
   mcp [dir]       serve the AI assistant's tools for the apps in dir over MCP on stdin and stdout
   publish [dir]   send the commit of the app in dir to the platform's delivery pipeline and wait for the outcome (--app <name>, -m <summary>, --no-wait)
   rpc add <app>   let the app in the current directory call the functions of the app named <app>
   status <id>     print the steps, problems and outcome of a publish (--json)
+  traces [dir]    print the spans of the app in dir on the platform, or of one trace (--env preview|production, --app, --since, --until, --trace, --limit, --json)
   version         print the aicoded version
   whoami          print the organisation, email and scopes of the sign-in to the platform (--json)
 `
@@ -155,6 +157,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runLogin(args, stdout, stderr)
 	case "logout":
 		return runLogout(args, stdout, stderr)
+	case "logs":
+		return runLogs(args, stdout, stderr)
 	case "mcp":
 		return runMCP(args, stdout, stderr)
 	case "publish":
@@ -174,6 +178,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return exitOK
 	case "status":
 		return runStatus(args, stdout, stderr)
+	case "traces":
+		return runTraces(args, stdout, stderr)
 	case "version":
 		if _, code, ok := parseArgs(newFlags("version", stderr), args, 0, 0); !ok {
 			return code

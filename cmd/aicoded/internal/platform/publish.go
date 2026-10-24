@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
@@ -55,6 +56,11 @@ var fixes = map[string]string{
 	"E-PUB-012": "install git 2.31 or later, and put it on PATH",
 	"E-PUB-013": "copy the id from what aicoded publish or the publish tool printed",
 	"E-PUB-014": "make sure git fsck finds nothing wrong in the app's repository, commit again, then run aicoded publish",
+	"E-PUB-015": "ask for 7 days or less: move --since and --until closer together, and read a longer time in several reads",
+	"E-PUB-016": "ask for 1000 rows or fewer, and narrow the time range with --since and --until to see the others",
+	"E-PUB-017": "give env preview or production, times in RFC 3339, a level of DEBUG, INFO, WARN or ERROR, and a trace id of 32 of 0-9 and a-f",
+	"E-PUB-018": "try again in a few minutes: the platform cannot read logs and traces right now",
+	"E-PUB-019": "check the app's name on the app: line of its aicoded.yaml: an app is on the platform once it is published",
 }
 
 // Fix returns the fix of the code of publishing, or the advice to read its docs page.
@@ -151,7 +157,7 @@ func (c *Client) App(ctx context.Context, name string) (app App, found bool, err
 	if err != nil {
 		return App{}, false, err
 	}
-	status, answer, err := c.call(ctx, c.HTTP, "/v1/apps/get", "application/json", body, maxAnswer)
+	status, answer, err := c.call(ctx, c.HTTP, http.MethodPost, "/v1/apps/get", "application/json", body, maxAnswer)
 	if err != nil {
 		return App{}, false, err
 	}
@@ -218,7 +224,7 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 	}
 	upload := *c.HTTP
 	upload.Timeout = uploadTimeout
-	status, answer, err := c.call(ctx, &upload, "/v1/publishes/create", mw.FormDataContentType(), body.Bytes(), maxAnswer)
+	status, answer, err := c.call(ctx, &upload, http.MethodPost, "/v1/publishes/create", mw.FormDataContentType(), body.Bytes(), maxAnswer)
 	if err != nil {
 		return Created{}, err
 	}
@@ -254,7 +260,7 @@ func (c *Client) Publish(ctx context.Context, id string) (Publish, error) {
 	if err != nil {
 		return Publish{}, err
 	}
-	status, answer, err := c.call(ctx, c.HTTP, "/v1/publishes/get", "application/json", body, maxPublish)
+	status, answer, err := c.call(ctx, c.HTTP, http.MethodPost, "/v1/publishes/get", "application/json", body, maxPublish)
 	if err != nil {
 		return Publish{}, err
 	}
@@ -311,23 +317,29 @@ func cleanProblems(qs []problem.Problem) []problem.Problem {
 	return out
 }
 
-// call posts body, of type contentType, to the builder API at path with hc and the access token
-// of the sign-in, and returns the answer's status and body, of at most limit bytes. When the
+// call sends a request of method with body, of type contentType, or none when it is nil, to the
+// builder API at path with hc and the access token of the sign-in, and returns the answer's status and body, of at most limit bytes. When the
 // platform does not accept the token, as when this computer's clock is off, or refuses it for want
 // of a scope, call refreshes the sign-in once, which also brings the scopes of the apps the
 // builder owns now, and posts again. A token the platform still does not accept is E-CLI-004.
-func (c *Client) call(ctx context.Context, hc *http.Client, path, contentType string, body []byte, limit int64) (int, []byte, error) {
+func (c *Client) call(ctx context.Context, hc *http.Client, method, path, contentType string, body []byte, limit int64) (int, []byte, error) {
 	tok, err := c.Token(ctx)
 	if err != nil {
 		return 0, nil, err
 	}
 	for refreshed := false; ; refreshed = true {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.address+path, bytes.NewReader(body))
+		var r io.Reader
+		if body != nil {
+			r = bytes.NewReader(body)
+		}
+		req, err := http.NewRequestWithContext(ctx, method, c.address+path, r)
 		if err != nil {
 			return 0, nil, err
 		}
 		req.Header.Set("Authorization", "Bearer "+tok)
-		req.Header.Set("Content-Type", contentType)
+		if body != nil {
+			req.Header.Set("Content-Type", contentType)
+		}
 		req.Header.Set("Accept", "application/json")
 		answer, status, err := send(hc, req, limit)
 		switch {

@@ -114,12 +114,12 @@ to add it, and never copy a value from `dev.yaml` into the app.
 With MCP, the same loop is a set of tools that take app names, never paths. Add the server with
 `claude mcp add aicoded -- aicoded mcp` in the workspace folder, or as the dev UI shows:
 
-- `app_create` creates an app; `check` is `aicoded check`;
+- `app_create` creates an app; `check` is `aicoded check`; `howto` reads the docs;
 - `preview` builds and starts an app and returns its address, or the problems that stop it;
-- `what_broke` lists the failed apps, error log lines and failed spans;
-- `describe` summarises the apps; `howto` reads the docs;
+- `what_broke` lists the failed apps, error log lines and failed spans; `describe` sums up apps;
 - `logs`, `traces`, `trace`, `mail_list` and `mail_get` show what `aicoded dev` saw, and
-  `mail_receive` delivers a test mail to an app's inbox;
+  `mail_receive` delivers a test mail; with `env` set to `preview` or `production`, `logs`,
+  `traces` and `trace` read an app on the platform: only when asked, as they hold real data;
 - `publish` and `release_status` publish an app and show the outcome, as below.
 
 ## Publishing
