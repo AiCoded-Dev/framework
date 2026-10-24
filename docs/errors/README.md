@@ -9,7 +9,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | WEB | web runtime |
 | RPC | calls between apps: the generator, `aicoded rpc add`, the runner and the called app |
 | MAN | aicoded.yaml |
-| RUN | app↔runner protocol, and what a runner refuses to serve |
+| RUN | app↔runner protocol, what a runner refuses to serve, and a runner's enrolment and connection to the platform |
 | DEV | `aicoded dev`, its control socket and its dev UI, and the apps of a workspace in `aicoded check`, `aicoded describe` and `aicoded mcp` |
 | CHK | `aicoded check` and the Go build it runs, also in `aicoded dev` |
 | LINT | the rules for app code that `aicoded check` applies after `go vet`, listed in [the rules guide](../guides/rules.md) |
@@ -124,6 +124,10 @@ E-RUN-006 is the page a runner shows, to everyone, for an app whose audience it 
 
 E-RUN-009 is the reason a runner reports for a release whose grants it cannot tell the resources
 of: a grant of a kind it does not know, or two of one kind.
+
+E-RUN-007, E-RUN-008 and E-RUN-010 are what the platform answers a server's runner that enrols or
+connects: a refused enrolment token or certificate request, a runner certificate that is missing,
+expired, revoked or of another server, and a runner of another protocol version.
 
 E-LOGIN-001 refuses to sign a person in to an app when the sign-in provider gives them an issuer or
 a subject of more than 255 characters, or an identity of more than 512 bytes joined.
