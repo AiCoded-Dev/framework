@@ -99,7 +99,7 @@ Releasing uses these codes, each a release that the platform refuses before anyt
   mailbox.
 - E-REL-014: an `email.from` other than the address the app sends from already.
 - E-REL-010: an app that has a release pending already.
-- E-REL-011: a control plane with no hosting for the apps' resources.
+- E-REL-011: a building block that the target of the organisation's server does not offer.
 - E-REL-012: an app whose name, or whose organisation's slug, cannot be a label of its host.
 - E-REL-015: an app that the platform's operator archived.
 
@@ -108,8 +108,9 @@ E-REL-009 refuses the operator's purge of a publish that a live or pending relea
 E-REL-016 refuses the operator's renaming or archiving of an app that has a release live or
 pending: such an app keeps its name and stays active until releases can be stopped.
 
-E-MAIL-009 refuses the operator's adding or verifying a mail domain on a control plane with no
-hosting for mail.
+E-MAIL-009 refuses the operator's adding or verifying a mail domain of an organisation that has no
+target to register it at: one placed on no server, or whose server's target the platform cannot
+reach.
 
 E-MAIL-010 refuses, on the platform, a message with a new idempotency key while 10 000 of the app's
 messages are being sent.
