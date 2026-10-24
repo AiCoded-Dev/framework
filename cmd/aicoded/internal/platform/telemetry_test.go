@@ -1,6 +1,7 @@
 package platform_test
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -43,13 +44,13 @@ func TestSpansAndATrace(t *testing.T) {
 	spans, err := c.Spans(t.Context(), platform.TelemetryQuery{App: "demo", Env: "preview", Limit: 1000})
 	require.NoError(t, err)
 	assert.Equal(t, want, spans)
-	spans, err = c.Trace(t.Context(), platform.TelemetryQuery{App: "demo", Env: "preview", Trace: trace})
+	spans, err = c.Trace(t.Context(), platform.TelemetryQuery{App: "demo", Env: "preview", Trace: trace, Limit: 5})
 	require.NoError(t, err)
 	assert.Equal(t, want, spans)
 	none, err := c.Logs(t.Context(), platform.TelemetryQuery{App: "demo", Env: "preview"})
 	require.NoError(t, err)
 	assert.Equal(t, []platform.LogLine{}, none)
-	assert.Equal(t, []string{"/v1/apps/demo/spans?env=preview&limit=1000", "/v1/apps/demo/traces/" + trace + "?env=preview",
+	assert.Equal(t, []string{"/v1/apps/demo/spans?env=preview&limit=1000", "/v1/apps/demo/traces/" + trace + "?env=preview&limit=5",
 		"/v1/apps/demo/logs?env=preview"}, p.Reads())
 }
 
@@ -77,10 +78,21 @@ func TestTelemetryRefused(t *testing.T) {
 	assert.Equal(t, "E-PUB-017", errs.Code(err))
 	assert.Equal(t, 1, p.Requests("/v1/apps/nope/logs")+p.Requests("/v1/apps/demo/logs"), "only the unknown app reached the platform")
 
-	p.TelemetryDown(true)
-	_, err = c.Spans(t.Context(), platform.TelemetryQuery{App: "demo", Env: "production"})
-	assert.Equal(t, "E-PUB-018", errs.Code(err))
-	assert.Contains(t, err.Error(), "fix: try again in a few minutes")
+	for _, tc := range []struct {
+		status          int
+		errorCode, code string
+		fix             string
+	}{
+		{http.StatusServiceUnavailable, "temporarily_unavailable", "E-PUB-018", "fix: try again in a few minutes"},
+		{http.StatusUnprocessableEntity, "too_large", "E-PUB-020", "fix: ask for fewer rows"},
+		{http.StatusInternalServerError, "server_error", "E-PUB-021", "fix: read another time"},
+		{http.StatusForbidden, "insufficient_scope", "E-PUB-006", "fix: publish under a new name"},
+	} {
+		p.RefuseTelemetry(tc.status, tc.errorCode, tc.code)
+		_, err = c.Spans(t.Context(), platform.TelemetryQuery{App: "demo", Env: "production"})
+		assert.Equal(t, tc.code, errs.Code(err), "%v", err)
+		assert.Contains(t, err.Error(), tc.fix)
+	}
 	assert.Empty(t, p.Reads())
 }
 

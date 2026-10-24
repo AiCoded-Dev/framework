@@ -32,7 +32,7 @@ func addTelemetryFlags(fs *flag.FlagSet, what string) telemetryFlags {
 		since: fs.String("since", "", "read from this `time` on: RFC 3339, such as 2026-10-24T09:00:00Z, or a while ago, such as 30m, 6h or 2d; an hour before --until by default"),
 		until: fs.String("until", "", "read up to this `time`, as --since takes it; now by default"),
 		trace: fs.String("trace", "", "only the "+what+" of this trace `id`"),
-		limit: fs.Int("limit", 0, "the newest `rows` to read, 1 to 1000; 100 by default"),
+		limit: fs.Int("limit", 0, "the newest `rows` to read, 1 to 1000; 100 by default, and every span of a trace up to 1000 with --trace"),
 		json:  fs.Bool("json", false, "print the "+what+" as JSON, newest first"),
 	}
 }

@@ -106,10 +106,10 @@ type builder struct {
 	uploads  []Upload
 	requests map[string]int
 	// telemetry holds the rows each telemetry path answers, reads the queries it got, and
-	// unavailable whether it answers 503.
-	telemetry   map[string][]map[string]any
-	reads       []string
-	unavailable bool
+	// telemetryRefusal the refusal of every read, when set.
+	telemetry        map[string][]map[string]any
+	reads            []string
+	telemetryRefusal *refusal
 }
 
 type fakeApp struct {
@@ -220,11 +220,15 @@ func (p *Platform) Telemetry(path string, rows ...map[string]any) {
 	p.telemetry[path] = rows
 }
 
-// TelemetryDown makes every read of telemetry answer 503 with E-PUB-018, or none again.
-func (p *Platform) TelemetryDown(down bool) {
+// RefuseTelemetry makes every read of telemetry answer status, the error errorCode and the
+// framework's code, or, with status 0, answer again.
+func (p *Platform) RefuseTelemetry(status int, errorCode, code string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.unavailable = down
+	p.telemetryRefusal = nil
+	if status != 0 {
+		p.telemetryRefusal = &refusal{status, errorCode, code}
+	}
 }
 
 // Reads returns the reads of telemetry the fake answered, each its path and query, oldest first.
@@ -391,8 +395,8 @@ func (p *Platform) readTelemetry(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusForbidden, "insufficient_scope", "E-PUB-005", "the app belongs to another builder, or your sign-in does not carry it yet")
 	case env != "preview" && env != "production":
 		apiError(w, http.StatusBadRequest, "invalid_request", "E-PUB-017", "env must be preview or production")
-	case p.unavailable:
-		apiError(w, http.StatusServiceUnavailable, "temporarily_unavailable", "E-PUB-018", "logs and traces cannot be read right now")
+	case p.telemetryRefusal != nil:
+		apiError(w, p.telemetryRefusal.status, p.telemetryRefusal.errorCode, p.telemetryRefusal.code, "refused as the test asked")
 	default:
 		p.reads = append(p.reads, r.URL.RequestURI())
 		rows := []map[string]any{}

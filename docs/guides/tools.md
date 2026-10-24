@@ -288,12 +288,14 @@ app: you must own it.
 - `--limit` is how many of the newest lines to read: 100 by default, at most 1000 (E-PUB-016).
 - `--json` prints the lines as JSON, newest first, each with its `time`, `level`, `body`,
   `trace_id`, `span_id`, `release`, `env` and `attributes`.
-- A value that is not valid is E-PUB-017, an app of another builder E-PUB-005, an app that is not
-  on the platform E-PUB-019, and a platform that cannot read logs right now E-PUB-018. Like
+- A value that is not valid is E-PUB-017, an app of another builder E-PUB-005, an archived app
+  E-PUB-006, an app that is not on the platform E-PUB-019, and a platform that cannot read logs
+  right now E-PUB-018. More rows than one answer holds, at most 16 MiB, is E-PUB-020: ask for
+  fewer, or a shorter time. A time whose rows the platform cannot read is E-PUB-021. Like
   `aicoded status`, it refreshes your sign-in once when it lacks the app's scope.
 
-Every read is written to the platform's audit log: who read which app, and the range and filters,
-never the lines.
+Every read, and every refusal, is written to the platform's audit log: who asked for which app, the
+outcome, and the range and filters, never the lines.
 
 ```text
 2026-10-24T09:12:03.120Z INFO  page served
@@ -306,7 +308,8 @@ never the lines.
 with its name, duration, `failed` and its status message when it failed, and its trace. With
 `--trace <id>` it prints the spans of that trace instead, indented below the span that holds
 them. It takes `--app`, `--since`, `--until`, `--limit` and `--json` as `aicoded logs` does, and
-refuses the same way; `--limit` does not apply to `--trace`, which reads at most 1000 spans. With
+refuses the same way. With `--trace`, `--limit` is how many of the trace's newest spans to read,
+1000 by default. With
 `--trace 4bf92f3577b34da6a3ce929d0e0e4736` it prints:
 
 ```text

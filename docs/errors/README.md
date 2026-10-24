@@ -60,9 +60,9 @@ Publishing uses these codes:
   not as claimed.
 - E-PUB-011 and E-PUB-014: a publish that ended in `error` or `refused`.
 - E-PUB-013: a publish id that the platform does not know in your organisation.
-- E-PUB-015 to E-PUB-019: a read of an app's logs and traces on the platform that it refuses: a
+- E-PUB-015 to E-PUB-021: a read of an app's logs and traces on the platform that it refuses: a
   range over 7 days, over 1000 rows, a value that is not valid, a store that cannot be read right
-  now, and an app that is not on the platform.
+  now, an app that is not on the platform, an answer too large, and rows that cannot be read.
 - E-GATE-001 to E-GATE-008: `go.mod`, `go.sum` and the modules an app uses.
 - E-GATE-009 and E-GATE-010: the files of the commit.
 - E-GATE-011 and E-GATE-027: the commit's permission list, which must name the app and be

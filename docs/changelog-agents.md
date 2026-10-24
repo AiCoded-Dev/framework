@@ -10,7 +10,9 @@ Changes to the API that AI assistants build apps with. Newest first.
   `since` and `until` to do the same, in the shape of their answers from `aicoded dev`. A sign-in
   reads only apps it owns, at most 7 days and 1000 rows at once. New codes: E-PUB-015 (over 7
   days), E-PUB-016 (over 1000 rows), E-PUB-017 (a value that is not valid), E-PUB-018 (logs and
-  traces cannot be read right now) and E-PUB-019 (no app of that name on the platform). Read
+  traces cannot be read right now), E-PUB-019 (no app of that name on the platform), E-PUB-020
+  (more than one answer holds) and E-PUB-021 (rows the platform cannot read); an archived app is
+  E-PUB-006. With `--trace`, `--limit` is how many of the trace's spans to read, 1000 by default. Read
   production only when the developer asks: its logs hold what the app's users entered. See
   `tasks/find-why-a-published-app-fails`.
 - For runners: `(*runnerproto/server.Server).SetDatabase` and `(*mysqlproxy.Proxy).SetUpstream`

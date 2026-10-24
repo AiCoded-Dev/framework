@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,13 +52,13 @@ func TestRunTraces(t *testing.T) {
 	p.Telemetry("/v1/apps/demo/traces/"+traceID, child, root)
 	p.Telemetry("/v1/apps/demo/spans", child, root)
 
-	code, out, errOut := aicoded("traces", "--env", "production", "--app", "demo", "--trace", traceID)
+	code, out, errOut := aicoded("traces", "--env", "production", "--app", "demo", "--trace", traceID, "--limit", "50")
 	require.Equal(t, 0, code, errOut)
 	assert.Equal(t, "2026-10-24T12:00:00.000Z HTTP GET  3ms  failed: E-SQL-001\n2026-10-24T12:00:00.001Z   sql.query  1.5ms\n", out)
 	code, out, errOut = aicoded("traces", "--env", "production", "--until", "2026-10-24T13:00:00+01:00", demoDir(t))
 	require.Equal(t, 0, code, errOut)
 	assert.Contains(t, out, "HTTP GET  3ms  failed: E-SQL-001  trace "+traceID+"\n")
-	assert.Equal(t, []string{"/v1/apps/demo/traces/" + traceID + "?env=production",
+	assert.Equal(t, []string{"/v1/apps/demo/traces/" + traceID + "?env=production&limit=50",
 		"/v1/apps/demo/spans?env=production&until=2026-10-24T12%3A00%3A00Z"}, p.Reads())
 }
 
@@ -85,7 +86,7 @@ func TestRunLogsRefuses(t *testing.T) {
 		assert.Contains(t, errOut, "\n  fix: ")
 	}
 	p.AddApp("demo", platformtest.Email)
-	p.TelemetryDown(true)
+	p.RefuseTelemetry(http.StatusServiceUnavailable, "temporarily_unavailable", "E-PUB-018")
 	code, _, errOut = aicoded("traces", "--env", "production", "--app", "demo")
 	assert.Equal(t, 1, code)
 	assert.Contains(t, errOut, "E-PUB-018: ")

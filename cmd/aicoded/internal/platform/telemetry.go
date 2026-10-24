@@ -114,14 +114,14 @@ func (c *Client) Spans(ctx context.Context, q TelemetryQuery) ([]Span, error) {
 	return spans(readTelemetry[Span](ctx, c, q, "traces", url.PathEscape(q.App)+"/spans", true))
 }
 
-// Trace returns the spans of the trace q.Trace of the app, newest first, at most 1000. It takes
-// no Level or Limit.
+// Trace returns the spans of the trace q.Trace of the app, newest first: at most q.Limit, or 1000
+// when it is 0. It takes no Level.
 func (c *Client) Trace(ctx context.Context, q TelemetryQuery) ([]Span, error) {
 	if !TraceID.MatchString(q.Trace) {
 		return nil, errs.New("E-PUB-017", "a trace id is 32 of 0-9 and a-f", Fix("E-PUB-017"))
 	}
-	if q.Level != "" || q.Limit != 0 {
-		return nil, errs.New("E-PUB-017", "a trace has no level or limit", Fix("E-PUB-017"))
+	if q.Level != "" {
+		return nil, errs.New("E-PUB-017", "a level keeps only some log lines, not the spans of a trace", Fix("E-PUB-017"))
 	}
 	return spans(readTelemetry[Span](ctx, c, q, "traces", url.PathEscape(q.App)+"/traces/"+q.Trace, false))
 }
@@ -138,7 +138,7 @@ func spans(out []Span, err error) ([]Span, error) {
 }
 
 // readTelemetry reads the list of T at /v1/apps/<path> for q; filters is whether the path takes
-// q's level, trace and limit. what names what is read, for errors.
+// q's level and trace. what names what is read, for errors.
 func readTelemetry[T any](ctx context.Context, c *Client, q TelemetryQuery, what, path string, filters bool) ([]T, error) {
 	if !manifest.ValidApp(q.App) {
 		return nil, errs.New("E-PUB-017", "an app's name is 2 to 63 lowercase letters, digits and dashes, starting with a letter",
@@ -160,7 +160,7 @@ func readTelemetry[T any](ctx context.Context, c *Client, q TelemetryQuery, what
 	if filters && q.Trace != "" {
 		v.Set("trace", q.Trace)
 	}
-	if filters && q.Limit != 0 {
+	if q.Limit != 0 {
 		v.Set("limit", strconv.Itoa(q.Limit))
 	}
 	status, answer, err := c.call(ctx, c.HTTP, http.MethodGet, "/v1/apps/"+path+"?"+v.Encode(), "", nil, maxTelemetry)

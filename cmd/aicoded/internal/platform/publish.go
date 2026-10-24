@@ -61,6 +61,8 @@ var fixes = map[string]string{
 	"E-PUB-017": "give env preview or production, times in RFC 3339, a level of DEBUG, INFO, WARN or ERROR, and a trace id of 32 of 0-9 and a-f",
 	"E-PUB-018": "try again in a few minutes: the platform cannot read logs and traces right now",
 	"E-PUB-019": "check the app's name on the app: line of its aicoded.yaml: an app is on the platform once it is published",
+	"E-PUB-020": "ask for fewer rows with --limit, or for a shorter time with --since and --until",
+	"E-PUB-021": "read another time with --since and --until, and give your administrator the app and the time that fails",
 }
 
 // Fix returns the fix of the code of publishing, or the advice to read its docs page.

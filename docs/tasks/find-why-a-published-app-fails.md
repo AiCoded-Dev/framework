@@ -9,7 +9,7 @@ app logged while people used it.
 
 1. Ask the developer what failed and when, such as "saving a ticket failed at about 9:10". The
    platform keeps 30 days, and one read covers at most 7 days and 1000 rows (E-PUB-015,
-   E-PUB-016).
+   E-PUB-016), and an answer of at most 16 MiB (E-PUB-020).
 2. Read the errors of that time, in the app's folder or with `--app`. `--env` is `preview` or
    `production` and must be given:
 
