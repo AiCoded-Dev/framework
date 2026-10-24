@@ -4,6 +4,9 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- For runners: `(*runnerproto/server.Server).SetDatabase` and `(*mysqlproxy.Proxy).SetUpstream`
+  change where `mysql.sock` logs in from the next connection the app opens; open sessions keep
+  their login. Nothing changes for apps.
 - E-REL-017: the platform does not run outside services or schedules yet, so it refuses to release
   an app whose permission list declares `egress` hosts or `schedule` jobs, and its runner refuses
   to start one. Keep both out of aicoded.yaml, and the code that uses them, until it runs them.

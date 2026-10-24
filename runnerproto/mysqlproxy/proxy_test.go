@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -258,6 +260,41 @@ func TestProxyUpstreamDown(t *testing.T) {
 			t.Fatalf("%s: OnError was not called", name)
 		}
 	}
+}
+
+func TestProxySetUpstream(t *testing.T) {
+	f := fakeServer(t)
+	sock, p := serveProxy(t, Upstream{Network: "unix", Address: f.sock, User: "u", Password: "old-pw", Database: "d"})
+	before, _, _ := hello(t, sock, appCaps)
+
+	p.SetUpstream(Upstream{Network: "unix", Address: f.sock, User: "u", Password: "new-pw", Database: "d"})
+	hello(t, sock, appCaps)
+	nonce := bytes.Repeat([]byte{'s'}, 20)
+	oldAuth, _ := scramble("mysql_native_password", "old-pw", nonce)
+	newAuth, _ := scramble("mysql_native_password", "new-pw", nonce)
+	logins := f.logins()
+	require.Len(t, logins, 2)
+	assert.Equal(t, oldAuth, logins[0].auth)
+	assert.Equal(t, newAuth, logins[1].auth, "a connection after the swap logs in with the new password")
+
+	require.NoError(t, writePacket(before, 0, append([]byte{0x03}, "SELECT 1"...)))
+	_, ok, err := readPacket(before, maxHandshake)
+	require.NoError(t, err)
+	assert.Equal(t, byte(0), ok[0], "a session opened before the swap keeps working")
+}
+
+func TestProxySetUpstreamWhileDialing(t *testing.T) {
+	f := fakeServer(t)
+	sock, p := serveProxy(t, Upstream{Network: "unix", Address: f.sock, User: "u", Database: "d"})
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Go(func() {
+			p.SetUpstream(Upstream{Network: "unix", Address: f.sock, User: fmt.Sprint("u", i), Database: "d"})
+		})
+		wg.Go(func() { hello(t, sock, appCaps) })
+	}
+	wg.Wait()
+	assert.Len(t, f.logins(), 8)
 }
 
 func TestProxyCloseEndsSessions(t *testing.T) {

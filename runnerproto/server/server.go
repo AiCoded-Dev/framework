@@ -58,8 +58,8 @@ type Options struct {
 	// Adopted marks an app that is already running and said Hello to an earlier server. Ready is
 	// closed at New; nothing else changes.
 	Adopted bool
-	// Database is where the proxy on mysql.sock logs in. It is set exactly when the app declares
-	// sqldb.
+	// Database is where the proxy on mysql.sock logs in, until SetDatabase changes it. It is set
+	// exactly when the app declares sqldb.
 	Database *mysqlproxy.Upstream
 	// OnDatabaseError, if set, gets each reason the proxy could not open the app's database.
 	// It may be called from several goroutines at once.
@@ -153,6 +153,16 @@ func (s *Server) markReady() { s.readyOnce.Do(func() { close(s.ready) }) }
 
 // Ready is closed once the app reports that it accepts requests, or at New for an adopted app.
 func (s *Server) Ready() <-chan struct{} { return s.ready }
+
+// SetDatabase makes the proxy on mysql.sock log in as up from the next connection the app opens
+// on: sessions already open keep their login. It refuses a server that serves no database.
+func (s *Server) SetDatabase(up mysqlproxy.Upstream) error {
+	if s.db == nil {
+		return errors.New("server: the app declares no sqldb, so the server serves no database")
+	}
+	s.db.SetUpstream(up)
+	return nil
+}
 
 // Close stops serving, which removes runner.sock and mysql.sock.
 func (s *Server) Close() error {

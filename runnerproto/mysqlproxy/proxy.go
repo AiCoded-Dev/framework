@@ -69,7 +69,7 @@ type Proxy struct {
 	// never carry the password. It may be called from several goroutines at once.
 	OnError func(error)
 
-	up     Upstream
+	up     atomic.Pointer[Upstream]
 	slots  chan struct{}
 	ids    atomic.Uint32
 	ctx    context.Context
@@ -82,8 +82,14 @@ type Proxy struct {
 // New returns a proxy that logs in as up.
 func New(up Upstream) *Proxy {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Proxy{up: up, slots: make(chan struct{}, MaxConns), ctx: ctx, cancel: cancel}
+	p := &Proxy{slots: make(chan struct{}, MaxConns), ctx: ctx, cancel: cancel}
+	p.up.Store(&up)
+	return p
 }
+
+// SetUpstream makes the proxy log in as up from the next connection it accepts on. Sessions
+// already open keep the login they have.
+func (p *Proxy) SetUpstream(up Upstream) { p.up.Store(&up) }
 
 // Serve accepts the app's connections on l until l is closed. A connection over MaxConns gets
 // E-SQL-004 and is closed.
@@ -147,7 +153,8 @@ func (p *Proxy) handle(app net.Conn) {
 	_ = app.SetDeadline(time.Now().Add(handshakeTimeout))
 	ctx, cancel := context.WithTimeout(p.ctx, handshakeTimeout)
 	defer cancel()
-	up, g, err := dial(ctx, p.up)
+	u := *p.up.Load()
+	up, g, err := dial(ctx, u)
 	if err != nil {
 		p.fail(err)
 		_ = writePacket(app, 0, errUpstream)
@@ -174,7 +181,7 @@ func (p *Proxy) handle(app net.Conn) {
 	case err != nil:
 		return
 	}
-	ok, err := login(up, g, p.up, resp.caps&hello.caps, resp.charset, resp.maxPacket)
+	ok, err := login(up, g, u, resp.caps&hello.caps, resp.charset, resp.maxPacket)
 	if err != nil {
 		p.fail(err)
 		_ = writePacket(app, 2, errUpstream)

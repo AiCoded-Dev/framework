@@ -173,6 +173,31 @@ func TestSockets(t *testing.T) {
 	assert.NoFileExists(t, db)
 }
 
+func TestSetDatabase(t *testing.T) {
+	opts := options(t, newFakes())
+	withDatabase(&opts)
+	s := start(t, opts)
+	upstream := filepath.Join(shortDir(t), "db.sock")
+	l, err := socket.Listen(t.Context(), upstream)
+	require.NoError(t, err)
+	defer l.Close()
+	require.NoError(t, s.SetDatabase(mysqlproxy.Upstream{Network: "unix", Address: upstream}))
+
+	var d net.Dialer
+	conn, err := d.DialContext(t.Context(), "unix", filepath.Join(opts.Dir, runnerproto.MySQLSocket))
+	require.NoError(t, err)
+	defer conn.Close()
+	require.NoError(t, l.(*net.UnixListener).SetDeadline(time.Now().Add(5*time.Second)))
+	up, err := l.Accept()
+	require.NoError(t, err, "the next connection dials the new upstream")
+	_ = up.Close()
+}
+
+func TestSetDatabaseRefusesAServerWithoutOne(t *testing.T) {
+	s := start(t, options(t, newFakes()))
+	require.Error(t, s.SetDatabase(mysqlproxy.Upstream{Network: "unix", Address: "/elsewhere.sock"}))
+}
+
 // failingAccept is a listener whose Accept fails as it does when the runner is out of files.
 type failingAccept struct{ net.Listener }
 
