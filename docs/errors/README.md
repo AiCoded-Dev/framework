@@ -129,6 +129,9 @@ E-RUN-006 is the page a runner shows, to everyone, for an app whose audience it 
 E-RUN-009 is the reason a runner reports for a release whose grants it cannot tell the resources
 of: a grant of a kind it does not know, or two of one kind.
 
+E-RUN-011 refuses, on the platform, an app's read of a declared secret that has no value where the
+app runs.
+
 E-RUN-007, E-RUN-008 and E-RUN-010 are what the platform answers a server's runner that enrols or
 connects: a refused enrolment token or certificate request, a runner certificate that is missing,
 expired, revoked or of another server, and a runner of another protocol version.

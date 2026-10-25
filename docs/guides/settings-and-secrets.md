@@ -69,6 +69,14 @@ workspaces:
 
 See [aicoded dev](dev.md) for the rest of `dev.yaml`.
 
+## On the platform
+
+The platform's operator sets the values of an app's secrets where the app runs; neither the app
+nor its builder can set or read them there. A declared secret with no value fails in
+`secrets.Get` with E-RUN-011, and works once the operator sets it, with no new release. A secret
+the platform cannot reach for a moment fails with an error to retry later. The platform keeps no
+settings yet: an app that declares `settings` is not released (E-REL-005).
+
 ## See also
 
 - [The permission list](permission-list.md): the `settings` and `secrets` sections.

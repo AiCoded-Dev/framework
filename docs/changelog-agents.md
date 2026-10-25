@@ -6,7 +6,8 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 - E-REL-005 now refuses `settings`, which the platform does not keep yet, and `secrets` only where
   the target of the organisation's server does not keep them. Where it keeps them, an app that
-  declares `secrets` is released, and `secrets.Get` reads their values as in `aicoded dev`.
+  declares `secrets` is released, and `secrets.Get` reads their values as in `aicoded dev`. A
+  declared secret with no value there fails with E-RUN-011.
 - `aicoded logs` and `aicoded traces` read an app's log lines and spans on the platform, with
   `--env preview` or `--env production`, which must be given, and `--since`, `--until`, `--level`,
   `--trace` and `--limit`; and the `logs`, `traces` and `trace` tools of `aicoded mcp` take `env`,

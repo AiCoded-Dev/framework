@@ -23,13 +23,18 @@ type fakeSecrets map[string]string
 
 func (f fakeSecrets) GetSecret(_ context.Context, r *connect.Request[runnerv1.GetSecretRequest]) (*connect.Response[runnerv1.GetSecretResponse], error) {
 	v, ok := f[r.Msg.GetName()]
-	if !ok {
+	switch {
+	case !ok:
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("not declared"))
+	case v == "":
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New(errs.New("E-RUN-011", "no value", "ask the operator").Error()))
+	case v == "down":
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("try again"))
 	}
 	return connect.NewResponse(&runnerv1.GetSecretResponse{Value: []byte(v)}), nil
 }
 
-var ctx = runner.With(context.Background(), &runner.Session{Secrets: fakeSecrets{"api_key": "s3cret"}})
+var ctx = runner.With(context.Background(), &runner.Session{Secrets: fakeSecrets{"api_key": "s3cret", "unset": "", "flaky": "down"}})
 
 func TestGet(t *testing.T) {
 	v, err := secrets.Get(ctx, "api_key")
@@ -40,6 +45,18 @@ func TestGet(t *testing.T) {
 	assert.Equal(t, "E-MAN-002", errs.Code(err))
 	_, err = secrets.Get(context.Background(), "api_key")
 	assert.Equal(t, "E-RUN-004", errs.Code(err))
+}
+
+// A coded refusal of the runner reaches the app as that coded error; any other keeps its status.
+func TestGetRefused(t *testing.T) {
+	_, err := secrets.Get(ctx, "unset")
+	var coded *errs.Error
+	require.ErrorAs(t, err, &coded)
+	assert.Equal(t, []string{"E-RUN-011", "no value", "ask the operator"}, []string{coded.Code, coded.Msg, coded.Fix})
+
+	_, err = secrets.Get(ctx, "flaky")
+	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err))
+	assert.Empty(t, errs.Code(err))
 }
 
 func TestValueNeverPrints(t *testing.T) {

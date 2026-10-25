@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -36,7 +37,8 @@ func (Value) MarshalJSON() ([]byte, error) { return []byte(`"` + redacted + `"`)
 
 func (Value) MarshalText() ([]byte, error) { return []byte(redacted), nil }
 
-// Get returns secret name.
+// Get returns secret name. A name the permission list does not declare is E-MAN-002, and a
+// runner's coded refusal, such as E-RUN-011 for a secret with no value, is that coded error.
 func Get(ctx context.Context, name string) (Value, error) {
 	s := runner.From(ctx)
 	if s == nil || s.Secrets == nil {
@@ -47,9 +49,21 @@ func Get(ctx context.Context, name string) (Value, error) {
 		return Value{}, errs.New("E-MAN-002", fmt.Sprintf("secret %q is not declared", name),
 			fmt.Sprintf("add %q to secrets in aicoded.yaml", name))
 	}
+	if coded, ok := errs.Parse(connectMessage(err)); ok {
+		return Value{}, coded
+	}
 	if err != nil {
 		return Value{}, fmt.Errorf("secrets: get %q: %w", name, err)
 	}
 	val := string(resp.Msg.GetValue())
 	return Value{p: &val}, nil
+}
+
+// connectMessage returns the message of err, a runner's refusal, or "".
+func connectMessage(err error) string {
+	var ce *connect.Error
+	if errors.As(err, &ce) {
+		return ce.Message()
+	}
+	return ""
 }
