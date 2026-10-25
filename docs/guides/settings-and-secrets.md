@@ -74,8 +74,11 @@ See [aicoded dev](dev.md) for the rest of `dev.yaml`.
 The platform's operator sets the values of an app's secrets where the app runs; neither the app
 nor its builder can set or read them there. A declared secret with no value fails in
 `secrets.Get` with E-RUN-011, and works once the operator sets it, with no new release. A secret
-the platform cannot reach for a moment fails with an error to retry later. The platform keeps no
-settings yet: an app that declares `settings` is not released (E-REL-005).
+the platform cannot reach for a moment fails with an error to retry later. Each read goes to the
+platform's secrets store, so read a secret once, when the app starts or first needs it, and keep
+the value in memory: an app that reads its secrets more than 20 times a second, after 100 at once,
+or 8 at once, fails with E-RUN-012. The platform keeps no settings yet: an app that declares
+`settings` is not released (E-REL-005).
 
 ## See also
 

@@ -4,6 +4,10 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- E-RUN-012: on the platform, the runner bounds an app's reads of its secrets to 100 at once, then
+  20 a second, and 8 under way at once, all its instances together; past either, `secrets.Get`
+  fails with E-RUN-012 and nothing is read. Read each secret once, when the app starts or first
+  needs it, and keep the value in memory rather than reading it at every request.
 - E-REL-005 now refuses `settings`, which the platform does not keep yet, and `secrets` only where
   the target of the organisation's server does not keep them. Where it keeps them, an app that
   declares `secrets` is released, and `secrets.Get` reads their values as in `aicoded dev`. A

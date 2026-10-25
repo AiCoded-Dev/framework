@@ -132,6 +132,9 @@ of: a grant of a kind it does not know, or two of one kind.
 E-RUN-011 refuses, on the platform, an app's read of a declared secret that has no value where the
 app runs.
 
+E-RUN-012 refuses, on the platform, an app's read of a secret past the runner's bound of its reads:
+100 at once, then 20 a second, and 8 under way at once.
+
 E-RUN-007, E-RUN-008 and E-RUN-010 are what the platform answers a server's runner that enrols or
 connects: a refused enrolment token or certificate request, a runner certificate that is missing,
 expired, revoked or of another server, and a runner of another protocol version.
