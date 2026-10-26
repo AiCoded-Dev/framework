@@ -94,6 +94,12 @@ func TestClassify(t *testing.T) {
 		"CREATE TABLE t (a INT); DROP TABLE u":                               "E-MIG-002",
 		"CREATE TABLE aicoded_migrations (a INT)":                            "E-MIG-002",
 		"ALTER TABLE `AICODED_MIGRATIONS` ADD COLUMN x INT":                  "E-MIG-002",
+		"ALTER TABLE aİcoded_mİgratİons ADD COLUMN x INT":                    "E-MIG-002",
+		"CREATE TABLE aıcoded_mıgratıons (a INT)":                            "E-MIG-002",
+		"CREATE TABLE aicoded_migrationſ (a INT)":                            "E-MIG-002",
+		"CREATE TABLE заметки (a INT)":                                       "",
+		"ALTER TABLE t ADD COLUMN modify INT":                                "E-MIG-002",
+		"ALTER TABLE t ADD COLUMN `modify` INT":                              "",
 		"ALTER TABLE t ADD COLUMN c INT NOT NULL":                            "E-MIG-002",
 		"ALTER TABLE t ADD c INT PRIMARY KEY":                                "E-MIG-002",
 		"ALTER TABLE t ADD (c INT, d INT)":                                   "E-MIG-002",
@@ -135,6 +141,7 @@ func TestClassifyFixes(t *testing.T) {
 		"ALTER TABLE t ADD (c INT, d INT)":                    "write one ADD COLUMN <name> <type> clause per column",
 		"ALTER TABLE t ADD COLUMN c INT PARTITION BY HASH(c)": "leave out PARTITION clauses",
 		"ALTER TABLE t ADD COLUMN c INT NOT NULL":             "give the column a DEFAULT",
+		"ALTER TABLE t ADD COLUMN modify INT":                 "write a column or index named modify in backquotes, as `modify`",
 		"/*!50000 DROP TABLE t */":                            "write the statement itself",
 	} {
 		_, err := migrate.Classify(stmt)

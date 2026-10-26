@@ -85,6 +85,17 @@ func TestApplyRunsWhatTheJournalLacks(t *testing.T) {
 	var free int
 	require.NoError(t, admin.QueryRowContext(t.Context(), "SELECT IS_FREE_LOCK(?)", lockName(name)).Scan(&free))
 	assert.Equal(t, 1, free, "Apply releases its lock")
+	var timeout int
+	require.NoError(t, db.QueryRowContext(t.Context(), "SELECT @@session.lock_wait_timeout").Scan(&timeout))
+	assert.NotEqual(t, 30, timeout, "Apply's connection does not go back to the pool")
+}
+
+func TestApplyRefusesALongList(t *testing.T) {
+	db, _, _ := database(t)
+	list := steps(1, "p1", make([]string, 2001)...)
+	_, err := migrate.Apply(t.Context(), db, list)
+	assert.Equal(t, "E-MIG-004", errs.Code(err))
+	require.ErrorContains(t, err, "the list holds 2001 steps")
 }
 
 func TestApplyEmpty(t *testing.T) {
@@ -219,7 +230,7 @@ func TestApplyTimesOut(t *testing.T) {
 
 	err = <-waiting
 	assert.Equal(t, "E-MIG-005", errs.Code(err))
-	require.ErrorContains(t, err, "step p1#2")
+	require.ErrorContains(t, err, "step p1#2 was stopped while it ran: context deadline exceeded")
 	assert.Equal(t, ran(steps(1, "p1", "CREATE TABLE t (x INT)")), journal(t, db))
 
 	assert.Eventually(t, func() bool {
@@ -259,7 +270,7 @@ func TestApplyLocksPerDatabase(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	_, err := migrate.Apply(ctx, other, steps(1, "p1", "CREATE TABLE a (x INT)"))
-	require.NoError(t, err, "neither the lock of another database nor the old server-wide name blocks Apply")
+	require.NoError(t, err, "neither the lock of another database nor a lock of another name blocks Apply")
 
 	ctx, cancel = context.WithTimeout(t.Context(), time.Second)
 	defer cancel()

@@ -42,6 +42,10 @@ const (
 	cleanupTimeout = 30 * time.Second
 	// maxPublish is the longest publish id the journal holds.
 	maxPublish = 40
+	// maxSteps is the most steps a list may hold.
+	maxSteps = 2000
+	// maxList is the most bytes the statements of a list may hold together.
+	maxList = 1 << 20
 
 	createJournal = "CREATE TABLE IF NOT EXISTS aicoded_migrations (seq INT PRIMARY KEY, publish VARCHAR(40) NOT NULL, " +
 		"step INT NOT NULL, sha256 CHAR(64) NOT NULL, applied_at BIGINT NOT NULL)"
@@ -114,10 +118,18 @@ func Extends(ran, steps []Step) error {
 	return nil
 }
 
-// valid refuses a list whose steps are not numbered from 1, or whose hash does not match.
+// valid refuses a list over 2000 steps or 1 MiB of statements, or whose steps are not numbered
+// from 1, or whose hash does not match.
 func valid(steps []Step) error {
+	size := 0
+	for _, s := range steps {
+		size += len(s.Statement)
+	}
+	if len(steps) > maxSteps || size > maxList {
+		return errs.New("E-MIG-004", fmt.Sprintf("the list holds %d steps and %d bytes of statements, more than the %d steps and %d bytes it may",
+			len(steps), size, maxSteps, maxList), listFix)
+	}
 	for i, s := range steps {
-		sum := sha256.Sum256([]byte(s.Statement))
 		switch {
 		case s.Seq != i+1:
 			return errs.New("E-MIG-004", fmt.Sprintf("step %d of the list has seq %d", i+1, s.Seq), listFix)
@@ -125,7 +137,7 @@ func valid(steps []Step) error {
 			return errs.New("E-MIG-004", fmt.Sprintf("step %d of the list has a publish id that is empty or longer than %d bytes", s.Seq, maxPublish), listFix)
 		case s.Index < 1:
 			return errs.New("E-MIG-004", fmt.Sprintf("step %d of the list has index %d", s.Seq, s.Index), listFix)
-		case s.SHA256 != hex.EncodeToString(sum[:]):
+		case s.SHA256 != sha(s.Statement):
 			return errs.New("E-MIG-004", fmt.Sprintf("step %s: its sha256 does not match its statement", s.name()), listFix)
 		}
 	}
@@ -192,12 +204,19 @@ func (s *session) journal(ctx context.Context) ([]Step, error) {
 // run runs a step under its own context, then adds its row to the journal even when ctx has
 // ended.
 func (s *session) run(ctx context.Context, st Step) error {
+	if err := ctx.Err(); err != nil {
+		return errs.New("E-MIG-005", fmt.Sprintf("step %s was not run: %v", st.name(), err), failFix)
+	}
 	sctx, cancel := context.WithTimeout(ctx, stepTimeout)
 	defer cancel()
 	if _, err := s.conn.ExecContext(sctx, st.Statement); err != nil {
-		if sctx.Err() != nil {
+		switch {
+		case ctx.Err() != nil:
 			s.stop(ctx)
-			return errs.New("E-MIG-005", fmt.Sprintf("step %s did not end in time and was stopped (%v)", st.name(), sctx.Err()), failFix)
+			return errs.New("E-MIG-005", fmt.Sprintf("step %s was stopped while it ran: %v", st.name(), ctx.Err()), failFix)
+		case sctx.Err() != nil:
+			s.stop(ctx)
+			return errs.New("E-MIG-005", fmt.Sprintf("step %s ran longer than %v and was stopped", st.name(), stepTimeout), failFix)
 		}
 		return failed("step "+st.name()+" failed", err)
 	}
@@ -223,7 +242,7 @@ func (s *session) failed(ctx context.Context, what string, err error) error {
 // a connection whose context ended. The lock goes with the session.
 func (s *session) stop(ctx context.Context) {
 	s.locked = false
-	_ = s.conn.Close()
+	s.discard()
 	kctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
 	defer cancel()
 	_, _ = s.db.ExecContext(kctx, "KILL ?", s.id)
@@ -237,16 +256,26 @@ func (s *session) close(ctx context.Context) {
 		defer cancel()
 		_, _ = s.conn.ExecContext(rctx, "DO RELEASE_LOCK(?)", s.lock)
 	}
+	s.discard()
+}
+
+// discard closes the connection rather than return it to db's pool.
+func (s *session) discard() {
 	_ = s.conn.Raw(func(any) error { return driver.ErrBadConn })
 	_ = s.conn.Close()
+}
+
+// sha returns the lower-case hex SHA-256 of statement.
+func sha(statement string) string {
+	sum := sha256.Sum256([]byte(statement))
+	return hex.EncodeToString(sum[:])
 }
 
 // lockName returns the name of the migration lock of database: aicoded_migrations: and the hex
 // SHA-256 of its name, cut to the 64 characters MySQL allows. Apps on one server never wait on
 // one another's lock.
 func lockName(database string) string {
-	sum := sha256.Sum256([]byte(database))
-	return ("aicoded_migrations:" + hex.EncodeToString(sum[:]))[:64]
+	return ("aicoded_migrations:" + sha(database))[:64]
 }
 
 // failed returns E-MIG-005 for what failed, naming MySQL's error number.

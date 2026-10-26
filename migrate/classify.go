@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
 
 	"aicoded.dev/framework/internal/errs"
 )
@@ -100,7 +101,7 @@ func readable(toks []token) error {
 		case i > 0 && t.up() == "SELECT":
 			return notAllowed("a query inside a schema change",
 				"write a DEFAULT as a literal value, list a new table's columns rather than copy them, and fill tables from the app's code")
-		case t.isName() && strings.EqualFold(t.name(), journal):
+		case t.isName() && isJournal(t.name()):
 			return notAllowed("the table "+journal+" is the platform's journal of migrations",
 				"give your table another name, such as app_migrations")
 		}
@@ -204,11 +205,17 @@ func alter(toks []token) error {
 		return err
 	}
 	for _, c := range clauses {
-		if w := destroys(c); w != "" {
+		if w := c[0].up(); slices.Contains(destroying, w) || w == "ALTER" {
 			return destructive("ALTER TABLE … " + w + " changes or removes what is there")
 		}
 	}
 	for _, c := range clauses {
+		for _, t := range outside(c[1:]) {
+			if slices.Contains(destroying, t.up()) {
+				return notAllowed(fmt.Sprintf("%s inside an ADD clause reads as a keyword that changes or removes what is there, not as a name", t.text),
+					fmt.Sprintf("write a column or index named %s in backquotes, as `%s`, or put a comma before the next clause", t.text, t.text))
+			}
+		}
 		if err := add(c); err != nil {
 			return err
 		}
@@ -246,17 +253,38 @@ func clauses(toks []token) ([][]token, error) {
 	return out, nil
 }
 
-// destroys returns the word that makes a clause of ALTER TABLE destructive, or "".
-func destroys(clause []token) string {
-	if clause[0].up() == "ALTER" {
-		return "ALTER"
+// destroying are the words that start a clause of ALTER TABLE that changes or removes what is
+// there, with ALTER.
+var destroying = []string{"DROP", "MODIFY", "CHANGE", "RENAME", "TRUNCATE"}
+
+// isJournal reports whether name names the journal under any case folding MySQL may apply to
+// table names: Unicode simple folding, and İ and ı to i.
+func isJournal(name string) bool {
+	runes := []rune(name)
+	if len(runes) != len(journal) {
+		return false
 	}
-	for _, t := range outside(clause) {
-		if w := t.up(); slices.Contains([]string{"DROP", "MODIFY", "CHANGE", "RENAME", "TRUNCATE"}, w) {
-			return w
+	for i, r := range runes {
+		if !foldsTo(r, rune(journal[i])) {
+			return false
 		}
 	}
-	return ""
+	return true
+}
+
+// foldsTo reports whether r folds to the ASCII letter or character c.
+func foldsTo(r, c rune) bool {
+	if c == 'i' && (r == 'İ' || r == 'ı') {
+		return true
+	}
+	for f := r; ; {
+		if f == c {
+			return true
+		}
+		if f = unicode.SimpleFold(f); f == r {
+			return false
+		}
+	}
 }
 
 // add allows a clause of ALTER TABLE that adds a column, an index, or a primary key, unique
