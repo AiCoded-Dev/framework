@@ -22,14 +22,14 @@ Without it, `sqldb.Open` fails with E-MAN-010. App code never opens a database i
 
 <!-- code: examples/people/deps/deps.go Deps.Start -->
 ```go
-// Start opens the database and the photo store, prepares the users table and reads the team's
-// address.
+// Start opens the database and the photo store, fills the users table when it is empty and reads
+// the team's address.
 func (d *Deps) Start(ctx context.Context) error {
 	db, err := sqldb.Open(ctx)
 	if err != nil {
 		return err
 	}
-	if err := prepare(ctx, db); err != nil {
+	if err := fill(ctx, db); err != nil {
 		return err
 	}
 	photos, err := filestore.Open(ctx, "photos")
@@ -53,9 +53,36 @@ func main() {
 }
 ```
 
-The table comes from the app's draft of schema changes, `.aicoded/migration.sql`: app code may
-not change the schema (E-LINT-013). `prepare` fills the table, in one transaction, with sample
-rows when it is empty.
+## Tables
+
+App code reads and writes rows; it never changes the schema. The app's tables come from its draft
+of schema changes, `.aicoded/migration.sql`, which stays out of git: `aicoded dev` and
+`aicoded check` apply it on your computer, `aicoded publish` sends it with the commit, and the
+platform applies it when the release rolls out. people's draft creates its one table:
+
+<!-- code: examples/people/.aicoded/migration.sql -->
+```sql
+-- The contacts tab compares a login with the viewer's Subject, so the column holds any Subject, of
+-- at most 512 bytes, and compares exactly, with no case folding and no trailing-space padding, so
+-- "Alice" and "alice " are not "alice".
+CREATE TABLE users (
+	id BIGINT AUTO_INCREMENT PRIMARY KEY,
+	login VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL UNIQUE,
+	name VARCHAR(100) NOT NULL,
+	age TINYINT UNSIGNED NOT NULL,
+	team VARCHAR(40) NOT NULL,
+	languages VARCHAR(100) NOT NULL,
+	on_site BOOL NOT NULL,
+	remote BOOL NOT NULL,
+	shift TINYINT UNSIGNED NOT NULL,
+	bio TEXT NOT NULL
+);
+```
+
+A draft only adds tables, indexes and columns. [Schema changes](schema-changes.md) lists what it
+may hold and what happens at publish and at release. The app's database user may only read and
+write rows, and `aicoded check` refuses `CREATE`, `ALTER`, `DROP`, `RENAME` and `TRUNCATE` in app
+code (E-LINT-013). `fill` fills the table, in one transaction, with sample rows when it is empty.
 
 ## Queries
 
@@ -149,16 +176,23 @@ workspaces:
     mysql: root:<password>@unix(/run/mysqld/mysqld.sock)/
 ```
 
-`aicoded dev` creates the app's own database and user there, both named `ac-dev-<app>`, and
-gives the user a new password on every start. The admin user needs `CREATE USER`, and
+`aicoded dev` creates the app's own database there, `ac-dev-<app>`, and two users, each with a
+new password on every start: the data user `ac-dev-<app>`, which the app logs in as and which
+reads and writes rows only, and the owner `ao-dev-<app>`, which applies the app's migrations and
+draft before the app starts. The admin user needs `CREATE USER`, and
 `ALL PRIVILEGES … WITH GRANT OPTION` on the apps' databases, including `CREATE` to create them
 (E-DEV-008). See [aicoded dev](dev.md).
+
+`aicoded check` makes a new test database the same way for the app's tests, which open it with
+`sqltest.Open(t)` from `aicoded.dev/framework/sqldb/sqltest`, and drops it after. Without
+`mysql:` in `dev.yaml`, `sqltest.Open` skips the test.
 
 ## See also
 
 - [The permission list](permission-list.md): the `data` section.
+- [Schema changes](schema-changes.md): the draft, and the migrations the platform applies.
 - [people/deps/users.go](../../examples/people/deps/users.go): queries, a transaction and the
-  table.
+  sample rows.
 - [contacts/deps/deps.go](../../examples/contacts/deps/deps.go): a database used by an app with
   no pages.
 - [List rows from the database](../tasks/list-from-database.md): a table, a query with

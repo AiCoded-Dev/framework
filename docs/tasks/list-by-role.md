@@ -124,8 +124,8 @@ same rule in a `Guard`, as [Check who owns a record](ownership-check.md) shows.
 ## Check it
 
 - `aicoded check` lints both statements: each is a constant, so E-LINT-007 passes.
-- room-maintenance's `deps/deps_test.go` checks each viewer's list against the MySQL server that
-  `AICODED_TEST_MYSQL_DSN` names: alice and bob each see only their own tickets, `Alice` and
+- room-maintenance's `deps/deps_test.go` checks each viewer's list on the test database that
+  `aicoded check` makes, opened with `sqltest.Open(t)`: alice and bob each see only their own tickets, `Alice` and
   `alice ` see none of alice's, a request with no viewer is refused, and dana, with `hotel-ops`,
   sees every ticket.
 - With the personas alice (`staff`) and dana (`staff` and `hotel-ops`): alice's `/tickets` says

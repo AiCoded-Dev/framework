@@ -8,8 +8,9 @@ app with no pages.
 ## Steps
 
 1. In the folder that holds your apps, run `aicoded init people`. It makes the folder `people/`
-   with `go.mod`, the permission list `aicoded.yaml`, `main.go`, one page, `pages/index.html`, and
-   `AGENTS.md`, the rules for AI assistants that build the app. It then runs `aicoded generate`
+   with `go.mod`, the permission list `aicoded.yaml`, `main.go`, one page, `pages/index.html`,
+   `AGENTS.md`, the rules for AI assistants that build the app, and a `.gitignore` that keeps the
+   draft of schema changes, `.aicoded/migration.sql`, out of git. It then runs `aicoded generate`
    and `go mod tidy`. The name is 2 to 63 lowercase letters, digits and dashes, starting with a
    letter and ending with a letter or digit (E-CLI-002).
 2. Write in `aicoded.yaml` what the app reaches. The finished people app has its own SQL
@@ -88,14 +89,14 @@ app with no pages.
 
    <!-- code: examples/people/deps/deps.go Deps.Start -->
    ```go
-   // Start opens the database and the photo store, prepares the users table and reads the team's
-   // address.
+   // Start opens the database and the photo store, fills the users table when it is empty and reads
+   // the team's address.
    func (d *Deps) Start(ctx context.Context) error {
    	db, err := sqldb.Open(ctx)
    	if err != nil {
    		return err
    	}
-   	if err := prepare(ctx, db); err != nil {
+   	if err := fill(ctx, db); err != nil {
    		return err
    	}
    	photos, err := filestore.Open(ctx, "photos")
@@ -111,9 +112,14 @@ app with no pages.
    }
    ```
 
-   `prepare` comes from [List rows from the database](list-from-database.md), and `LastSeen` and
+   `fill` comes from [List rows from the database](list-from-database.md), and `LastSeen` and
    `NewLastSeen` from [Add a live value](add-live-value.md): leave them and the live hubs,
    `HomePages`, `UsersAdded` and `Seen`, out until you need them.
+
+   `Start` creates no table: the app's tables come from its draft of schema changes,
+   `.aicoded/migration.sql`, which `aicoded dev` applies before the app starts and
+   `aicoded publish` sends with the commit. App code that changes the schema is refused
+   (E-LINT-013). See [Schema changes](../guides/schema-changes.md).
 
    There is no DSN and no password. `sqldb.Open`, `filestore.Open` and `config.String` reach,
    through the runner, only what the permission list declares, and refuse anything else
@@ -188,13 +194,13 @@ func main() {
 
 <!-- code: examples/contacts/deps/deps.go Start -->
 ```go
-// Start opens the app's database and prepares the contacts table.
+// Start opens the app's database and fills the contacts table when it is empty.
 func Start(ctx context.Context) error {
 	conn, err := sqldb.Open(ctx)
 	if err != nil {
 		return err
 	}
-	if err := prepare(ctx, conn); err != nil {
+	if err := fill(ctx, conn); err != nil {
 		return err
 	}
 	db = conn
@@ -202,7 +208,8 @@ func Start(ctx context.Context) error {
 }
 ```
 
-Its permission list declares only its database. `aicoded generate` adds `access: {}` and the
+Its table, `contacts`, comes from its draft, `.aicoded/migration.sql`, as people's does. Its
+permission list declares only its database. `aicoded generate` adds `access: {}` and the
 function it serves:
 
 <!-- code: examples/contacts/aicoded.yaml -->
@@ -236,4 +243,5 @@ services:
 - [The permission list](../guides/permission-list.md)
 - [Settings and secrets](../guides/settings-and-secrets.md)
 - [aicoded dev](../guides/dev.md)
+- [Schema changes](../guides/schema-changes.md)
 - [Tools](../guides/tools.md)

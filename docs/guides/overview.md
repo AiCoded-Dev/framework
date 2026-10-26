@@ -147,6 +147,8 @@ live values or page calls also opens one live connection. It runs the same acces
 - [The permission list](permission-list.md): what `aicoded.yaml` declares, and the sections
   `aicoded generate` writes.
 - [The SQL database](sql-database.md): the app's own MySQL database, with no DSN.
+- [Schema changes](schema-changes.md): the draft of the next change to the app's tables, and how
+  the platform applies it.
 - [File stores](file-stores.md): reading and writing the app's files.
 - [Mail](mail.md): sending mail with an idempotency key, and reading the mailbox.
 - [Settings and secrets](settings-and-secrets.md): configured values and values nobody may see.

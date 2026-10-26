@@ -106,7 +106,8 @@ declares `sqldb`, `aicoded dev` applies to the app's database, as the owner:
    Restart on the dev UI or the `preview` tool once its last answer is a minute old; a rebuild
    after a change takes the kept ones. When you are not signed in or the platform cannot be
    reached, it applies the ones kept there and prints one warning line, or, with none kept, only
-   the draft;
+   the draft. A `.aicoded/migrations.json` it cannot read is a warning line too, and only the
+   draft is applied;
 2. then the statements of the draft, `.aicoded/migration.sql`, the next schema change.
 
 The database's journal, the table `aicoded_migrations`, holds what ran. A draft that grows is

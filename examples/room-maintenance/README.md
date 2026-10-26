@@ -185,6 +185,9 @@ func (p *DP) Subscribe(ctx context.Context, _ *web.Request, state *ReactiveState
 
 ## Data
 
+- The tables come from the app's draft of schema changes,
+  [.aicoded/migration.sql](.aicoded/migration.sql), which `aicoded dev` and `aicoded check` apply
+  before the app starts; the app's own database user reads and writes rows only.
 - `rooms` holds the hotel's 32 rooms, 101 to 408 on four floors. `deps.Start` adds them in one
   transaction when the table is empty, so a second start adds nothing.
 - `tickets` holds the room, the title, the details, the status (`open`, `in_progress` or
@@ -198,8 +201,8 @@ func (p *DP) Subscribe(ctx context.Context, _ *web.Request, state *ReactiveState
 - `deps/rules_test.go` checks `CanOpen`, `CanEdit`, which lists a change wakes and the limits of
   a ticket's text, and `pages/tickets/report/dataprovider_test.go` how the report form offers the
   rooms.
-- `deps/deps_test.go` checks the tables against the MySQL server that `AICODED_TEST_MYSQL_DSN`
-  names, skipping without it: the rooms, what each viewer's list holds, exact logins, a subject
+- `deps/deps_test.go` checks the tables on the test database that `aicoded check` makes, which
+  it opens with `sqltest.Open(t)` and empties first, skipping elsewhere: the rooms, what each viewer's list holds, exact logins, a subject
   of 512 bytes, edits by the author and by anyone else, and status changes. A list asked
   for with no viewer and a status other than open, in progress and done are refused before the
   database is reached.

@@ -1,30 +1,24 @@
 package deps
 
 import (
-	"context"
-	"crypto/rand"
 	"database/sql"
 	"fmt"
 	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"aicoded.dev/framework/migrate"
+	"aicoded.dev/framework/sqldb/sqltest"
 )
 
 func TestUsers(t *testing.T) {
 	ctx := t.Context()
 	d := &Deps{DB: testDB(t)}
-	require.NoError(t, prepare(ctx, d.DB))
-	require.NoError(t, prepare(ctx, d.DB), "a second start adds nothing")
+	require.NoError(t, fill(ctx, d.DB))
+	require.NoError(t, fill(ctx, d.DB), "a second start adds nothing")
 
 	users, err := d.Users(ctx)
 	require.NoError(t, err)
@@ -52,7 +46,7 @@ func TestAddUserRemovesItsPhotosWhenItFails(t *testing.T) {
 	ctx := t.Context()
 	photos := memStore{MapFS: fstest.MapFS{}, broken: "dave/b.png"}
 	d := &Deps{DB: testDB(t)}
-	require.NoError(t, prepare(ctx, d.DB))
+	require.NoError(t, fill(ctx, d.DB))
 	dave := User{Login: "dave", Name: "Dave Brown", Age: 30, Team: "IT", Languages: "English", OnSite: true, Shift: 1, Bio: "Dave fixes laptops."}
 	two := []Photo{{Name: "a.png", Data: []byte("a")}, {Name: "b.png", Data: []byte("b")}}
 
@@ -73,7 +67,7 @@ func TestAddUserRemovesItsPhotosWhenItFails(t *testing.T) {
 func TestAddUserRace(t *testing.T) {
 	ctx := t.Context()
 	d := &Deps{DB: testDB(t)}
-	require.NoError(t, prepare(ctx, d.DB))
+	require.NoError(t, fill(ctx, d.DB))
 	erin := User{Login: "erin", Name: "Erin Hall", Age: 30, Team: "IT", Languages: "English", OnSite: true, Shift: 1, Bio: "Erin runs the help desk."}
 	other, err := d.DB.BeginTx(ctx, nil) // another add of erin, which passed its check too
 	require.NoError(t, err)
@@ -84,7 +78,7 @@ func TestAddUserRace(t *testing.T) {
 	go func() { added <- d.AddUser(ctx, erin, nil) }()
 	require.Eventually(t, func() bool {
 		var n int
-		err := d.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM performance_schema.data_locks WHERE object_schema = DATABASE() AND lock_status = 'WAITING'").Scan(&n)
+		err := d.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.processlist WHERE db = DATABASE() AND info LIKE 'INSERT INTO users %'").Scan(&n)
 		return err == nil && n > 0
 	}, 10*time.Second, 10*time.Millisecond, "AddUser passed its check and waits to insert")
 	require.NoError(t, other.Commit())
@@ -138,47 +132,12 @@ func (s memStore) Remove(name string) error {
 	return nil
 }
 
-// testDB returns a new database on the MySQL server that AICODED_TEST_MYSQL_DSN names, with the
-// tables of the app's draft, .aicoded/migration.sql, and drops it when the test ends. Without
-// the variable the test is skipped, or fails when AICODED_E2E_MYSQL is required. Nothing here
-// prints the DSN, which holds a password.
+// testDB returns the test database that aicoded check makes with the tables of
+// .aicoded/migration.sql, emptied, or skips the test outside aicoded check.
 func testDB(t *testing.T) *sql.DB {
 	t.Helper()
-	dsn := os.Getenv("AICODED_TEST_MYSQL_DSN")
-	if dsn == "" {
-		if os.Getenv("AICODED_E2E_MYSQL") == "required" {
-			t.Fatal("AICODED_E2E_MYSQL=required, but AICODED_TEST_MYSQL_DSN is not set")
-		}
-		t.Skip("AICODED_TEST_MYSQL_DSN is not set")
-	}
-	cfg, err := mysql.ParseDSN(dsn)
-	if err != nil {
-		t.Fatal("AICODED_TEST_MYSQL_DSN is not a valid DSN")
-	}
-	admin := open(t, cfg)
-	name := "test_" + strings.ToLower(rand.Text()[:12])
-	_, err = admin.ExecContext(t.Context(), "CREATE DATABASE `"+name+"`")
+	db := sqltest.Open(t)
+	_, err := db.ExecContext(t.Context(), "DELETE FROM users")
 	require.NoError(t, err)
-	t.Cleanup(func() { _, _ = admin.ExecContext(context.Background(), "DROP DATABASE `"+name+"`") })
-	cfg.DBName = name
-	cfg.ParseTime, cfg.Loc = true, time.UTC
-	db := open(t, cfg)
-	draft, err := os.ReadFile(filepath.Join("..", ".aicoded", "migration.sql"))
-	require.NoError(t, err)
-	stmts, err := migrate.Split(draft)
-	require.NoError(t, err)
-	for _, stmt := range stmts {
-		_, err := db.ExecContext(t.Context(), stmt)
-		require.NoError(t, err)
-	}
-	return db
-}
-
-func open(t *testing.T, cfg *mysql.Config) *sql.DB {
-	t.Helper()
-	c, err := mysql.NewConnector(cfg)
-	require.NoError(t, err)
-	db := sql.OpenDB(c)
-	t.Cleanup(func() { _ = db.Close() })
 	return db
 }

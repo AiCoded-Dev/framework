@@ -91,17 +91,24 @@ func publishedDraft(dir string, published []migrate.Step) bool {
 }
 
 // Published returns the steps of the migrations that the app app in dir published, as Steps
-// does. When the platform lists none but the cache holds some, warning says so.
+// does. When the platform lists none but the cache holds some, or the answer is the cache and it
+// cannot be read, warning says so.
 func Published(ctx context.Context, dir, app string, p Platform) (steps []migrate.Step, warning string) {
 	c, found, cerr := read(dir)
-	if p == nil {
+	cached := func() ([]migrate.Step, string) {
+		if cerr != nil {
+			return nil, cerr.Error() + ", so only the draft is applied"
+		}
 		return c.Steps, ""
+	}
+	if p == nil {
+		return cached()
 	}
 	fctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	steps, err := p.Migrations(fctx, app)
 	cancel()
 	if errors.Is(err, ErrUseCache) {
-		return c.Steps, ""
+		return cached()
 	}
 	if err != nil {
 		why := "could not get the migrations " + app + " published from the platform: " + reason(err)

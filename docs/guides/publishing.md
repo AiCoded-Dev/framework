@@ -26,7 +26,11 @@ computer, `aicoded publish` refuses:
   refused, since the history of the whole repository would be sent: run `git init` in the app's
   folder and commit the app there;
 - a change that is not committed, untracked files included (E-PUB-002): `git status` must list
-  nothing. Files that `.gitignore` names do not count, and are never sent;
+  nothing. Files that `.gitignore` names do not count, and are never sent; neither do the draft
+  of schema changes, `.aicoded/migration.sql`, and `.aicoded/migrations.json`;
+- a commit or an index that holds the draft (E-MIG-001): run
+  `git rm --cached .aicoded/migration.sql`. While the publish that carried the draft has not
+  ended, a new publish is refused the same way;
 - with `--app <name>`, an app of another name (E-PUB-003);
 - any problem that `aicoded check --frozen --no-tests` finds (E-PUB-004). `aicoded publish`
   prints them as `aicoded check` does and sends nothing. It checks as a released `aicoded` does,
@@ -44,7 +48,8 @@ and commit what it writes.
 - The app's own files: `go.mod` and `go.sum`, the permission list, `main.go`, `deps/`, the pages
   with their data providers, scripts, styles and images, and `rpc/`.
 - Every generated file, current: `*_gen.go`, `*_gen.ts`, `pages/assets_gen/`, `services/`,
-  `.aicoded/`, and the `access` and `services` sections of `aicoded.yaml`. The delivery pipeline
+  `.aicoded/` but the draft and the cache of migrations, and the `access` and `services`
+  sections of `aicoded.yaml`. The delivery pipeline
   generates the app again and refuses it when a generated file differs (E-CHK-001), so generated
   files are never edited by hand.
 - A `go.mod` that requires a released framework version that the platform builds (E-GATE-007),
@@ -70,6 +75,10 @@ and commit what it writes.
 - The app's name, the commit, and a summary for the change record: `-m <summary>`, or else the
   commit's subject. Control characters are removed, line breaks and tabs become spaces, and the
   first 1000 characters are kept, or fewer when they take more than 3900 bytes, as emoji do.
+
+- The draft of schema changes, `.aicoded/migration.sql`, when the app has one, beside the
+  bundle. Once the publish passed, `aicoded publish` deletes it, and a publish that failed leaves
+  it. [Schema changes](schema-changes.md) tells what happens to it then.
 
 The bundle may be at most 32 MiB (E-PUB-009). A committed file stays in the history after you
 delete it, so keep large files out of the repository. `aicoded` runs git without your `GIT_`
@@ -277,5 +286,6 @@ running an app in production without the platform, `aicoded run`, comes later.
 - [Tools](tools.md): `aicoded publish`, `aicoded status`, `aicoded check` and `aicoded login`.
 - [MCP](mcp.md): the `publish` and `release_status` tools.
 - [Simulated attacks](simulated-attacks.md): what the `attacks` and `personal-data` steps do.
+- [Schema changes](schema-changes.md): the draft that a publish carries.
 - [Project structure](project-structure.md): which files are yours and which are generated.
 - [The error catalogue](../errors/README.md): every code with its page.

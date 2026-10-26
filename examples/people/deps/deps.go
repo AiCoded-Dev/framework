@@ -36,14 +36,14 @@ func New() *Deps {
 	}
 }
 
-// Start opens the database and the photo store, prepares the users table and reads the team's
-// address.
+// Start opens the database and the photo store, fills the users table when it is empty and reads
+// the team's address.
 func (d *Deps) Start(ctx context.Context) error {
 	db, err := sqldb.Open(ctx)
 	if err != nil {
 		return err
 	}
-	if err := prepare(ctx, db); err != nil {
+	if err := fill(ctx, db); err != nil {
 		return err
 	}
 	photos, err := filestore.Open(ctx, "photos")

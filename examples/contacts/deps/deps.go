@@ -17,13 +17,13 @@ var ErrNoPerson = errors.New("no such person")
 // db is the app's database. Start sets it before the runner sends the app any call.
 var db *sql.DB
 
-// Start opens the app's database and prepares the contacts table.
+// Start opens the app's database and fills the contacts table when it is empty.
 func Start(ctx context.Context) error {
 	conn, err := sqldb.Open(ctx)
 	if err != nil {
 		return err
 	}
-	if err := prepare(ctx, conn); err != nil {
+	if err := fill(ctx, conn); err != nil {
 		return err
 	}
 	db = conn
@@ -61,9 +61,9 @@ func Contacts(ctx context.Context, login string) (phones, emails []string, err e
 	return phones, emails, nil
 }
 
-// prepare fills the contacts table, which .aicoded/migration.sql creates, with seed when it is
+// fill adds seed to the contacts table, which .aicoded/migration.sql creates, when the table is
 // empty.
-func prepare(ctx context.Context, conn *sql.DB) error {
+func fill(ctx context.Context, conn *sql.DB) error {
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err

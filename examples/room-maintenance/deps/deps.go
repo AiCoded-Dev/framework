@@ -49,22 +49,22 @@ func (d *Deps) FollowTickets(viewer auth.Identity) Changes {
 	return d.byAuthor.Subscribe(viewer.Subject)
 }
 
-// Start opens the database and prepares the rooms and tickets tables.
+// Start opens the database and adds the hotel's rooms when there are none.
 func (d *Deps) Start(ctx context.Context) error {
 	db, err := sqldb.Open(ctx)
 	if err != nil {
 		return err
 	}
-	if err := prepare(ctx, db); err != nil {
+	if err := fill(ctx, db); err != nil {
 		return err
 	}
 	d.DB = db
 	return nil
 }
 
-// prepare adds the hotel's rooms to the rooms table, which .aicoded/migration.sql creates with the
+// fill adds the hotel's rooms to the rooms table, which .aicoded/migration.sql creates with the
 // tickets table, when there are none.
-func prepare(ctx context.Context, db *sql.DB) error {
+func fill(ctx context.Context, db *sql.DB) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

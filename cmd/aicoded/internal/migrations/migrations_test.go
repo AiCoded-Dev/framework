@@ -200,6 +200,16 @@ func TestPublishedFromTheCache(t *testing.T) {
 		"AICODED_PLATFORM names the platform you publish to; the platform's answer is applied", warning)
 }
 
+func TestPublishedFromAnUnreadableCache(t *testing.T) {
+	dir := app(t, "")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, Cache), []byte("{"), 0o644))
+	for _, p := range []Platform{fake{err: ErrUseCache}, nil} {
+		steps, warning := Published(t.Context(), dir, "notes", p)
+		assert.Empty(t, steps)
+		assert.Equal(t, "the cache .aicoded/migrations.json is not valid, so only the draft is applied", warning)
+	}
+}
+
 func TestForget(t *testing.T) {
 	dir := app(t, draftB)
 	require.NoError(t, MarkSent(dir, pub, []byte(draftB)))

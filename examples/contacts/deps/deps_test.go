@@ -1,27 +1,20 @@
 package deps
 
 import (
-	"context"
-	"crypto/rand"
 	"database/sql"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
-	"time"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"aicoded.dev/framework/migrate"
+	"aicoded.dev/framework/sqldb/sqltest"
 )
 
 func TestContacts(t *testing.T) {
 	db = testDB(t)
 	ctx := t.Context()
-	require.NoError(t, prepare(ctx, db))
-	require.NoError(t, prepare(ctx, db), "a second start adds nothing")
+	require.NoError(t, fill(ctx, db))
+	require.NoError(t, fill(ctx, db), "a second start adds nothing")
 	var n int
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT COUNT(*) FROM contacts").Scan(&n))
 	assert.Len(t, seed, n)
@@ -42,47 +35,12 @@ func TestContacts(t *testing.T) {
 	require.Error(t, err, "a contact is a phone or an email")
 }
 
-// testDB returns a new database on the MySQL server that AICODED_TEST_MYSQL_DSN names, with the
-// tables of the app's draft, .aicoded/migration.sql, and drops it when the test ends. Without
-// the variable the test is skipped, or fails when AICODED_E2E_MYSQL is required. Nothing here
-// prints the DSN, which holds a password.
+// testDB returns the test database that aicoded check makes with the tables of
+// .aicoded/migration.sql, emptied, or skips the test outside aicoded check.
 func testDB(t *testing.T) *sql.DB {
 	t.Helper()
-	dsn := os.Getenv("AICODED_TEST_MYSQL_DSN")
-	if dsn == "" {
-		if os.Getenv("AICODED_E2E_MYSQL") == "required" {
-			t.Fatal("AICODED_E2E_MYSQL=required, but AICODED_TEST_MYSQL_DSN is not set")
-		}
-		t.Skip("AICODED_TEST_MYSQL_DSN is not set")
-	}
-	cfg, err := mysql.ParseDSN(dsn)
-	if err != nil {
-		t.Fatal("AICODED_TEST_MYSQL_DSN is not a valid DSN")
-	}
-	admin := open(t, cfg)
-	name := "test_" + strings.ToLower(rand.Text()[:12])
-	_, err = admin.ExecContext(t.Context(), "CREATE DATABASE `"+name+"`")
+	db := sqltest.Open(t)
+	_, err := db.ExecContext(t.Context(), "DELETE FROM contacts")
 	require.NoError(t, err)
-	t.Cleanup(func() { _, _ = admin.ExecContext(context.Background(), "DROP DATABASE `"+name+"`") })
-	cfg.DBName = name
-	cfg.ParseTime, cfg.Loc = true, time.UTC
-	db := open(t, cfg)
-	draft, err := os.ReadFile(filepath.Join("..", ".aicoded", "migration.sql"))
-	require.NoError(t, err)
-	stmts, err := migrate.Split(draft)
-	require.NoError(t, err)
-	for _, stmt := range stmts {
-		_, err := db.ExecContext(t.Context(), stmt)
-		require.NoError(t, err)
-	}
-	return db
-}
-
-func open(t *testing.T, cfg *mysql.Config) *sql.DB {
-	t.Helper()
-	c, err := mysql.NewConnector(cfg)
-	require.NoError(t, err)
-	db := sql.OpenDB(c)
-	t.Cleanup(func() { _ = db.Close() })
 	return db
 }

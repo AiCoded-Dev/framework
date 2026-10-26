@@ -64,7 +64,9 @@ make check   # checks the generated protobuf code, in every module runs go test 
 ```
 
 - Tests that need MySQL read the admin DSN of a MySQL 8 server from `AICODED_TEST_MYSQL_DSN` and
-  skip without it; `AICODED_E2E_MYSQL=required` makes them fail instead. The browser tests need
+  skip without it; `AICODED_E2E_MYSQL=required` makes them fail instead. The examples' database
+  tests open the test database that `aicoded check` makes, so `go test` in an example skips them,
+  and the end-to-end tests run them on that server with nothing skipped. The browser tests need
   Chrome, and `AICODED_E2E_BROWSER=required` makes them fail without it.
 - `make docs` rewrites `llms.txt` and the code the docs quote from the examples; `go test ./docs/`
   fails until both are current.

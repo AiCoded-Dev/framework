@@ -43,6 +43,7 @@ not for changing the framework itself. Follow them in every change.
   module the app uses.
 - Open the database and file stores once, in `OnStart`. Use the context of the request or call
   being served for everything else.
+- Schema changes go in `.aicoded/migration.sql`; never commit it; `aicoded publish` sends it.
 - To end a request from a hook, return `web.NotFound()`, `web.Forbidden()`,
   `web.Error(status, message)` or `web.Redirect("/path")`; otherwise return nil, or the error.
   The viewer sees only these messages; any other error shows "Something went wrong.", logged.
@@ -59,16 +60,15 @@ not for changing the framework itself. Follow them in every change.
   a database driver: the building blocks reach everything through the runner, and `log/slog`
   logs. App code imports only its own packages, the building blocks, the standard packages that
   `aicoded explain E-LINT-001` lists, and the modules that `modules:` in `aicoded.yaml` declares.
-  This is a rule for app code: until a test kit exists, a test may open the MySQL server that
-  `AICODED_TEST_MYSQL_DSN` names, as the examples' tests do.
+  Tests open the test database with `sqltest.Open(t)` of `aicoded.dev/framework/sqldb/sqltest`.
 - Never call `sql.Open`, `sql.OpenDB`, `rpc.Call`, `web.New`, `http.Get`, `http.Post`,
   `http.ListenAndServe` or `http.NewServeMux`: get the database from `sqldb.Open`, call another
   app through its generated client in `services/<app>/`, and call `app.Main` with an
   `app.Options` literal written in the call, whose `Handler` and `RPC` are only
   `pages.NewHandler(...)` and `rpc.Server()`, which `aicoded generate` writes.
-- Never edit generated files: `*_gen.go`, `*_gen.ts`, `pages/assets_gen/`, `.aicoded/`, and the
-  `access` and `services` sections of `aicoded.yaml`. Change the template, `rpc/` or the rest of
-  the permission list, and run `aicoded generate`.
+- Never edit generated files: `*_gen.go`, `*_gen.ts`, `pages/assets_gen/`, `.aicoded/` but
+  `migration.sql`, and the `access` and `services` sections of `aicoded.yaml`. Change the
+  template, `rpc/` or the rest of the permission list, and run `aicoded generate`.
 - Never put a form value, a name, an email address, a phone number or any other personal data in
   a log line, a print or a span: `aicoded check` refuses every value from outside the app that
   reaches one, such as a form value, the viewer's identity, a row of the database or a secret

@@ -66,8 +66,9 @@ people is a staff directory. Its pages:
 | `/users/<login>/contacts` | `staff`, then a `Guard` | the user's phones and emails, from contacts |
 
 - `deps.Deps` in [people/deps/deps.go](people/deps/deps.go), which `main` passes to `app.Main` as
-  `OnStart`, opens the database and the photo store, creates and fills the `users` table, and
-  reads `team_address`. Its hubs carry live values from page to page: a `reactive.Broadcast` for
+  `OnStart`, opens the database and the photo store, fills the `users` table when it is empty,
+  and reads `team_address`. The table comes from people's draft of schema changes,
+  [people/.aicoded/migration.sql](people/.aicoded/migration.sql). Its hubs carry live values from page to page: a `reactive.Broadcast` for
   the open home pages and one for added users, and a `reactive.Topic` keyed by login for when a
   viewer last opened a page.
 - Adding a user inserts it in a transaction that commits only once its photos are stored, inside
@@ -88,17 +89,16 @@ people is a staff directory. Its pages:
   `Alice` and `alice ` are not `alice`.
 
 Its tests check the add form's checks of the login and the photos, the contact form's address
-check and idempotency key, and the card's initials without a runner. They check the database code
-against the MySQL server that `AICODED_TEST_MYSQL_DSN` names, skipping without it, with the photo
-store in memory. They open that server with the driver `github.com/go-sql-driver/mysql`: app code
-never imports a database driver, but until a test kit exists a test may open the MySQL server that
-`AICODED_TEST_MYSQL_DSN` names.
+check and idempotency key, and the card's initials without a runner. They check the database code,
+with the photo store in memory, on the test database that `aicoded check` makes from the draft,
+which they open with `sqltest.Open(t)` and empty first; elsewhere those tests are skipped.
 
 ## contacts
 
 contacts has no pages. It keeps the contacts in its own SQL database: `deps.Start`, which `main`
-passes to `app.Main` as `OnStart`, opens the database, creates the `contacts` table and, when the
-table is empty, fills it with sample people. The app serves one function, in
+passes to `app.Main` as `OnStart`, opens the database and, when the `contacts` table is empty,
+fills it with sample people. The table comes from its draft,
+[contacts/.aicoded/migration.sql](contacts/.aicoded/migration.sql). The app serves one function, in
 [contacts/rpc/rpc.go](contacts/rpc/rpc.go):
 
 ```go
@@ -115,8 +115,8 @@ func Contacts(ctx context.Context, in ContactsIn) (ContactsOut, error)
   padding, so `Alice` and `alice ` are not `alice`.
 
 Its tests check the rule, and that `Contacts` checks it before it reads the database, without a
-runner, and the database code against the MySQL server that `AICODED_TEST_MYSQL_DSN` names;
-without the variable those tests are skipped. They open that server as people's tests do.
+runner, and the database code on the test database that `aicoded check` makes, as people's tests
+do.
 
 ## room-maintenance
 
@@ -126,12 +126,22 @@ ticket and change its status, which shows live in every open list that holds the
 [README](room-maintenance/README.md) shows where each rule is checked: the access rules, a `Guard`
 on each ticket, the SQL that reads and changes tickets, and the hubs that wake the lists.
 
+## Schema changes
+
+Each example keeps its tables in its draft of schema changes, `.aicoded/migration.sql`, which
+`aicoded dev` and `aicoded check` apply before the app starts or its tests run. The examples
+commit their drafts, since they are never published; an app of your own keeps its draft out of
+git, and `aicoded publish` sends it. See [schema changes](../docs/guides/schema-changes.md).
+
 ## Checks
 
 `make check` in the checkout tests, lints and scans every example like the framework itself, and
 `TestExamplesAreGenerated` fails when an example's generated files are out of date.
 `aicoded check --frozen examples` checks every example without writing anything: it reports
-generated files that are out of date, and builds, vets, lints and tests each app.
+generated files that are out of date, and builds, vets, lints and tests each app, on a test
+database of its own when `dev.yaml` names `mysql:`. Under `make check`, the end-to-end tests run
+it on the MySQL server that `AICODED_TEST_MYSQL_DSN` names, and run the examples' database tests
+there with nothing skipped.
 
 The end-to-end tests in `cmd/aicoded/internal/e2e` run the three examples under `aicoded dev` and
 drive people and room-maintenance in Chrome. They drop the `ac-dev-contacts`, `ac-dev-people` and

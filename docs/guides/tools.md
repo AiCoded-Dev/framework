@@ -252,6 +252,9 @@ record. [Publishing](publishing.md) tells the whole story.
   or all of it on the first publish, at most 32 MiB (E-PUB-009), with the app's name and a
   summary: `-m`, or the commit's subject. The first publish of a name creates the app, owned by
   you.
+- It sends the draft of schema changes, `.aicoded/migration.sql`, with the commit, and refuses a
+  commit that holds it (E-MIG-001). Once the publish passed, it deletes the draft, as
+  `aicoded status` does after `--no-wait`. See [Schema changes](schema-changes.md).
 - It prints `Published <app> at <commit> as <id>.`, then waits for the outcome, asking every 3
   seconds for up to 35 minutes, and prints the steps, the problems as `aicoded check` prints
   them, the notes, which do not stop a publish, and the status. It exits with 0 when the publish

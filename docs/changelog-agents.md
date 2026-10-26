@@ -4,13 +4,28 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- Schema changes moved out of app code into the draft `.aicoded/migration.sql`, which stays out of
+  git and travels with `aicoded publish`; the platform applies it, as the database's owner, when a
+  release rolls out, and the app's own database user reads and writes rows only. Move every
+  `CREATE TABLE` and other schema change from `OnStart` to the draft, and keep only the code that
+  fills tables. The examples, `guides/sql-database`, `tasks/new-app`, `tasks/list-from-database`
+  and the package doc of `sqldb` now do so, the examples' tests use `sqltest.Open(t)`, and the new
+  guide `guides/schema-changes` tells what a draft may hold and what happens at publish and at
+  release. A new app's `AGENTS.md` says: schema changes go in `.aicoded/migration.sql`; never
+  commit it; `aicoded publish` sends it.
+- The floor: apps below v0.6.0 are not released (E-REL-003). Require v0.6.0 or later and move DDL
+  to `.aicoded/migration.sql`.
+- New codes: E-MIG-001 to E-MIG-006 (the draft and the migrations), E-LINT-013 (a schema change
+  in app code), E-DATA-001 and E-DATA-002 (notes on data). Changed: E-LINT-007 (DDL is no longer
+  allowed) and E-REL-003 (the floor is v0.6.0).
 - `aicoded dev` gives an app that declares `sqldb` a data-only database user: `mysql.sock` logs in
   as `ac-dev-<app>`, which may only `SELECT`, `INSERT`, `UPDATE` and `DELETE`, so a schema change
   from app code gets MySQL's access-denied error. Before every start, it applies, as the owner
   `ao-dev-<app>`, the migrations the app published, fetched from the platform with the sign-in and
   cached in `.aicoded/migrations.json`, then the draft, `.aicoded/migration.sql`. A changed draft,
   or a database whose journal does not match, makes the dev database again. A refused draft or a
-  failed step stops the app (E-MIG-001 to E-MIG-006).
+  failed step stops the app (E-MIG-001 to E-MIG-006). A cache it cannot read is a warning line,
+  and only the draft is applied.
 - `aicoded check` makes a test database for each app that declares `sqldb`, when `dev.yaml` names
   `mysql:`, and runs its tests with `AICODED_TEST_DB` set. New package
   `aicoded.dev/framework/sqldb/sqltest`: `sqltest.Open(t)` opens it as the data user, and skips

@@ -12,20 +12,19 @@ import (
 
 var db *sql.DB // the database Open returned in OnStart
 
-// Open the database once, in OnStart, and create the app's tables there. Keep the *sql.DB in the
-// app's deps for every page.
+// Open the database once, in OnStart, and keep the *sql.DB in the app's deps for every page. Its
+// tables come from the app's draft of schema changes, .aicoded/migration.sql, such as
+//
+//	CREATE TABLE notes (
+//		id BIGINT AUTO_INCREMENT PRIMARY KEY,
+//		owner VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL,
+//		title VARCHAR(200) NOT NULL,
+//		created DATETIME NOT NULL
+//	);
 func ExampleOpen() {
 	onStart := func(ctx context.Context) error {
 		var err error
 		db, err = sqldb.Open(ctx)
-		if err != nil {
-			return err
-		}
-		_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS notes (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
-			owner VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL,
-			title VARCHAR(200) NOT NULL,
-			created DATETIME NOT NULL)`)
 		return err
 	}
 	_ = onStart

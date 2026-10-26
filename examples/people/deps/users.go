@@ -195,8 +195,8 @@ func scan(row interface{ Scan(...any) error }) (User, error) {
 	return u, err
 }
 
-// prepare fills the users table, which .aicoded/migration.sql creates, with seed when it is empty.
-func prepare(ctx context.Context, db *sql.DB) error {
+// fill adds seed to the users table, which .aicoded/migration.sql creates, when the table is empty.
+func fill(ctx context.Context, db *sql.DB) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

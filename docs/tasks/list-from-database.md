@@ -10,14 +10,36 @@ rows.
    `classes: [internal]`. Open it once, in `Deps.Start`, with `sqldb.Open(ctx)`, as
    [Start a new app](new-app.md) shows. There is no DSN: the runner logs in as the app's own
    database user.
-2. Create the table in the app's draft of schema changes, `.aicoded/migration.sql`: app code may
-   not change the schema (E-LINT-013). Fill it in `Start`, before the app serves. people fills
-   `users` in one transaction when it is empty:
+2. Create the table in the app's draft of schema changes, `.aicoded/migration.sql`, never in app
+   code (E-LINT-013). The draft stays out of git, and `aicoded publish` sends it with the commit;
+   [Schema changes](../guides/schema-changes.md) tells what it may hold. people's draft:
 
-   <!-- code: examples/people/deps/users.go prepare -->
+   <!-- code: examples/people/.aicoded/migration.sql -->
+   ```sql
+   -- The contacts tab compares a login with the viewer's Subject, so the column holds any Subject, of
+   -- at most 512 bytes, and compares exactly, with no case folding and no trailing-space padding, so
+   -- "Alice" and "alice " are not "alice".
+   CREATE TABLE users (
+   	id BIGINT AUTO_INCREMENT PRIMARY KEY,
+   	login VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL UNIQUE,
+   	name VARCHAR(100) NOT NULL,
+   	age TINYINT UNSIGNED NOT NULL,
+   	team VARCHAR(40) NOT NULL,
+   	languages VARCHAR(100) NOT NULL,
+   	on_site BOOL NOT NULL,
+   	remote BOOL NOT NULL,
+   	shift TINYINT UNSIGNED NOT NULL,
+   	bio TEXT NOT NULL
+   );
+   ```
+
+   `aicoded dev` applies it to the app's dev database before the app starts. Fill the table in
+   `Start`, before the app serves; people fills `users` in one transaction when it is empty:
+
+   <!-- code: examples/people/deps/users.go fill -->
    ```go
-   // prepare fills the users table, which .aicoded/migration.sql creates, with seed when it is empty.
-   func prepare(ctx context.Context, db *sql.DB) error {
+   // fill adds seed to the users table, which .aicoded/migration.sql creates, when the table is empty.
+   func fill(ctx context.Context, db *sql.DB) error {
    	tx, err := db.BeginTx(ctx, nil)
    	if err != nil {
    		return err
@@ -166,12 +188,16 @@ rows.
 
 - `aicoded check` generates, builds, vets, lints and tests the app.
 - `aicoded dev` makes the app's own database, `ac-dev-people`, on the MySQL server that
-  `dev.yaml` names. Open `http://people.localhost:8080/users` as a persona with the `staff` role.
+  `dev.yaml` names, and applies the draft to it. Open `http://people.localhost:8080/users` as a
+  persona with the `staff` role.
+- The app's tests open the test database that `aicoded check` makes with
+  `sqltest.Open(t)`, from `aicoded.dev/framework/sqldb/sqltest`.
 - The dev UI's Traces page shows each statement as a span, such as `sql.query`, which records
   only the statement's first word, never its text or its values.
 
 ## See also
 
 - [SQL database](../guides/sql-database.md)
+- [Schema changes](../guides/schema-changes.md)
 - [Template syntax](../guides/template-syntax.md)
 - [The permission list](../guides/permission-list.md)
