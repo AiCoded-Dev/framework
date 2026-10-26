@@ -6,7 +6,8 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 - E-LINT-013: app code may not change the schema. SQL passed to `database/sql` that starts with
   `CREATE`, `ALTER`, `DROP`, `RENAME` or `TRUNCATE` is refused; write the change in
-  `.aicoded/migration.sql`. E-LINT-007 now allows only `SELECT`, `INSERT`, `UPDATE`, `DELETE`,
+  `.aicoded/migration.sql`. SQL that names `aicoded_migrations`, the platform's journal of
+  migrations, is refused with E-LINT-013 too. E-LINT-007 now allows only `SELECT`, `INSERT`, `UPDATE`, `DELETE`,
   `REPLACE` and `WITH`.
 - `aicoded check` checks the app's draft, `.aicoded/migration.sql`, when it has one, with the
   rules of `migrate` (E-MIG-001 to E-MIG-003, at the draft's lines), and refuses a draft of an

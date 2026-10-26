@@ -220,3 +220,12 @@ func TestCheckPositionsName(t *testing.T) {
 	require.ErrorAs(t, err, &coded)
 	assert.Equal(t, ".aicoded/migration.sql:1", coded.Pos)
 }
+
+func TestIsJournal(t *testing.T) {
+	for _, name := range []string{"aicoded_migrations", "AICODED_MIGRATIONS", "aİcoded_mİgratİons", "aıcoded_mıgratıons"} {
+		assert.True(t, migrate.IsJournal(name), name)
+	}
+	for _, name := range []string{"aicoded_migrations_log", "app_migrations", "aicoded-migrations", "app.aicoded_migrations", ""} {
+		assert.False(t, migrate.IsJournal(name), name)
+	}
+}

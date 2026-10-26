@@ -22,7 +22,7 @@ The MCP setup page of the dev UI shows the commands for Claude Code and Codex, a
 | Tool | What it does |
 |---|---|
 | `app_create` | creates a new app in its own folder of the workspace, as `aicoded init` does, with its `AGENTS.md` |
-| `check` | runs lint's precheck of GOFLAGS and the `vendor` folder, `aicoded generate`, `go build`, `go vet`, the lint rules for app code and the tests for every app or one, and lists each problem with its code, `file:line` and fix; `frozen` writes nothing |
+| `check` | runs lint's precheck of GOFLAGS and the `vendor` folder, `aicoded generate`, the check of the draft `.aicoded/migration.sql`, `go build`, `go vet`, the lint rules for app code and the tests for every app or one, and lists each problem with its code, `file:line` and fix, and each app's notes in the same shape, which do not fail the check; `frozen` writes nothing |
 | `preview` | builds and starts, or restarts, an app in `aicoded dev`, and returns its state and local address, or the problems that stop it |
 | `what_broke` | lists what went wrong: the problems of failed apps, the last error log lines and the last failed spans |
 | `describe` | summarises the apps, as `aicoded describe` does |

@@ -129,7 +129,11 @@ func Run(ctx context.Context, dir string, cfg Config) (Result, error) {
 		}
 		for _, d := range act.Diagnostics {
 			file, line, column := a.position(act.Package.Fset, d.Pos)
-			a.report(file, line, column, d.Category, d.Message)
+			f := finding{file: file, line: line, column: column, code: d.Category, message: d.Message}
+			if len(d.SuggestedFixes) > 0 {
+				f.fix = d.SuggestedFixes[0].Message
+			}
+			a.found = append(a.found, f)
 		}
 	}
 	if err := a.taint(ctx, pkgs); err != nil {
@@ -236,6 +240,8 @@ type finding struct {
 	file          string
 	line, column  int
 	code, message string
+	// fix is the fix of this finding, when it is not the one of its code.
+	fix string
 }
 
 // analyzers returns the analyzers of the rules that read the app's type-checked Go files. Each
@@ -265,6 +271,11 @@ func (a *app) analyzer(name string, check func(*analysis.Pass)) *analysis.Analyz
 // diagnose reports a finding of the rule code at pos.
 func diagnose(p *analysis.Pass, pos token.Pos, code, message string) {
 	p.Report(analysis.Diagnostic{Pos: pos, Category: code, Message: message})
+}
+
+// diagnoseFix reports a finding of the rule code at pos whose fix is fix, one of the rule's Also.
+func diagnoseFix(p *analysis.Pass, pos token.Pos, code, message, fix string) {
+	p.Report(analysis.Diagnostic{Pos: pos, Category: code, Message: message, SuggestedFixes: []analysis.SuggestedFix{{Message: fix}}})
 }
 
 // isGenerated reports whether f is a file of Config.Generated. It goes by the file read, not by
@@ -309,7 +320,8 @@ func (a *app) problems() []*errs.Error {
 	return coded(a.found, fix)
 }
 
-// coded returns found as coded errors with the fix of each code, sorted by position.
+// coded returns found as coded errors, sorted by position, each with its own fix or else the fix
+// of its code.
 func coded(found []finding, fix func(code string) string) []*errs.Error {
 	slices.SortFunc(found, func(x, y finding) int {
 		return cmp.Or(cmp.Compare(x.file, y.file), cmp.Compare(x.line, y.line), cmp.Compare(x.column, y.column),
@@ -321,7 +333,11 @@ func coded(found []finding, fix func(code string) string) []*errs.Error {
 		if f.line > 0 {
 			pos += ":" + strconv.Itoa(f.line)
 		}
-		out = append(out, errs.At(pos, f.code, f.message, fix(f.code)))
+		fixText := f.fix
+		if fixText == "" {
+			fixText = fix(f.code)
+		}
+		out = append(out, errs.At(pos, f.code, f.message, fixText))
 	}
 	return out
 }

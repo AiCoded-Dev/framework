@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
+
+	"aicoded.dev/framework/migrate"
 )
 
 // sqlMethods are the methods of database/sql that take SQL, as refused names them. The SQL is
@@ -28,7 +30,7 @@ var sqlMethods = func() []string {
 // executable comment, a statement of a kind allowedStatement refuses, more than one statement or
 // a file access of the database server, a method of sqlMethods that is not called directly,
 // which would hide its SQL, and a method that lint cannot tell from one of sqlMethods; and, with
-// E-LINT-013, constant SQL that changes the schema. It reads generated files too, which hold the
+// E-LINT-013, constant SQL that changes the schema or names the journal of migrations. It reads generated files too, which hold the
 // code of the templates. It records the write of every constant statement.
 func (a *app) constantSQL(p *analysis.Pass) {
 	for _, f := range p.Files {
@@ -89,6 +91,11 @@ func (a *app) sqlCall(p *analysis.Pass, call *ast.CallExpr, called map[*ast.Iden
 	}
 	if kw := schemaChange(sql); kw != "" {
 		diagnose(p, call.Args[i].Pos(), "E-LINT-013", "the SQL passed to "+display(m)+" is a schema change, "+kw+", which app code may not make")
+		return
+	}
+	if journalNamed(sqlWords(sql)) {
+		diagnoseFix(p, call.Args[i].Pos(), "E-LINT-013", "the SQL passed to "+display(m)+
+			" names aicoded_migrations, the platform's journal of migrations, which app code may not read or write", journalFix)
 		return
 	}
 	if !allowedStatement(sql) {
@@ -153,6 +160,18 @@ func schemaChange(sql string) string {
 		return kw
 	}
 	return ""
+}
+
+// journalNamed reports whether words, the words of a statement, name the journal of migrations,
+// aicoded_migrations, as a table or as a part of a qualified name, in any case MySQL folds onto
+// it.
+func journalNamed(words []string) bool {
+	for _, w := range words {
+		if isName(w) && slices.ContainsFunc(strings.Split(w, "."), migrate.IsJournal) {
+			return true
+		}
+	}
+	return false
 }
 
 // allowedStatement reports whether sql is one of the statement kinds E-LINT-007 allows: a query

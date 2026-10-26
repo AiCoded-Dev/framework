@@ -101,7 +101,7 @@ func readable(toks []token) error {
 		case i > 0 && t.up() == "SELECT":
 			return notAllowed("a query inside a schema change",
 				"write a DEFAULT as a literal value, list a new table's columns rather than copy them, and fill tables from the app's code")
-		case t.isName() && isJournal(t.name()):
+		case t.isName() && IsJournal(t.name()):
 			return notAllowed("the table "+journal+" is the platform's journal of migrations",
 				"give your table another name, such as app_migrations")
 		}
@@ -257,9 +257,10 @@ func clauses(toks []token) ([][]token, error) {
 // there, with ALTER.
 var destroying = []string{"DROP", "MODIFY", "CHANGE", "RENAME", "TRUNCATE"}
 
-// isJournal reports whether name names the journal under any case folding MySQL may apply to
-// table names: Unicode simple folding, and İ and ı to i.
-func isJournal(name string) bool {
+// IsJournal reports whether name, a table name without quotes, names the journal of migrations,
+// aicoded_migrations, under any case folding MySQL may apply to table names: Unicode simple
+// folding, and İ and ı to i. Lint uses it to keep app code away from the journal.
+func IsJournal(name string) bool {
 	runes := []rune(name)
 	if len(runes) != len(journal) {
 		return false

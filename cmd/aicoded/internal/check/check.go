@@ -124,12 +124,12 @@ func Run(ctx context.Context, dir string, opts Options) (Report, error) {
 			r.Apps = append(r.Apps, App{Name: a.Name, Dir: a.Dir, Problems: problem.FromErrs(a.Name, ps)})
 			continue
 		}
-		app, notes, err := checkApp(ctx, a, names, opts, r.Race)
+		app, held, err := checkApp(ctx, a, names, opts, r.Race)
 		if err != nil {
 			return Report{}, err
 		}
 		r.Apps = append(r.Apps, app)
-		r.Notes = append(r.Notes, notes...)
+		r.Notes = append(r.Notes, held...)
 	}
 	return r, nil
 }
@@ -149,7 +149,7 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 		out.Problems = problem.From(a.Name, err)
 		return out, nil, nil
 	}
-	notes, err := generate.CheckHeld(a.Name, names)
+	held, err := generate.CheckHeld(a.Name, names)
 	if err != nil {
 		out.Problems = problem.From(a.Name, err)
 		return out, nil, nil
@@ -190,7 +190,7 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 			break
 		}
 	}
-	return out, notes, nil
+	return out, held, nil
 }
 
 // codedErrs returns the coded errors that err is or joins, or err itself when one of them has no

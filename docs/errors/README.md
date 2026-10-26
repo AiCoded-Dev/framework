@@ -102,7 +102,8 @@ Schema changes use these codes:
 - E-MIG-005: a step that failed while it was applied.
 - E-MIG-006: a draft while the permission list declares no `sqldb`.
 
-E-LINT-013 refuses a schema change in app code: it goes in the draft.
+E-LINT-013 refuses a schema change in app code, which goes in the draft, and SQL in app code that
+names `aicoded_migrations`, the platform's journal of migrations.
 
 Notes on where data goes, which never stop a check or a publish, use these codes:
 

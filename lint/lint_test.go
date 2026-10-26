@@ -41,7 +41,8 @@ func runIn(t *testing.T, dir string, cfg lint.Config) []string {
 	require.NoError(t, err)
 	var out []string
 	for _, p := range r.Problems {
-		assert.Equal(t, rule(t, p.Code).Fix, p.Fix)
+		code := rule(t, p.Code)
+		assert.Contains(t, append([]string{code.Fix}, code.Also...), p.Fix)
 		out = append(out, p.Pos+": "+p.Code+": "+p.Msg)
 	}
 	return out
@@ -97,6 +98,9 @@ func TestRules(t *testing.T) {
 		first, _, _ := strings.Cut(string(page), "\n")
 		assert.Equal(t, "# "+r.Code+": "+r.Title, first)
 		assert.Contains(t, string(page), "\n**Fix:** "+r.Fix)
+		for _, fix := range r.Also {
+			assert.Contains(t, string(page), fix, "%s names each fix", r.Code)
+		}
 	}
 }
 
@@ -814,11 +818,23 @@ func TestSQL(t *testing.T) {
 		`main.go:129: E-LINT-013: the SQL passed to sql.DB.ExecContext is a schema change, DROP, which app code may not make`,
 		`main.go:130: E-LINT-013: the SQL passed to sql.DB.Exec is a schema change, CREATE, which app code may not make`,
 		`main.go:131: E-LINT-013: the SQL passed to sql.DB.ExecContext is a schema change, ALTER, which app code may not make`,
-	}, run(t, "sql"), "a constant expression is a constant, in every form a method that takes SQL is called, an allowed statement kind, no schema change, one statement and no file of the server")
+		`main.go:138: E-LINT-013: the SQL passed to sql.DB.QueryRowContext names aicoded_migrations, the platform's journal of migrations, which app code may not read or write`,
+		`main.go:139: E-LINT-013: the SQL passed to sql.Tx.ExecContext names aicoded_migrations, the platform's journal of migrations, which app code may not read or write`,
+		`main.go:140: E-LINT-013: the SQL passed to sql.DB.ExecContext names aicoded_migrations, the platform's journal of migrations, which app code may not read or write`,
+		`main.go:141: E-LINT-013: the SQL passed to sql.DB.ExecContext names aicoded_migrations, the platform's journal of migrations, which app code may not read or write`,
+	}, run(t, "sql"), "a constant expression is a constant, in every form a method that takes SQL is called, an allowed statement kind, no schema change, not the journal, one statement and no file of the server")
 
 	r, err := lint.Run(t.Context(), filepath.Join("testdata", "sql"), lint.Config{})
 	require.NoError(t, err)
+	for _, p := range r.Problems {
+		if strings.Contains(p.Msg, "journal") {
+			assert.Equal(t, "do not read or write aicoded_migrations; schema changes go in .aicoded/migration.sql", p.Fix, p.Pos)
+		} else {
+			assert.Equal(t, rule(t, p.Code).Fix, p.Fix, p.Pos)
+		}
+	}
 	assert.Equal(t, []lint.Write{
+		{Table: "aicoded_migrations_log", Op: "DELETE"},
 		{Table: "app.tags", Op: "REPLACE"},
 		{Table: "drafts", Op: "DELETE"},
 		{Table: "notes", Op: "DELETE"},

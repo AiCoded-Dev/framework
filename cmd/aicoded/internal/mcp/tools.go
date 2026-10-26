@@ -186,7 +186,7 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 		Description: "Create a new app in its own folder of this workspace, with a permission list (aicoded.yaml), a main.go, one page and AGENTS.md, the rules for AI assistants that build the app."},
 		s.appCreate)
 	tool(srv, &mcpsdk.Tool{Name: "check", Annotations: rerun,
-		Description: "Run aicoded generate, go build, go vet, the lint rules for app code and the tests for every app, or one, and list each problem with its code, file:line and fix. It rewrites generated files unless frozen."},
+		Description: "Run aicoded generate, the check of the schema-change draft, go build, go vet, the lint rules for app code and the tests for every app, or one, and list each problem with its code, file:line and fix, and each app's notes in the same shape, which do not fail the check. It rewrites generated files unless frozen."},
 		s.check)
 	tool(srv, &mcpsdk.Tool{Name: "preview", Annotations: rerun,
 		Description: "Build and start, or restart, an app in aicoded dev and return its state and local address, or the problems that stop it."},

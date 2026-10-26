@@ -132,3 +132,13 @@ func schema(ctx context.Context, db *sql.DB, tx *sql.Tx) {
 	_ = db.QueryRowContext(ctx, "SELECT 'CREATE TABLE notes' FROM notes")
 	_, _ = db.ExecContext(ctx, "INSERT INTO notes (body) VALUES ('DROP TABLE notes')")
 }
+
+// journal reads and writes the platform's journal of migrations, and tables that only look so.
+func journal(ctx context.Context, db *sql.DB, tx *sql.Tx) {
+	_ = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM aicoded_migrations")
+	_, _ = tx.ExecContext(ctx, "INSERT INTO `AICODED_MIGRATIONS` (seq) VALUES (?)", 1)
+	_, _ = db.ExecContext(ctx, "DELETE FROM app.aicoded_migrations")
+	_, _ = db.ExecContext(ctx, "UPDATE notes n JOIN aİcoded_mİgratİons m ON m.seq = n.id SET n.body = ''")
+	_ = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM app_migrations WHERE note <> 'aicoded_migrations'")
+	_, _ = db.ExecContext(ctx, "DELETE FROM aicoded_migrations_log")
+}

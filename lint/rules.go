@@ -8,7 +8,9 @@ type Rule struct {
 	Title string // the title of the rule's page, docs/errors/<Code>.md
 	Dont  string // what app code must not do, in one sentence
 	Do    string // what it does instead, in one sentence
-	Fix   string // the one-line fix of every finding of the rule
+	Fix   string // the one-line fix of every finding of the rule, but those that Also covers
+	// Also holds the fixes of particular findings of the rule, which its page names too.
+	Also []string
 }
 
 var rules = []Rule{
@@ -99,15 +101,23 @@ var rules = []Rule{
 	{
 		Code:  "E-LINT-013",
 		Title: "schema change in app code",
-		Dont:  "Run CREATE, ALTER, DROP, RENAME or TRUNCATE from app code.",
-		Do:    "Write each schema change in .aicoded/migration.sql, which aicoded publish sends with the commit, and only read and write rows from app code.",
+		Dont:  "Run CREATE, ALTER, DROP, RENAME or TRUNCATE from app code, or read or write aicoded_migrations, the platform's journal of migrations.",
+		Do:    "Write each schema change in .aicoded/migration.sql, which aicoded publish sends with the commit, and only read and write the rows of the app's own tables from app code.",
 		Fix:   "write it in .aicoded/migration.sql; the platform applies it when the release rolls out",
+		Also:  []string{journalFix},
 	},
 }
 
+// journalFix is the fix of E-LINT-013 for SQL that names the journal of migrations.
+const journalFix = "do not read or write aicoded_migrations; schema changes go in .aicoded/migration.sql"
+
 // Rules returns every rule, sorted by code.
 func Rules() []Rule {
-	return slices.Clone(rules)
+	out := slices.Clone(rules)
+	for i := range out {
+		out[i].Also = slices.Clone(out[i].Also)
+	}
+	return out
 }
 
 // fix returns the fix of the rule code.
