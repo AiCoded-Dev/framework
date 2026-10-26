@@ -387,7 +387,7 @@ func TestRunStatusNotes(t *testing.T) {
 		"  demo: main.go:9: E-GATE-015: unchecked error\n    fix: handle it\n    docs: https://aicoded.dev/docs/errors/E-GATE-015\n"+
 		"  note: demo: main.go:12: E-GATE-025: //nolint silences a check\n    fix: remove it\n    docs: https://aicoded.dev/docs/errors/E-GATE-025\n"+
 		"  note: demo: go.mod:7: E-GATE-022: GO-2026-0001 is not called\n    fix: upgrade\n    docs: https://aicoded.dev/docs/errors/E-GATE-022\n"+
-		"  checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later\n"+
+		"  checks: the security checks of layers L1 to L5, L8 and L9 ran; simulated attacks (L7) come later\n"+
 		"  change record 3\nfailed: 1 problem\n", out, "notes follow the problems, and only problems are counted")
 
 	code, out, _ = aicoded("status", "--json", id)

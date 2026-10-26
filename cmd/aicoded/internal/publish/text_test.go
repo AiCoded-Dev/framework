@@ -12,8 +12,8 @@ import (
 
 func TestWriteTextChecks(t *testing.T) {
 	for checks, want := range map[string]string{
-		"all":        "  checks: the security checks of layers L1 to L5 and the simulated attacks (L7) ran\n",
-		"all-but-l7": "  checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later\n",
+		"all":        "  checks: the security checks of layers L1 to L5, L8 and L9, and the simulated attacks (L7), ran\n",
+		"all-but-l7": "  checks: the security checks of layers L1 to L5, L8 and L9 ran; simulated attacks (L7) come later\n",
 		"partial":    "  partial checks: not every security check ran; the steps above say which\n",
 		"later":      "  checks: later\n",
 		"":           "",

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 
+	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/migrate"
 )
 
@@ -21,8 +22,13 @@ const maxSteps = 2000
 // Migrations returns the steps of the migrations that the app name published, in order, as the
 // platform applies them when a release rolls out. An app the platform does not have has none. Another
 // builder's app is E-PUB-005. Every step must be numbered in order, come from a publish and hold
-// the hash of its statement.
+// the hash of its statement. Without a sign-in kept for the platform, or when the credentials file
+// cannot be read, it asks nothing, takes no lock and returns E-CLI-004; a credentials file that
+// others can read is E-CLI-007.
 func (c *Client) Migrations(ctx context.Context, name string) ([]migrate.Step, error) {
+	if err := c.signedIn(); err != nil {
+		return nil, err
+	}
 	body, err := json.Marshal(map[string]string{"app": name})
 	if err != nil {
 		return nil, err
@@ -65,4 +71,20 @@ func validSteps(steps []migrate.Step) bool {
 		}
 	}
 	return true
+}
+
+// signedIn returns nil when the credentials file keeps a sign-in to the platform, which it reads
+// without the lock on the file. Without one, or when the file cannot be read, it returns E-CLI-004,
+// and E-CLI-007 when others can read the file.
+func (c *Client) signedIn() error {
+	cr, err := Load(c.address)
+	switch {
+	case errs.Code(err) != "":
+		return err
+	case err != nil:
+		return signedOut("not signed in to the platform at " + c.address + ": " + clean(err.Error(), 300))
+	case cr.AccessToken == "" || cr.RefreshToken == "":
+		return signedOut("not signed in to the platform at " + c.address)
+	}
+	return nil
 }

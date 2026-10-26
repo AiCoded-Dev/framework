@@ -2,6 +2,8 @@ package dev
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
+	"aicoded.dev/framework/cmd/aicoded/internal/testhome"
 	"aicoded.dev/framework/migrate"
 )
 
@@ -41,4 +44,15 @@ func TestSession(t *testing.T) {
 	require.NoError(t, ask("notes"), "a restart a minute later asks again")
 	require.ErrorIs(t, ask("notes"), migrations.ErrUseCache)
 	assert.Equal(t, int32(3), p.n.Load())
+}
+
+// A builder who never signed in, with a configuration folder that others can open, gets one line
+// that says so, not a refusal of the folder.
+func TestPlatformWithoutASignIn(t *testing.T) {
+	home := testhome.Set(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".config", "aicoded"), 0o755))
+	t.Setenv("AICODED_PLATFORM", "http://127.0.0.1:1")
+	steps, warning := migrations.Published(t.Context(), t.TempDir(), "notes", Platform())
+	assert.Empty(t, steps)
+	assert.Equal(t, "E-CLI-004: not signed in to the platform at http://127.0.0.1:1; only the draft is applied", warning)
 }

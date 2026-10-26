@@ -73,7 +73,8 @@ Publishing uses these codes:
   the checks.
 - E-GATE-000: a finding of a check that has no code of its own.
 - E-GATE-013 to E-GATE-017: what staticcheck, gosec, errcheck, bodyclose and sqlclosecheck find.
-- E-GATE-018 and E-GATE-019: a secret in the commit or in its history.
+- E-GATE-018 and E-GATE-019: a secret in the commit, in the draft of schema changes the publish
+  carried, or in its history.
 - E-GATE-020: a critical known weakness that the app calls.
 - E-GATE-021 to E-GATE-025 are notes, which do not stop a publish: known weaknesses that the app
   calls but that are not critical or are in the Go standard library, known weaknesses that the app
@@ -98,8 +99,11 @@ Schema changes use these codes:
   executable comment, `DELIMITER` or a name with a database in front.
 - E-MIG-003: a destructive statement: `DROP`, `RENAME`, `TRUNCATE`, or `ALTER TABLE` with a
   `DROP`, `MODIFY`, `CHANGE`, `RENAME` or `ALTER` clause.
-- E-MIG-004: migrations that differ from those the database ran.
-- E-MIG-005: a step that failed while it was applied.
+- E-MIG-004: migrations that differ from those the database ran, and on the platform a release
+  of a publish whose schema changes were rejected after a step failed on production data.
+- E-MIG-005: a step that failed while it was applied; on the platform, the schema changes after
+  a step that MySQL refused on production data are rejected, and a step that could not finish is
+  tried again with the next release.
 - E-MIG-006: a draft while the permission list declares no `sqldb`.
 
 E-LINT-013 refuses a schema change in app code, which goes in the draft, and SQL in app code that

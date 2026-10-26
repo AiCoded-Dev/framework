@@ -113,6 +113,8 @@ publish pub_hoskmcer6l2grf5cxrfq3ilioe of rooms at 1a2b3c4: Add the list of room
   licences        passed
   sbom            passed
   capabilities    passed
+  migrations      passed
+  data            passed
   build           passed
   tests           passed
   attacks         failed
@@ -123,7 +125,7 @@ publish pub_hoskmcer6l2grf5cxrfq3ilioe of rooms at 1a2b3c4: Add the list of room
   note: rooms: deps/rooms.go:31: E-GATE-025: //nolint:errcheck silences a check
     fix: remove the directive and fix what the check reports
     docs: https://aicoded.dev/docs/errors/E-GATE-025
-  checks: the security checks of layers L1 to L5 and the simulated attacks (L7) ran
+  checks: the security checks of layers L1 to L5, L8 and L9, and the simulated attacks (L7), ran
   change record 7
 failed: 1 problem
 ```
@@ -166,19 +168,25 @@ security checks, which the change record names too.
 | `licences` | L3 Known weaknesses | reads the licence of each module with go-licenses | nothing |
 | `sbom` | L3 Known weaknesses | lists the app's modules with Syft, as an SBOM | nothing |
 | `capabilities` | L2 Stays in its limits | follows the app's calls to the network, files and other capabilities with capslock | nothing |
+| `migrations` | L9 Safe data changes | checks the draft of schema changes that the publish carried, `.aicoded/migration.sql`, with the rules of `aicoded check`, and refuses a commit that holds the draft | E-MIG-001 to E-MIG-003 and E-MIG-006 |
+| `data` | L8 Stays in its limits | notes the data that may reach the app's mail, as `aicoded check` finds it, and each data class that the permission list adds | nothing |
 | `build` | L1 Approved parts only | builds the app's program | a build that fails |
 | `tests` | L1 Approved parts only | runs the tests with `-race` | a failing test (E-CHK-004) |
 | `attacks` | L7 Simulated attacks | starts the app it built and attacks it: requests without a session or a role, another viewer on each guarded page, and markup in every field | E-GATE-029 to E-GATE-034 and E-GATE-036 |
 | `personal-data` | L7 Simulated attacks | searches what the app wrote during the attacks, its output and its spans, for what was entered in its forms | E-GATE-035 and E-GATE-037 |
 
 `checkout` and `modules` come first, and a problem in either skips the rest. The steps from
-`check` to `capabilities` run no code of the app, and they run whatever one of them finds, so one
-publish shows every problem they find, with one exception: when `check` finds Go that does not
+`check` to `data` run no code of the app, and they run whatever one of them finds, so one
+publish shows every problem they find, with two exceptions: when `check` finds Go that does not
 compile (E-CHK-002) or `go mod tidy` fails (E-CHK-006), the steps that read the app's packages,
-`lint`, `vulnerabilities`, `licences` and `capabilities`, are `skipped`, while `secrets` and
-`sbom` still run. `build` and `tests` run only when all of them passed. `attacks` and
-`personal-data` run only when `tests` passed, on one run of the app, and `personal-data` is
-skipped when `attacks` ended in `error` or the app did not start (E-GATE-036).
+`lint`, `vulnerabilities`, `licences` and `capabilities`, are `skipped`, while `secrets`, `sbom`
+and `migrations` still run; and `data`, which takes its notes from `check`, is `skipped` when
+`check` stopped before it read the app's code. The draft's problems that `check` finds show in
+`migrations`, and `secrets` scans the draft too: a secret there is E-GATE-018 at
+`.aicoded/migration.sql:<line>`. `build` and `tests` run only when all of them passed.
+`attacks` and `personal-data` run only when `tests` passed, on one run of the app, and
+`personal-data` is skipped when `attacks` ended in `error` or the app did not start
+(E-GATE-036).
 [Simulated attacks](simulated-attacks.md) says what each attack does and how to let the attacks
 reach every page. A step that runs out of time, memory or disk is E-GATE-012, and tests that stop
 the checks, or the go command that runs them (E-CHK-008), are E-GATE-028. A finding of a check
@@ -202,7 +210,10 @@ change record counts the notes, and security sees them, so fix them when you can
 - E-GATE-024: the app reaches a capability, such as the network or files, without a building
   block;
 - E-GATE-025: a directive silences a check;
-- E-GATE-038: a page the simulated attacks did not reach, which the change record lists too.
+- E-GATE-038: a page the simulated attacks did not reach, which the change record lists too;
+- E-DATA-001: data from the app's database, its files, its inbox or a secret that the app's mail
+  may send;
+- E-DATA-002: a data class that the permission list adds, which the app did not have before.
 
 A known weakness that the app calls stops the publish when its score is 9.0 or more: the highest
 CVSS score of the weakness and its aliases, such as its CVE id, in the OSV database (E-GATE-020).
@@ -222,15 +233,35 @@ with, such as `go 1.25.0` when it builds with Go 1.26 (E-GATE-026): `go mod edit
 raises it.
 
 A publish whose `attacks` step ran says
-`checks: the security checks of layers L1 to L5 and the simulated attacks (L7) ran`. A publish
-whose `lint` step ran but not its attacks, such as one whose tests failed or one to a platform
-that does not run the attacks yet, says
-`checks: the security checks of layers L1 to L5 ran; simulated attacks (L7) come later`. Any
-other publish says `partial checks: not every security check ran; the steps above say which`,
+`checks: the security checks of layers L1 to L5, L8 and L9, and the simulated attacks (L7), ran`.
+A publish whose `lint`, `migrations` and `data` steps ran but not its attacks, such as one whose
+tests failed or one to a platform that does not run the attacks yet, says
+`checks: the security checks of layers L1 to L5, L8 and L9 ran; simulated attacks (L7) come later`.
+Any other publish says `partial checks: not every security check ran; the steps above say which`,
 such as one that has not ended, one that a step before `lint` stopped, or one whose `check` found
 Go that does not compile; an older platform that runs only `aicoded check` and the tests says it
-of every publish. Approvals and releases to production come later, so a publish that passes is
-checked and recorded, but runs nowhere yet.
+of every publish. Approvals come later, so a publish that passes is checked and recorded, and
+runs in production only once the platform releases it.
+
+## When a release stops at a schema change
+
+When the platform releases a publish to production, it first applies the app's schema changes
+that the production database has not run yet, as [schema changes](schema-changes.md) tells. When
+one of them fails, the release stops and the version that runs keeps serving (E-MIG-005). The
+message names the step, as `<publish>#<index>`, and MySQL's error number, with a fixed short text
+such as `MySQL error 1062 (duplicate key)`, never MySQL's own message, which can quote the app's
+data.
+
+- **MySQL refused the statement on production data**, such as a unique key over rows that repeat
+  a value. The steps that ran in production stay, and the schema changes after them are rejected:
+  every publish that holds them is never released, and `aicoded status` and `release_status`
+  show E-MIG-005 as a problem of each such publish, though its status stays `passed`. A release
+  of one is refused with E-MIG-004. Put a corrected version of the unreleased changes in
+  `.aicoded/migration.sql`, leaving out the steps that ran, and publish again. `aicoded dev`
+  makes the dev database again from the app's migrations and the new draft.
+- **The step could not finish**, through a lock wait, a deadlock, a time limit or a broken
+  connection. Nothing is rejected: the publish shows E-MIG-005 as a note, and the next release
+  tries the step again.
 
 ## What security sees
 
@@ -263,7 +294,9 @@ says which sections are enforced today, and which the platform only records for 
 - E-GATE-000 and E-GATE-013 to E-GATE-020: what the security checks find in the code, its
   history and its modules.
 - E-GATE-029 to E-GATE-037: what the simulated attacks find in the running app.
-- E-GATE-021 to E-GATE-025 and E-GATE-038: notes, which do not stop a publish.
+- E-MIG-001 to E-MIG-006: the draft of schema changes, and the migrations a release applies.
+- E-GATE-021 to E-GATE-025, E-GATE-038, E-DATA-001 and E-DATA-002: notes, which do not stop a
+  publish.
 
 `aicoded explain <code>` prints the page of each, as does the `howto` tool of `aicoded mcp`.
 

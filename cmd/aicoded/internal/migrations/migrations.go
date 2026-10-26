@@ -92,7 +92,8 @@ func publishedDraft(dir string, published []migrate.Step) bool {
 
 // Published returns the steps of the migrations that the app app in dir published, as Steps
 // does. When the platform lists none but the cache holds some, or the answer is the cache and it
-// cannot be read, warning says so.
+// cannot be read, warning says so. When p is not signed in, E-CLI-004, warning starts with that
+// error rather than with the platform it could not ask.
 func Published(ctx context.Context, dir, app string, p Platform) (steps []migrate.Step, warning string) {
 	c, found, cerr := read(dir)
 	cached := func() ([]migrate.Step, string) {
@@ -111,12 +112,15 @@ func Published(ctx context.Context, dir, app string, p Platform) (steps []migrat
 		return cached()
 	}
 	if err != nil {
-		why := "could not get the migrations " + app + " published from the platform: " + reason(err)
+		why, theCached := "could not get the migrations "+app+" published from the platform: "+reason(err), "the ones"
+		if errs.Code(err) == "E-CLI-004" {
+			why, theCached = reason(err), "the migrations"
+		}
 		switch {
 		case cerr != nil:
 			return nil, why + "; " + cerr.Error() + ", so only the draft is applied"
 		case found:
-			return c.Steps, why + "; the ones cached in " + Cache + " are applied"
+			return c.Steps, why + "; " + theCached + " cached in " + Cache + " are applied"
 		}
 		return nil, why + "; only the draft is applied"
 	}

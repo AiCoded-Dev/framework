@@ -104,10 +104,12 @@ declares `sqldb`, `aicoded dev` applies to the app's database, as the owner:
 1. the migrations the app published, which it asks the platform for with your sign-in and keeps
    in `.aicoded/migrations.json`. It asks at the app's first start, and again at a Start or
    Restart on the dev UI or the `preview` tool once its last answer is a minute old; a rebuild
-   after a change takes the kept ones. When you are not signed in or the platform cannot be
-   reached, it applies the ones kept there and prints one warning line, or, with none kept, only
-   the draft. A `.aicoded/migrations.json` it cannot read is a warning line too, and only the
-   draft is applied;
+   after a change takes the kept ones. When you are not signed in, or your sign-in cannot be
+   read, it does not ask the platform: it prints one warning line,
+   `E-CLI-004: not signed in to the platform at <address>; only the draft is applied`, or, with
+   migrations kept there, applies them and says so. When the platform cannot be reached, it
+   applies the ones kept there and prints one warning line, or, with none kept, only the draft. A
+   `.aicoded/migrations.json` it cannot read is a warning line too, and only the draft is applied;
 2. then the statements of the draft, `.aicoded/migration.sql`, the next schema change.
 
 The database's journal, the table `aicoded_migrations`, holds what ran. A draft that grows is

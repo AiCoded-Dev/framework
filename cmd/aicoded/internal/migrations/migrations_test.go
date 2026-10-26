@@ -15,6 +15,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform/platformtest"
 	"aicoded.dev/framework/cmd/aicoded/internal/testhome"
+	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/migrate"
 )
@@ -88,6 +89,23 @@ func TestStepsWithoutCache(t *testing.T) {
 	_, _, err = Steps(t.Context(), dir, notes, fake{})
 	require.NoError(t, err)
 	assert.False(t, exists(dir, Cache), "an app with nothing published gets no cache")
+}
+
+func TestStepsWithoutASignIn(t *testing.T) {
+	dir := app(t, "CREATE TABLE b (y INT);\n")
+	out := fake{err: errs.New("E-CLI-004", "not signed in to the platform at https://a.example", "run aicoded login")}
+	steps, warning, err := Steps(t.Context(), dir, notes, out)
+	require.NoError(t, err)
+	assert.Equal(t, "E-CLI-004: not signed in to the platform at https://a.example; only the draft is applied", warning)
+	assert.Equal(t, Append(nil, Draft, []string{"CREATE TABLE b (y INT)"}), steps)
+
+	_, _, err = Steps(t.Context(), dir, notes, fake{steps: published})
+	require.NoError(t, err)
+	steps, warning, err = Steps(t.Context(), dir, notes, out)
+	require.NoError(t, err)
+	assert.Equal(t, "E-CLI-004: not signed in to the platform at https://a.example; the migrations cached in .aicoded/migrations.json "+
+		"are applied", warning)
+	assert.Len(t, steps, 2, "the cached step, then the draft's")
 }
 
 func TestStepsRefusesTheDraft(t *testing.T) {

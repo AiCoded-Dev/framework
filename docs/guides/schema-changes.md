@@ -150,11 +150,24 @@ itself only ever gets a user that reads and writes rows. The database keeps what
 journal, the table `aicoded_migrations`, which app code may not read or write (E-LINT-013).
 
 - A step that fails, waits more than 30 seconds for a table another session uses, or runs for
-  more than 5 minutes stops the release (E-MIG-005). The version that runs keeps serving, the
-  steps before it stay applied, and the next try starts at the step that failed.
+  more than 5 minutes stops the release (E-MIG-005). The version that runs keeps serving, and the
+  steps before it stay applied. The message names the step and MySQL's error number, with a
+  fixed short text such as `MySQL error 1062 (duplicate key)`, never MySQL's own message, which
+  can quote the app's data.
+- When MySQL refused the statement on production data, such as a unique key over rows that
+  repeat a value, the schema changes after the steps that ran are rejected: no publish that holds
+  them is ever released, `aicoded status` and `release_status` show E-MIG-005 on each, with the
+  step, and the app's migrations become the steps that ran. Put a corrected version of the
+  unreleased changes in `.aicoded/migration.sql`, leaving out the steps that ran, and publish
+  again: the platform refuses a publish whose draft repeats one of them (E-MIG-001). `aicoded dev`
+  then makes the dev database again from the app's migrations and the new draft.
+- When the step could not finish, through a lock wait, a deadlock, a time limit or a broken
+  connection, nothing is rejected: the publish shows E-MIG-005 as a note, and the next release
+  tries the step again.
 - A rollback to an older release, whose steps the database ran already, applies nothing.
 - A release whose migrations do not start with what the database ran, such as one from another
-  line of publishes, is refused (E-MIG-004).
+  line of publishes, is refused (E-MIG-004), and so is a release of a publish whose schema changes
+  were rejected.
 
 ## A published change never changes
 

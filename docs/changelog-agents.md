@@ -4,6 +4,37 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- A step of the migrations that MySQL refuses on production data stops the release, and the
+  version that runs keeps serving; the schema changes after the steps that ran are rejected, so no
+  publish that holds them is ever released. `aicoded status` and `release_status` show E-MIG-005
+  as a problem of each such publish, which stays `passed`, and a release of one is refused with
+  E-MIG-004. Put a corrected version of the unreleased changes in `.aicoded/migration.sql`,
+  leaving out the steps that ran, and publish again; `aicoded dev` makes the dev database again.
+  A step that could not finish, through a lock wait, a deadlock, a time limit or a broken
+  connection, rejects nothing: the publish shows E-MIG-005 as a note, and the next release tries
+  it again. On the platform the message names the step and MySQL's error number with a fixed
+  short text, such as `MySQL error 1062 (duplicate key)`, never MySQL's own message. The pages of
+  E-MIG-004 and E-MIG-005 say so, and `guides/publishing` and `guides/schema-changes` too.
+- The delivery pipeline runs two more steps after `capabilities`: `migrations` (L9, *Safe data
+  changes*), which checks the draft that the publish carried and refuses a commit that holds it
+  (E-MIG-001 to E-MIG-003, E-MIG-006), and `data` (L8, part of *Stays in its limits*), which
+  carries the notes E-DATA-001 and E-DATA-002 and never fails a publish.
+- `aicoded publish` and `aicoded status` print `checks: all-but-l7`, which the platform gives once
+  `lint`, `migrations` and `data` ran, as
+  `checks: the security checks of layers L1 to L5, L8 and L9 ran; simulated attacks (L7) come later`,
+  and `all` as
+  `checks: the security checks of layers L1 to L5, L8 and L9, and the simulated attacks (L7), ran`.
+- E-GATE-007: the platform builds apps with v0.6.0 and later only; for an app older than v0.6.0
+  the fix is to require v0.6.0 or a later listed version and move DDL from the app's code to
+  `.aicoded/migration.sql`.
+- E-GATE-018: the delivery pipeline scans the draft of schema changes for secrets too, and a
+  secret there is at `.aicoded/migration.sql:<line>`.
+- `aicoded dev` and `aicoded check` no longer ask the platform for the published migrations
+  without a sign-in, or when the sign-in cannot be read, and no longer report the configuration
+  folder's lock or mode then: they print one line,
+  `E-CLI-004: not signed in to the platform at <address>; only the draft is applied`, or apply
+  the migrations cached in `.aicoded/migrations.json` and say so. A sign-in that others can read
+  is still E-CLI-007.
 - Schema changes moved out of app code into the draft `.aicoded/migration.sql`, which stays out of
   git and travels with `aicoded publish`; the platform applies it, as the database's owner, when a
   release rolls out, and the app's own database user reads and writes rows only. Move every
