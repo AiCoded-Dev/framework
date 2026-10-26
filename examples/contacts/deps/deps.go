@@ -61,20 +61,9 @@ func Contacts(ctx context.Context, login string) (phones, emails []string, err e
 	return phones, emails, nil
 }
 
-// prepare creates the contacts table and, when it is empty, fills it with seed. A login is
-// compared with the viewer's Subject, so the column holds any Subject, of at most 512 bytes, and
-// compares exactly, with no case folding and no trailing-space padding, so "Alice" and "alice "
-// are not "alice".
+// prepare fills the contacts table, which .aicoded/migration.sql creates, with seed when it is
+// empty.
 func prepare(ctx context.Context, conn *sql.DB) error {
-	if _, err := conn.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS contacts (
-		id BIGINT AUTO_INCREMENT PRIMARY KEY,
-		login VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL,
-		kind ENUM('phone', 'email') NOT NULL,
-		value VARCHAR(254) NOT NULL,
-		UNIQUE KEY (login, kind, value)
-	)`); err != nil {
-		return err
-	}
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err

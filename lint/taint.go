@@ -111,10 +111,12 @@ func (s *summary) equal(o *summary) bool {
 		maps.Equal(s.sinks, o.sinks) && maps.Equal(s.places, o.places)
 }
 
-// sink is a call that records a value: its position, and what it calls, as messages name it.
+// sink is a call that records a value, or with mail, one that sends it in mail: its position,
+// and what it calls, as messages name it.
 type sink struct {
 	pos  token.Pos
 	name string
+	mail bool
 }
 
 // place is a global variable or a pool.
@@ -186,6 +188,8 @@ type imethod struct {
 // taint reports, with E-LINT-008, outside data that reaches a recording call in a file of the
 // app, generated files included: a log, a print or a span. A call that may be one of several
 // recording functions, such as a call of a function value, is reported once and names them all.
+// It notes, with E-DATA-001, each call in a file of the app that may send data from the app's
+// database, its files, its inbox or a secret in mail.
 // Its error says that ctx ended, that no package belongs to the app's module, or that a package
 // cannot be built for the analysis.
 func (a *app) taint(ctx context.Context, pkgs []*packages.Package) error {
@@ -231,8 +235,12 @@ func (a *app) taint(ctx context.Context, pkgs []*packages.Package) error {
 			}
 		}
 	}
-	reached, names := map[token.Pos]labels{}, map[token.Pos][]string{}
+	reached, names, mailed := map[token.Pos]labels{}, map[token.Pos][]string{}, map[token.Pos]labels{}
 	for at, l := range t.found {
+		if at.mail {
+			mailed[at.pos] |= l
+			continue
+		}
 		reached[at.pos] |= l
 		names[at.pos] = append(names[at.pos], at.name)
 	}
@@ -241,7 +249,42 @@ func (a *app) taint(ctx context.Context, pkgs []*packages.Package) error {
 		file, line, column := a.position(prog.Fset, pos)
 		a.report(file, line, column, "E-LINT-008", describe(l)+" reaches "+either(names[pos]))
 	}
+	for pos, l := range mailed {
+		if note := mailNote(l); note != "" {
+			file, line, column := a.position(prog.Fset, pos)
+			a.noted = append(a.noted, finding{file: file, line: line, column: column, code: "E-DATA-001", message: note})
+		}
+	}
 	return nil
+}
+
+// dataFlowFix is the fix of E-DATA-001.
+const dataFlowFix = "nothing, when the mail may carry this data to its recipients; otherwise send an id, " +
+	"a count or a link to the app instead"
+
+// mailedKinds names the kinds of outside data that E-DATA-001 notes in mail, in the order of
+// their bits.
+var mailedKinds = []struct {
+	kind labels
+	name string
+}{{dbValue, "the app's database"}, {inboxMail, "its inbox"}, {storedFile, "its files"}, {secret, "a secret"}}
+
+// mailNote returns the message of E-DATA-001 for l, what a call that sends mail may carry, or ""
+// when it carries none of the kinds the note names: "the app's database or a secret reaches mail".
+func mailNote(l labels) string {
+	var names []string
+	for _, m := range mailedKinds {
+		if l&m.kind != 0 {
+			names = append(names, m.name)
+		}
+	}
+	switch {
+	case len(names) == 0:
+		return ""
+	case names[len(names)-1] == "its files":
+		return either(names) + " reach mail"
+	}
+	return either(names) + " reaches mail"
 }
 
 // collect fills funcs, and the functions that dynamic calls and calls of interface methods may

@@ -21,6 +21,11 @@ var recorders = setOf(slices.Concat(
 	},
 ))
 
+// mailers are the functions outside the app that send their arguments in mail. What reaches one
+// is noted (E-DATA-001) when it comes from the app's database, its files, its inbox or a secret,
+// and never refused.
+var mailers = setOf([]string{Framework + "/mailer.Send"})
+
 // logCalls are the functions of log/slog that log, and the methods of *slog.Logger with the same
 // names.
 var logCalls = []string{
@@ -236,9 +241,9 @@ var requests = setOf([]string{Framework + "/web.Request", "net/http.Request"})
 
 // tabled holds every function and method that a table names.
 var tabled = setOf(slices.Concat(
-	slices.Collect(maps.Keys(recorders)), slices.Collect(maps.Keys(sources)), slices.Collect(maps.Keys(writers)),
-	slices.Collect(maps.Keys(keepers)), slices.Collect(maps.Keys(links)), slices.Collect(maps.Keys(putters)),
-	slices.Collect(maps.Keys(getters)),
+	slices.Collect(maps.Keys(recorders)), slices.Collect(maps.Keys(mailers)), slices.Collect(maps.Keys(sources)),
+	slices.Collect(maps.Keys(writers)), slices.Collect(maps.Keys(keepers)), slices.Collect(maps.Keys(links)),
+	slices.Collect(maps.Keys(putters)), slices.Collect(maps.Keys(getters)),
 ))
 
 // tableMethods returns every method that the tables name.

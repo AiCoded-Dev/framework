@@ -510,6 +510,89 @@ func TestCheckHeldSnapshots(t *testing.T) {
 	assert.Equal(t, []string{"precheck shop", "race shop"}, *ran, "nothing is built with a broken held snapshot")
 }
 
+// withDraft declares sqldb in the permission list of the app in dir, and writes text as its draft
+// unless text is "".
+func withDraft(t *testing.T, dir, text string) {
+	yaml := filepath.Join(dir, "aicoded.yaml")
+	write(t, yaml, read(t, yaml)+"data:\n  - source: sqldb\n    classes: [internal]\n")
+	if text != "" {
+		write(t, filepath.Join(dir, ".aicoded", "migration.sql"), text)
+	}
+}
+
+func TestCheckDraft(t *testing.T) {
+	requireGo(t)
+	ran := record(t)
+	for name, c := range map[string]struct {
+		text string
+		want brief
+	}{
+		"destructive":        {"CREATE TABLE a (x INT);\nDROP TABLE b;\n", brief{"calc", "E-MIG-003", ".aicoded/migration.sql:2"}},
+		"executable comment": {"/*!50000 CREATE TABLE a (x INT) */;", brief{"calc", "E-MIG-002", ".aicoded/migration.sql:1"}},
+		"over 64 KiB":        {"-- " + strings.Repeat("x", 64<<10), brief{"calc", "E-MIG-001", ".aicoded/migration.sql"}},
+	} {
+		root := tempRoot(t)
+		withDraft(t, calc(t, root, "calc", false), c.text)
+		*ran = nil
+		r, err := Run(t.Context(), root, Options{})
+		require.NoError(t, err)
+		assert.Equal(t, []brief{c.want}, briefs(r.Apps[0].Problems), name)
+		assert.Equal(t, []string{"precheck calc", "race calc"}, *ran, "nothing is built after the draft fails: %s", name)
+	}
+}
+
+func TestCheckDraftWithoutDatabase(t *testing.T) {
+	requireGo(t)
+	root := tempRoot(t)
+	write(t, filepath.Join(calc(t, root, "calc", false), ".aicoded", "migration.sql"), "CREATE TABLE a (x INT);")
+	r, err := Run(t.Context(), root, Options{NoTests: true})
+	require.NoError(t, err)
+	assert.Equal(t, []brief{{"calc", "E-MIG-006", ".aicoded/migration.sql"}}, briefs(r.Apps[0].Problems))
+}
+
+func TestCheckCleanDraft(t *testing.T) {
+	requireGo(t)
+	root := tempRoot(t)
+	withDraft(t, calc(t, root, "drafted", false), "CREATE TABLE a (x INT);\n")
+	withDraft(t, calc(t, root, "plain", false), "")
+	r, err := Run(t.Context(), root, Options{})
+	require.NoError(t, err)
+	assert.True(t, r.OK(), "a clean draft and no draft pass")
+}
+
+func TestCheckNotes(t *testing.T) {
+	requireGo(t)
+	root := tempRoot(t)
+	dir := pagesApp(t, root, "shop")
+	write(t, filepath.Join(dir, "mail", "mail.go"), `// Package mail mails the first user's name.
+package mail
+
+import (
+	"context"
+	"database/sql"
+
+	"aicoded.dev/framework/mailer"
+)
+
+// Mail mails the first user's name.
+func Mail(ctx context.Context, db *sql.DB) error {
+	var name string
+	if err := db.QueryRowContext(ctx, "SELECT name FROM users LIMIT 1").Scan(&name); err != nil {
+		return err
+	}
+	_, err := mailer.Send(ctx, mailer.Message{IdempotencyKey: "first", Text: name})
+	return err
+}
+`)
+	r, err := Run(t.Context(), root, Options{NoTests: true, FrameworkDir: checkout(t)})
+	require.NoError(t, err)
+	assert.True(t, r.OK(), "a note does not fail the app")
+	assert.Equal(t, []brief{{"shop", "E-DATA-001", "mail/mail.go:17"}}, briefs(r.Apps[0].Notes))
+	b, err := json.Marshal(r)
+	require.NoError(t, err)
+	assert.Contains(t, string(b), `"notes":[{"app":"shop","code":"E-DATA-001","pos":"mail/mail.go:17","message":"the app's database reaches mail","fix":`)
+}
+
 func TestCheckRefusesWorkspace(t *testing.T) {
 	_, err := Run(t.Context(), t.TempDir(), Options{})
 	assert.Equal(t, "E-MAN-006", errs.Code(err))
@@ -517,10 +600,11 @@ func TestCheckRefusesWorkspace(t *testing.T) {
 
 func TestWriteText(t *testing.T) {
 	fail := problem.From("shop", errs.At("main.go:4", "E-CHK-002", "undefined: x", "fix the Go code at this line"))
+	note := errs.At("deps/mail.go:9", "E-DATA-001", "a secret reaches mail", "send an id instead")
 	r := Report{
 		Apps: []App{
 			{Name: "billing", Dir: "/w/billing", Changed: []string{"rpc/server_gen.go"}, Warnings: []string{"pages/x.ts:3: duplicate key"},
-				Surface: &surface.Surface{Size: 2, EntryPoints: 2, Effects: 1}},
+				Surface: &surface.Surface{Size: 2, EntryPoints: 2, Effects: 1}, Notes: problem.From("billing", note)},
 			{Name: "shop", Dir: "/w/shop", Problems: append(fail, fail...)},
 		},
 		Notes: []string{"tests ran without -race: cgo is off; the delivery pipeline will run them with -race"},
@@ -531,6 +615,9 @@ func TestWriteText(t *testing.T) {
   wrote rpc/server_gen.go
   warning: pages/x.ts:3: duplicate key
   surface 2 (2 entry points, 1 effect)
+  note: billing: deps/mail.go:9: E-DATA-001: a secret reaches mail
+    fix: send an id instead
+    docs: https://aicoded.dev/docs/errors/E-DATA-001
 FAIL shop
   shop: main.go:4: E-CHK-002: undefined: x
     fix: fix the Go code at this line

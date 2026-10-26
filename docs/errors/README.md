@@ -17,6 +17,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | PUB | `aicoded publish` and `aicoded status`, and the `publish` and `release_status` tools of `aicoded mcp` |
 | GATE | the security checks of the platform's delivery pipeline, in the problems and notes of a publish |
 | REL | the platform's release of a publish to production |
+| DATA | notes on where the app's data goes, in `aicoded check` and the delivery pipeline: they never stop a check or a publish |
 | MIG | schema changes: the draft `.aicoded/migration.sql` in `aicoded check`, `aicoded dev` and the delivery pipeline, and the migrations applied to a database |
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
@@ -91,7 +92,8 @@ Publishing uses these codes:
 
 Schema changes use these codes:
 
-- E-MIG-001: a draft too large, not UTF-8, with no statement, or committed to git.
+- E-MIG-001: a draft too large, not UTF-8, with no statement, not a file in the app's folder,
+  or committed to git.
 - E-MIG-002: a statement that a schema change may not hold, such as one that changes data, an
   executable comment, `DELIMITER` or a name with a database in front.
 - E-MIG-003: a destructive statement: `DROP`, `RENAME`, `TRUNCATE`, or `ALTER TABLE` with a
@@ -99,6 +101,14 @@ Schema changes use these codes:
 - E-MIG-004: migrations that differ from those the database ran.
 - E-MIG-005: a step that failed while it was applied.
 - E-MIG-006: a draft while the permission list declares no `sqldb`.
+
+E-LINT-013 refuses a schema change in app code: it goes in the draft.
+
+Notes on where data goes, which never stop a check or a publish, use these codes:
+
+- E-DATA-001: data from the app's database, its files, its inbox or a secret that a call of
+  `mailer.Send` may send.
+- E-DATA-002: a data class that the permission list adds.
 
 Releasing uses these codes, each a release that the platform refuses before anything runs:
 

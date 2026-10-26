@@ -53,8 +53,9 @@ func main() {
 }
 ```
 
-`prepare` creates the table with `CREATE TABLE IF NOT EXISTS` and, in one transaction, fills it
-with sample rows when it is empty.
+The table comes from the app's draft of schema changes, `.aicoded/migration.sql`: app code may
+not change the schema (E-LINT-013). `prepare` fills the table, in one transaction, with sample
+rows when it is empty.
 
 ## Queries
 

@@ -20,20 +20,11 @@ type Note struct {
 // Deps is filled by Start before the app serves.
 type Deps struct{ DB *sql.DB }
 
-// Start opens the database and creates the notes table. An owner compares exactly, with no case
-// folding and no trailing-space padding.
+// Start opens the database. Its notes table comes from .aicoded/migration.sql, the app's draft
+// of schema changes.
 func (d *Deps) Start(ctx context.Context) error {
 	db, err := sqldb.Open(ctx)
 	if err != nil {
-		return err
-	}
-	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS notes (
-		id BIGINT AUTO_INCREMENT PRIMARY KEY,
-		owner VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL,
-		title VARCHAR(100) NOT NULL,
-		body TEXT NOT NULL,
-		KEY (owner)
-	)`); err != nil {
 		return err
 	}
 	d.DB = db

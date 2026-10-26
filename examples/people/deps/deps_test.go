@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -15,6 +16,8 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"aicoded.dev/framework/migrate"
 )
 
 func TestUsers(t *testing.T) {
@@ -135,9 +138,10 @@ func (s memStore) Remove(name string) error {
 	return nil
 }
 
-// testDB returns a new, empty database on the MySQL server that AICODED_TEST_MYSQL_DSN names,
-// and drops it when the test ends. Without the variable the test is skipped, or fails when
-// AICODED_E2E_MYSQL is required. Nothing here prints the DSN, which holds a password.
+// testDB returns a new database on the MySQL server that AICODED_TEST_MYSQL_DSN names, with the
+// tables of the app's draft, .aicoded/migration.sql, and drops it when the test ends. Without
+// the variable the test is skipped, or fails when AICODED_E2E_MYSQL is required. Nothing here
+// prints the DSN, which holds a password.
 func testDB(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("AICODED_TEST_MYSQL_DSN")
@@ -158,7 +162,16 @@ func testDB(t *testing.T) *sql.DB {
 	t.Cleanup(func() { _, _ = admin.ExecContext(context.Background(), "DROP DATABASE `"+name+"`") })
 	cfg.DBName = name
 	cfg.ParseTime, cfg.Loc = true, time.UTC
-	return open(t, cfg)
+	db := open(t, cfg)
+	draft, err := os.ReadFile(filepath.Join("..", ".aicoded", "migration.sql"))
+	require.NoError(t, err)
+	stmts, err := migrate.Split(draft)
+	require.NoError(t, err)
+	for _, stmt := range stmts {
+		_, err := db.ExecContext(t.Context(), stmt)
+		require.NoError(t, err)
+	}
+	return db
 }
 
 func open(t *testing.T, cfg *mysql.Config) *sql.DB {

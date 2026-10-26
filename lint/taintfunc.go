@@ -239,8 +239,8 @@ func (f *flow) put(p place, l labels) {
 	}
 }
 
-// reach records that l reaches the recording call at: its kinds of outside data as a finding,
-// and its inputs in the summary.
+// reach records that l reaches the recording or mailing call at: its kinds of outside data as a
+// finding, and its inputs in the summary.
 func (f *flow) reach(at sink, l labels) {
 	if k := l & kinds; k != 0 && at.pos.IsValid() {
 		f.t.found[at] |= k
@@ -252,11 +252,21 @@ func (f *flow) reach(at sink, l labels) {
 
 // record reports that the call at pos of what messages name name records the values args.
 func (f *flow) record(pos token.Pos, name string, args []ssa.Value) {
+	f.reach(sink{pos: f.t.checked(pos), name: name}, f.carried(args))
+}
+
+// mail reports that the call at pos of what messages name name sends the values args in mail.
+func (f *flow) mail(pos token.Pos, name string, args []ssa.Value) {
+	f.reach(sink{pos: f.t.checked(pos), name: name, mail: true}, f.carried(args))
+}
+
+// carried returns what the values vals carry together.
+func (f *flow) carried(vals []ssa.Value) labels {
 	var l labels
-	for _, a := range args {
-		l |= f.l[a]
+	for _, v := range vals {
+		l |= f.l[v]
 	}
-	f.reach(sink{pos: f.t.checked(pos), name: name}, l)
+	return l
 }
 
 // hook returns what the parameters of fn are when fn is a function the framework calls with

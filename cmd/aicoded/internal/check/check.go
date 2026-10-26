@@ -1,6 +1,6 @@
 // Package check runs aicoded check on the apps of a workspace: for each app, the precheck of the
-// lint package, generate, the check of the snapshots it holds, go build, go vet, the rules of the
-// lint package and go test.
+// lint package, generate, the check of the snapshots it holds, the check of its schema-change
+// draft, go build, go vet, the rules of the lint package and go test.
 package check
 
 import (
@@ -8,6 +8,7 @@ import (
 	"errors"
 	"path/filepath"
 
+	"aicoded.dev/framework/cmd/aicoded/internal/draft"
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
 	"aicoded.dev/framework/cmd/aicoded/internal/gotool"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
@@ -50,6 +51,9 @@ type App struct {
 	Changed  []string          `json:"changed,omitempty"`
 	Warnings []string          `json:"warnings,omitempty"`
 	Problems []problem.Problem `json:"problems,omitempty"`
+	// Notes are what lint reports without failing the app, such as E-DATA-001, once lint has
+	// read its code.
+	Notes []problem.Problem `json:"notes,omitempty"`
 	// Surface is the app's size, once lint has read its code.
 	Surface *surface.Surface `json:"surface,omitempty"`
 }
@@ -151,6 +155,10 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 		return out, nil, nil
 	}
 	steps := []func() ([]*errs.Error, error){
+		func() ([]*errs.Error, error) {
+			_, err := draft.Check(a.Dir, m)
+			return codedErrs(err)
+		},
 		func() ([]*errs.Error, error) { return goBuild(ctx, a.Dir) },
 		func() ([]*errs.Error, error) { return goVet(ctx, a.Dir) },
 		func() ([]*errs.Error, error) {
@@ -162,6 +170,9 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 			if err == nil {
 				s := surface.Of(m, r.Writes)
 				out.Surface = &s
+				if len(r.Notes) > 0 {
+					out.Notes = problem.FromErrs(a.Name, r.Notes)
+				}
 			}
 			return r.Problems, err
 		},
@@ -180,4 +191,25 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 		}
 	}
 	return out, notes, nil
+}
+
+// codedErrs returns the coded errors that err is or joins, or err itself when one of them has no
+// code.
+func codedErrs(err error) ([]*errs.Error, error) {
+	if err == nil {
+		return nil, nil
+	}
+	all := []error{err}
+	if joined, ok := err.(interface{ Unwrap() []error }); ok {
+		all = joined.Unwrap()
+	}
+	var out []*errs.Error
+	for _, e := range all {
+		var coded *errs.Error
+		if !errors.As(e, &coded) {
+			return nil, err
+		}
+		out = append(out, coded)
+	}
+	return out, nil
 }

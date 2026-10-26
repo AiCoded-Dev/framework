@@ -187,6 +187,9 @@ func (f *flow) outside(name string, fv ssa.Value, args []ssa.Value, out [][]ssa.
 	if recorders[name] {
 		f.record(pos, display(name), args[first:])
 	}
+	if mailers[name] {
+		f.mail(pos, display(name), args[first:])
+	}
 	if k, ok := sources[name]; ok {
 		all = k | in
 	}

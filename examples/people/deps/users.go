@@ -195,25 +195,8 @@ func scan(row interface{ Scan(...any) error }) (User, error) {
 	return u, err
 }
 
-// prepare creates the users table and, when it is empty, fills it with seed. The contacts tab
-// compares a login with the viewer's Subject, so the column holds any Subject, of at most 512
-// bytes, and compares exactly, with no case folding and no trailing-space padding, so "Alice" and
-// "alice " are not "alice".
+// prepare fills the users table, which .aicoded/migration.sql creates, with seed when it is empty.
 func prepare(ctx context.Context, db *sql.DB) error {
-	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS users (
-		id BIGINT AUTO_INCREMENT PRIMARY KEY,
-		login VARCHAR(512) COLLATE utf8mb4_0900_bin NOT NULL UNIQUE,
-		name VARCHAR(100) NOT NULL,
-		age TINYINT UNSIGNED NOT NULL,
-		team VARCHAR(40) NOT NULL,
-		languages VARCHAR(100) NOT NULL,
-		on_site BOOL NOT NULL,
-		remote BOOL NOT NULL,
-		shift TINYINT UNSIGNED NOT NULL,
-		bio TEXT NOT NULL
-	)`); err != nil {
-		return err
-	}
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

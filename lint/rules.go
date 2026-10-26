@@ -58,7 +58,7 @@ var rules = []Rule{
 		Code:  "E-LINT-007",
 		Title: "SQL is not a constant",
 		Dont:  "Build SQL by joining strings, with fmt.Sprintf or from variables, pass a method of database/sql that takes SQL around as a value, put more than one statement in one call, or read or write a file of the database server.",
-		Do:    "Write every statement as a constant query or a simple table change, pass every value with a ? placeholder, and pass a list for IN as one JSON value that JSON_TABLE reads.",
+		Do:    "Write every statement as a constant SELECT, INSERT, UPDATE, DELETE, REPLACE or WITH, pass every value with a ? placeholder, and pass a list for IN as one JSON value that JSON_TABLE reads.",
 		Fix:   "write the SQL as a constant and pass every value with a ? placeholder; when the viewer's role decides which rows to read, write one constant statement for each case and choose one in Go, as tasks/list-by-role shows; for a list in IN, use JSON_TABLE(?, ...) as guides/sql-database shows",
 	},
 	{
@@ -95,6 +95,13 @@ var rules = []Rule{
 		Dont:  "Set a cookie whose name does not start with __Host-, that lacks Path: \"/\" or Secure: true or that has a Domain, write a Set-Cookie header that is not the String() of an http.Cookie, or read a cookie whose name does not start with __Host-.",
 		Do:    "Make each cookie with an http.Cookie literal whose constant Name starts with __Host-, with Path: \"/\", Secure: true and no Domain, set it with w.Header().Add(\"Set-Cookie\", c.String()), and read only __Host- cookies.",
 		Fix:   "name the cookie with a constant that starts with __Host-, set Path: \"/\" and Secure: true, leave out Domain, set it with w.Header().Add(\"Set-Cookie\", c.String()), and read only cookies whose name starts with __Host-",
+	},
+	{
+		Code:  "E-LINT-013",
+		Title: "schema change in app code",
+		Dont:  "Run CREATE, ALTER, DROP, RENAME or TRUNCATE from app code.",
+		Do:    "Write each schema change in .aicoded/migration.sql, which aicoded publish sends with the commit, and only read and write rows from app code.",
+		Fix:   "write it in .aicoded/migration.sql; the platform applies it when the release rolls out",
 	},
 }
 

@@ -55,6 +55,10 @@ type Result struct {
 	// finding has the position GOFLAGS, and a vendor folder with no vendor/modules.txt the
 	// position vendor.
 	Problems []*errs.Error
+	// Notes are what the checks report without refusing it, sorted and placed as Problems are:
+	// E-DATA-001, outside data that a call of mailer.Send may carry from the app's database,
+	// its files, its inbox or a secret.
+	Notes []*errs.Error
 	// Writes are the tables that the app's constant SQL writes, with how, each once, sorted.
 	Writes []Write
 	// Stopped is true when what Precheck reports stopped Run before it loaded the app: Problems
@@ -143,7 +147,7 @@ func Run(ctx context.Context, dir string, cfg Config) (Result, error) {
 	if err := ctx.Err(); err != nil {
 		return Result{}, err
 	}
-	return Result{Problems: a.problems(), Writes: a.sortedWrites()}, nil
+	return Result{Problems: a.problems(), Notes: coded(a.noted, func(string) string { return dataFlowFix }), Writes: a.sortedWrites()}, nil
 }
 
 // Precheck reports, with E-LINT-011, what Run checks in the app in dir before it runs any other
@@ -223,6 +227,8 @@ type app struct {
 	writes map[Write]bool
 	// found holds what the rules found.
 	found []finding
+	// noted holds the notes of the taint analysis.
+	noted []finding
 }
 
 // finding is one problem a rule found.
@@ -300,12 +306,17 @@ func (a *app) rel(name string) string {
 
 // problems returns the findings as coded errors, sorted by position.
 func (a *app) problems() []*errs.Error {
-	slices.SortFunc(a.found, func(x, y finding) int {
+	return coded(a.found, fix)
+}
+
+// coded returns found as coded errors with the fix of each code, sorted by position.
+func coded(found []finding, fix func(code string) string) []*errs.Error {
+	slices.SortFunc(found, func(x, y finding) int {
 		return cmp.Or(cmp.Compare(x.file, y.file), cmp.Compare(x.line, y.line), cmp.Compare(x.column, y.column),
 			cmp.Compare(x.code, y.code), cmp.Compare(x.message, y.message))
 	})
 	var out []*errs.Error
-	for _, f := range a.found {
+	for _, f := range found {
 		pos := f.file
 		if f.line > 0 {
 			pos += ":" + strconv.Itoa(f.line)

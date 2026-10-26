@@ -4,6 +4,18 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- E-LINT-013: app code may not change the schema. SQL passed to `database/sql` that starts with
+  `CREATE`, `ALTER`, `DROP`, `RENAME` or `TRUNCATE` is refused; write the change in
+  `.aicoded/migration.sql`. E-LINT-007 now allows only `SELECT`, `INSERT`, `UPDATE`, `DELETE`,
+  `REPLACE` and `WITH`.
+- `aicoded check` checks the app's draft, `.aicoded/migration.sql`, when it has one, with the
+  rules of `migrate` (E-MIG-001 to E-MIG-003, at the draft's lines), and refuses a draft of an
+  app that declares no `sqldb` (E-MIG-006).
+- Notes, which never fail `aicoded check` or a publish: `aicoded check` prints each app's notes,
+  and `aicoded check --json` lists them in `apps[].notes`, with the fields of `problems`. New
+  codes: E-DATA-001 (data from the app's database, its files, its inbox or a secret that a call
+  of `mailer.Send` may send) and E-DATA-002 (a data class that the permission list adds, noted
+  by the delivery pipeline).
 - New package `migrate`, for the aicoded CLI and the platform: it checks a schema-change draft,
   `.aicoded/migration.sql`, and applies migrations to a database. A draft may only add:
   `CREATE TABLE`, `CREATE INDEX` and `ALTER TABLE … ADD`, with a new `NOT NULL` column given a

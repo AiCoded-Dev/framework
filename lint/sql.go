@@ -27,8 +27,9 @@ var sqlMethods = func() []string {
 // constantSQL reports, with E-LINT-007, SQL that is not a constant expression, that holds an
 // executable comment, a statement of a kind allowedStatement refuses, more than one statement or
 // a file access of the database server, a method of sqlMethods that is not called directly,
-// which would hide its SQL, and a method that lint cannot tell from one of sqlMethods. It reads generated files too,
-// which hold the code of the templates. It records the write of every constant statement.
+// which would hide its SQL, and a method that lint cannot tell from one of sqlMethods; and, with
+// E-LINT-013, constant SQL that changes the schema. It reads generated files too, which hold the
+// code of the templates. It records the write of every constant statement.
 func (a *app) constantSQL(p *analysis.Pass) {
 	for _, f := range p.Files {
 		called := map[*ast.Ident]bool{}
@@ -86,6 +87,10 @@ func (a *app) sqlCall(p *analysis.Pass, call *ast.CallExpr, called map[*ast.Iden
 		diagnose(p, call.Args[i].Pos(), "E-LINT-007", "the SQL passed to "+display(m)+" holds an executable comment, which runs as SQL that lint does not read")
 		return
 	}
+	if kw := schemaChange(sql); kw != "" {
+		diagnose(p, call.Args[i].Pos(), "E-LINT-013", "the SQL passed to "+display(m)+" is a schema change, "+kw+", which app code may not make")
+		return
+	}
 	if !allowedStatement(sql) {
 		diagnose(p, call.Args[i].Pos(), "E-LINT-007", "the SQL passed to "+display(m)+" is not one of the statement kinds lint allows: "+allowedKinds)
 		return
@@ -139,27 +144,23 @@ func executable(sql string) bool {
 }
 
 // allowedKinds names the statement kinds that allowedStatement accepts, for the finding.
-const allowedKinds = "SELECT, INSERT, UPDATE, DELETE, REPLACE, WITH, CREATE TABLE, CREATE INDEX, ALTER TABLE, DROP TABLE and DROP INDEX"
+const allowedKinds = "SELECT, INSERT, UPDATE, DELETE, REPLACE and WITH"
 
-// allowedStatement reports whether sql is one of the statement kinds E-LINT-007 allows. Any other
-// kind is refused, so that a statement that runs viewer data as SQL (PREPARE/EXECUTE), calls a
-// procedure (CALL) or changes how SQL is lexed (SET) cannot pass as constant SQL.
+// schemaChange returns the first keyword of sql when it changes the schema (E-LINT-013): CREATE,
+// ALTER, DROP, RENAME or TRUNCATE. It returns "" for any other statement.
+func schemaChange(sql string) string {
+	if kw := leadingKeyword(sqlWords(sql)); slices.Contains([]string{"CREATE", "ALTER", "DROP", "RENAME", "TRUNCATE"}, kw) {
+		return kw
+	}
+	return ""
+}
+
+// allowedStatement reports whether sql is one of the statement kinds E-LINT-007 allows: a query
+// or a change of rows. Any other kind is refused, so that a statement that runs viewer data as SQL
+// (PREPARE/EXECUTE), calls a procedure (CALL) or changes how SQL is lexed (SET) cannot pass as
+// constant SQL.
 func allowedStatement(sql string) bool {
-	kw := leadingKeywords(sqlWords(sql))
-	if len(kw) == 0 {
-		return false
-	}
-	switch kw[0] {
-	case "SELECT", "INSERT", "UPDATE", "DELETE", "REPLACE", "WITH":
-		return true
-	case "CREATE":
-		return kwAt(kw, 1) == "TABLE" || kwAt(kw, 1) == "INDEX" || kwAt(kw, 1) == "UNIQUE" && kwAt(kw, 2) == "INDEX"
-	case "ALTER":
-		return kwAt(kw, 1) == "TABLE"
-	case "DROP":
-		return kwAt(kw, 1) == "TABLE" || kwAt(kw, 1) == "INDEX"
-	}
-	return false
+	return slices.Contains([]string{"SELECT", "INSERT", "UPDATE", "DELETE", "REPLACE", "WITH"}, leadingKeyword(sqlWords(sql)))
 }
 
 // stacked reports whether words, the words of a statement, hold a ; that another word follows,
@@ -187,29 +188,17 @@ func fileAccess(words []string) bool {
 	return false
 }
 
-// leadingKeywords returns up to three leading name words of words, uppercased, skipping the
-// parentheses that may wrap a query, and stopping at the first word that is not a name.
-func leadingKeywords(words []string) []string {
-	var kw []string
+// leadingKeyword returns the first word of words, uppercased, skipping the parentheses that may
+// wrap a query, or "" when that word is not a name.
+func leadingKeyword(words []string) string {
 	for _, w := range words {
 		if w == "(" {
 			continue
 		}
 		if !isName(w) {
-			break
+			return ""
 		}
-		kw = append(kw, strings.ToUpper(w))
-		if len(kw) == 3 {
-			break
-		}
-	}
-	return kw
-}
-
-// kwAt returns the keyword at index i of kw, or "".
-func kwAt(kw []string, i int) string {
-	if i < len(kw) {
-		return kw[i]
+		return strings.ToUpper(w)
 	}
 	return ""
 }

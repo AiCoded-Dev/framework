@@ -121,3 +121,14 @@ func statements(ctx context.Context, db *sql.DB) {
 	_, _ = db.ExecContext(ctx, "DELETE FROM drafts WHERE body = ';' -- ; DROP TABLE notes\n;\n", 1)
 	_ = db.QueryRowContext(ctx, "SELECT body INTO @body FROM notes WHERE body <> 'INTO OUTFILE' /* LOAD_FILE */")
 }
+
+// schema changes the schema in the forms lint reads, and runs SQL that only names a change.
+func schema(ctx context.Context, db *sql.DB, tx *sql.Tx) {
+	_, _ = tx.ExecContext(ctx, "/* c */ create table notes (id INT)")
+	_, _ = db.ExecContext(ctx, "RENAME TABLE notes TO old_notes")
+	_, _ = (*sql.DB).ExecContext(db, ctx, "DROP "+"TABLE notes")
+	_, _ = db.Exec("CREATE TEMPORARY TABLE scratch (id INT)")
+	_, _ = db.ExecContext(ctx, "ALTER TABLE notes ADD COLUMN body TEXT; DROP TABLE notes")
+	_ = db.QueryRowContext(ctx, "SELECT 'CREATE TABLE notes' FROM notes")
+	_, _ = db.ExecContext(ctx, "INSERT INTO notes (body) VALUES ('DROP TABLE notes')")
+}

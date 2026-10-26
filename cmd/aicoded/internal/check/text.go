@@ -16,8 +16,9 @@ func (r Report) OK() bool {
 	return true
 }
 
-// WriteText writes the report as aicoded check prints it: a block per app, the notes, a line
-// that sums it up, and a last line when the tests did not run.
+// WriteText writes the report as aicoded check prints it: a block per app, with its problems and
+// notes, the notes of the whole check, a line that sums it up, and a last line when the tests did
+// not run. Notes never fail an app.
 func (r Report) WriteText(w io.Writer) error {
 	var b strings.Builder
 	problems, failed := 0, 0
@@ -44,6 +45,9 @@ func (r Report) WriteText(w io.Writer) error {
 		}
 		for _, p := range a.Problems {
 			fmt.Fprintf(&b, "  %s\n", strings.ReplaceAll(p.String(), "\n", "\n  "))
+		}
+		for _, n := range a.Notes {
+			fmt.Fprintf(&b, "  note: %s\n", strings.ReplaceAll(n.String(), "\n", "\n  "))
 		}
 	}
 	for _, note := range r.Notes {
