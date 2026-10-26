@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
@@ -16,6 +17,7 @@ import (
 	"unicode/utf8"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
+	"aicoded.dev/framework/docs"
 	"aicoded.dev/framework/internal/errs"
 )
 
@@ -66,12 +68,40 @@ var fixes = map[string]string{
 	"E-PUB-021": "read another time with --since and --until, and give your administrator the app and the time that fails",
 }
 
-// Fix returns the fix of the code of publishing, or the advice to read its docs page.
+// Fix returns the fix of the code of publishing, or the fix on the page of the error catalogue of
+// another code, or the advice to read its docs page.
 func Fix(code string) string {
 	if fix, ok := fixes[code]; ok {
 		return fix
 	}
+	if fix, ok := pageFix(code); ok {
+		return fix
+	}
 	return "read the docs page below"
+}
+
+// known reports whether code, from an answer of the platform, is a code of publishing or one with
+// a page in the framework's error catalogue, such as E-MIG-001.
+func known(code string) bool {
+	_, ok := pageFix(code)
+	return pubCode.MatchString(code) || ok
+}
+
+// pageFix returns the fix on the page of the error catalogue of code, and whether it has a page.
+func pageFix(code string) (string, bool) {
+	if !codeName.MatchString(code) {
+		return "", false
+	}
+	page, err := fs.ReadFile(docs.FS, "errors/"+code+".md")
+	if err != nil {
+		return "", false
+	}
+	for line := range strings.Lines(string(page)) {
+		if fix, ok := strings.CutPrefix(line, "**Fix:** "); ok {
+			return strings.TrimSuffix(strings.TrimSpace(fix), "."), true
+		}
+	}
+	return "read the docs page below", true
 }
 
 // ErrBaseChanged is the error of CreatePublish when another publish of the app changed its base
@@ -170,7 +200,7 @@ func (c *Client) App(ctx context.Context, name string) (app App, found bool, err
 	e := parseError(answer)
 	switch {
 	case status == http.StatusOK:
-	case pubCode.MatchString(e.Code):
+	case known(e.Code):
 		return App{}, false, refusal(e, e.Code, "the platform refused the app "+name)
 	case status == http.StatusNotFound && e.Error == "not_found":
 		return App{}, false, nil
@@ -241,7 +271,7 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 	case status == http.StatusCreated:
 	case status == http.StatusConflict && e.Error == "base_changed":
 		return Created{}, ErrBaseChanged
-	case pubCode.MatchString(e.Code):
+	case known(e.Code):
 		return Created{}, refusal(e, e.Code, "the platform refused the publish")
 	case status == http.StatusForbidden:
 		return Created{}, refusal(e, "E-PUB-005", "the app "+u.App+" belongs to another builder")
@@ -284,7 +314,7 @@ func (c *Client) Publish(ctx context.Context, id string) (Publish, error) {
 	e := parseError(answer)
 	switch {
 	case status == http.StatusOK:
-	case pubCode.MatchString(e.Code):
+	case known(e.Code):
 		return Publish{}, refusal(e, e.Code, "the platform refused to show the publish "+id)
 	case status == http.StatusNotFound:
 		return Publish{}, refusal(e, "E-PUB-013", "the platform knows no publish "+id)

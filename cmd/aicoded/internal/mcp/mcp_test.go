@@ -621,6 +621,20 @@ func TestPublishToolsCarryTheDraft(t *testing.T) {
 	assert.NoFileExists(t, draft)
 }
 
+// The platform's refusal of a draft reaches the agent with its code and fix.
+func TestPublishToolShowsTheDraftsRefusal(t *testing.T) {
+	testhome.Set(t)
+	p := platformtest.New(t)
+	t.Setenv("AICODED_PLATFORM", p.URL)
+	p.SignIn(t)
+	dir := gittest.DatabaseApp(t, "demo", "CREATE TABLE notes (v TEXT);\n")
+	cs := connect(t, dir, io.Discard)
+	p.RefuseUpload(http.StatusBadRequest, "invalid_request", "E-MIG-003")
+	res := call(t, cs, "publish", map[string]any{"app": "demo", "summary": "First"})
+	assert.True(t, res.IsError)
+	assert.Contains(t, text(res), "E-MIG-003: refused as the test asked\n  fix: make the change expand-only")
+}
+
 func TestTelemetryToolsReadThePlatform(t *testing.T) {
 	home := testhome.Set(t)
 	p := platformtest.New(t)

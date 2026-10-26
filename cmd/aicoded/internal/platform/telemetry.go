@@ -173,7 +173,7 @@ func readTelemetry[T any](ctx context.Context, c *Client, q TelemetryQuery, what
 	case status == http.StatusForbidden && (e.Code == "" || e.Code == "E-PUB-005"):
 		return nil, errs.New("E-PUB-005", "the platform refused to show the "+what+" of "+q.App+": "+clean(cmp.Or(e.Description,
 			"the app belongs to another builder"), 300), "read the "+what+" of an app you own: ask its owner, or your administrator to transfer it to you")
-	case pubCode.MatchString(e.Code):
+	case known(e.Code):
 		return nil, refusal(e, e.Code, "the platform refused to show the "+what+" of "+q.App)
 	case status == http.StatusNotFound:
 		return nil, refusal(e, "E-PUB-019", "your organisation has no app "+q.App+" on the platform")

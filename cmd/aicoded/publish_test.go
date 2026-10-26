@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -533,4 +534,16 @@ func TestRunStatusWithAnUnreadableDraft(t *testing.T) {
 	assert.Equal(t, 0, code)
 	assert.Contains(t, out, "\npassed\n")
 	assert.Contains(t, errOut, "aicoded: the draft stays: .aicoded/migration.sql: E-MIG-001: the draft is not a regular file")
+}
+
+// The platform's refusal of a draft reaches the builder with its code, message, fix and docs.
+func TestRunPublishShowsTheDraftsRefusal(t *testing.T) {
+	p, aicoded := signedIn(t)
+	dir := gittest.DatabaseApp(t, "demo", draftText)
+	p.RefuseUpload(http.StatusConflict, "conflict", "E-MIG-001")
+	code, _, errOut := aicoded("publish", dir)
+	assert.Equal(t, 1, code)
+	assert.Contains(t, errOut, "E-MIG-001: refused as the test asked\n  fix: keep the draft to 64 KiB")
+	assert.Contains(t, errOut, "docs: https://aicoded.dev/docs/errors/E-MIG-001")
+	assert.FileExists(t, draftFile(dir), "a refused draft stays")
 }

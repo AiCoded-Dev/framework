@@ -36,7 +36,7 @@ func (c *Client) Migrations(ctx context.Context, name string) ([]migrate.Step, e
 	case status == http.StatusOK:
 	case status == http.StatusNotFound && e.Error == "not_found":
 		return nil, nil
-	case pubCode.MatchString(e.Code):
+	case known(e.Code):
 		return nil, refusal(e, e.Code, "the platform refused the migrations of "+name)
 	case status == http.StatusForbidden && e.Error == "insufficient_scope":
 		return nil, refusal(e, "E-PUB-005", "the app "+name+" belongs to another builder")
