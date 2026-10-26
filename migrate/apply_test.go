@@ -70,7 +70,7 @@ func ran(list []migrate.Step) []migrate.Step {
 }
 
 func TestApplyRunsWhatTheJournalLacks(t *testing.T) {
-	db, admin, _ := database(t)
+	db, admin, name := database(t)
 	list := append(steps(1, "p1", "CREATE TABLE a (x INT)", "ALTER TABLE a ADD COLUMN y INT"), steps(3, "p2", "CREATE INDEX i ON a (y)")...)
 
 	applied, err := migrate.Apply(t.Context(), db, list[:2])
@@ -83,7 +83,7 @@ func TestApplyRunsWhatTheJournalLacks(t *testing.T) {
 	assert.Equal(t, ran(list), journal(t, db))
 
 	var free int
-	require.NoError(t, admin.QueryRowContext(t.Context(), "SELECT IS_FREE_LOCK('aicoded_migrations')").Scan(&free))
+	require.NoError(t, admin.QueryRowContext(t.Context(), "SELECT IS_FREE_LOCK(?)", lockName(name)).Scan(&free))
 	assert.Equal(t, 1, free, "Apply releases its lock")
 }
 
@@ -231,6 +231,84 @@ func TestApplyTimesOut(t *testing.T) {
 	var columns int
 	require.NoError(t, admin.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 't'", name).Scan(&columns))
 	assert.Equal(t, 1, columns, "the step did not run once the table was free")
+}
+
+// lockName returns the name of the migration lock of database.
+func lockName(database string) string {
+	sum := sha256.Sum256([]byte(database))
+	return ("aicoded_migrations:" + hex.EncodeToString(sum[:]))[:64]
+}
+
+// hold takes the named lock on a session of admin until the test ends.
+func hold(t *testing.T, admin *sql.DB, lock string) {
+	conn, err := admin.Conn(t.Context())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	var got int
+	require.NoError(t, conn.QueryRowContext(t.Context(), "SELECT GET_LOCK(?, 0)", lock).Scan(&got))
+	require.Equal(t, 1, got)
+}
+
+// Each database has its own migration lock: an applier waits only on appliers of its database.
+func TestApplyLocksPerDatabase(t *testing.T) {
+	one, admin, name := database(t)
+	other, _, _ := database(t)
+	hold(t, admin, "aicoded_migrations")
+	hold(t, admin, lockName(name))
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	_, err := migrate.Apply(ctx, other, steps(1, "p1", "CREATE TABLE a (x INT)"))
+	require.NoError(t, err, "neither the lock of another database nor the old server-wide name blocks Apply")
+
+	ctx, cancel = context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	_, err = migrate.Apply(ctx, one, steps(1, "p1", "CREATE TABLE a (x INT)"))
+	assert.Equal(t, "E-MIG-005", errs.Code(err), "Apply waits on its database's lock")
+}
+
+func TestApplyNeedsADatabase(t *testing.T) {
+	cfg := testmysql.Config(t)
+	cfg.DBName = ""
+	c, err := mysql.NewConnector(cfg)
+	require.NoError(t, err)
+	db := sql.OpenDB(c)
+	defer db.Close()
+	_, err = migrate.Apply(t.Context(), db, nil)
+	assert.Equal(t, "E-MIG-005", errs.Code(err))
+	require.ErrorContains(t, err, "the connection has no database selected")
+}
+
+// Two appliers on two databases of one server do not wait on each other.
+func TestApplyOnTwoDatabases(t *testing.T) {
+	one, admin, name := database(t)
+	other, _, _ := database(t)
+	_, err := migrate.Apply(t.Context(), one, steps(1, "p1", "CREATE TABLE t (x INT)"))
+	require.NoError(t, err)
+	holder, err := admin.Conn(t.Context())
+	require.NoError(t, err)
+	defer holder.Close()
+	_, err = holder.ExecContext(t.Context(), "LOCK TABLES `"+name+"`.t WRITE")
+	require.NoError(t, err)
+
+	waiting := make(chan error, 1)
+	go func() {
+		_, err := migrate.Apply(t.Context(), one, steps(1, "p1", "CREATE TABLE t (x INT)", "ALTER TABLE t ADD COLUMN y INT"))
+		waiting <- err
+	}()
+	require.Eventually(t, func() bool {
+		var n int
+		return admin.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM information_schema.PROCESSLIST WHERE DB = ? AND STATE = 'Waiting for table metadata lock'", name).Scan(&n) == nil && n == 1
+	}, time.Second, 20*time.Millisecond, "the first applier holds its lock and waits on the table")
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	_, err = migrate.Apply(ctx, other, steps(1, "p1", "CREATE TABLE a (x INT)"))
+	require.NoError(t, err)
+
+	_, err = holder.ExecContext(t.Context(), "UNLOCK TABLES")
+	require.NoError(t, err)
+	require.NoError(t, <-waiting)
 }
 
 func TestExtends(t *testing.T) {

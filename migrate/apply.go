@@ -51,9 +51,10 @@ const (
 )
 
 // Apply runs on db the steps that its journal, the table aicoded_migrations, lacks, in order,
-// and returns them. It holds the lock aicoded_migrations meanwhile, on one connection with
-// lock_wait_timeout 30, and runs each step under a 5-minute context, then adds its row to the
-// journal.
+// and returns them. It holds the database's migration lock meanwhile, a named lock of
+// aicoded_migrations: and the hex SHA-256 of the database's name cut to 64 characters, on one
+// connection with lock_wait_timeout 30, and runs each step under a 5-minute context, then
+// adds its row to the journal.
 //
 // It refuses, before running anything, a list whose steps are not numbered from 1 or whose
 // hash does not match its statement (E-MIG-004), a list the journal does not agree with
@@ -136,20 +137,26 @@ type session struct {
 	db     *sql.DB
 	conn   *sql.Conn
 	id     int64
+	lock   string
 	locked bool
 }
 
 // open takes the lock, sets the session's lock_wait_timeout and creates the journal.
 func (s *session) open(ctx context.Context) error {
-	if err := s.conn.QueryRowContext(ctx, "SELECT CONNECTION_ID()").Scan(&s.id); err != nil {
-		return failed("cannot read the connection's id", err)
+	var database sql.NullString
+	if err := s.conn.QueryRowContext(ctx, "SELECT CONNECTION_ID(), DATABASE()").Scan(&s.id, &database); err != nil {
+		return failed("cannot read the connection's id and database", err)
 	}
+	if !database.Valid {
+		return errs.New("E-MIG-005", "the connection has no database selected", "open the connection with the app's database in its DSN")
+	}
+	s.lock = lockName(database.String)
 	var got sql.NullInt64
-	if err := s.conn.QueryRowContext(ctx, "SELECT GET_LOCK('aicoded_migrations', 60)").Scan(&got); err != nil {
-		return s.failed(ctx, "cannot take the lock aicoded_migrations", err)
+	if err := s.conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, 60)", s.lock).Scan(&got); err != nil {
+		return s.failed(ctx, "cannot take the database's migration lock", err)
 	}
 	if got.Int64 != 1 {
-		return errs.New("E-MIG-005", "another applier held the lock aicoded_migrations for 60 seconds", "release again once the migrations under way end")
+		return errs.New("E-MIG-005", "another applier held the database's migration lock for 60 seconds", "release again once the migrations under way end")
 	}
 	s.locked = true
 	if _, err := s.conn.ExecContext(ctx, "SET SESSION lock_wait_timeout = 30"); err != nil {
@@ -228,10 +235,18 @@ func (s *session) close(ctx context.Context) {
 	if s.locked {
 		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
 		defer cancel()
-		_, _ = s.conn.ExecContext(rctx, "DO RELEASE_LOCK('aicoded_migrations')")
+		_, _ = s.conn.ExecContext(rctx, "DO RELEASE_LOCK(?)", s.lock)
 	}
 	_ = s.conn.Raw(func(any) error { return driver.ErrBadConn })
 	_ = s.conn.Close()
+}
+
+// lockName returns the name of the migration lock of database: aicoded_migrations: and the hex
+// SHA-256 of its name, cut to the 64 characters MySQL allows. Apps on one server never wait on
+// one another's lock.
+func lockName(database string) string {
+	sum := sha256.Sum256([]byte(database))
+	return ("aicoded_migrations:" + hex.EncodeToString(sum[:]))[:64]
 }
 
 // failed returns E-MIG-005 for what failed, naming MySQL's error number.

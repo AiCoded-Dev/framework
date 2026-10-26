@@ -115,6 +115,35 @@ func TestClassify(t *testing.T) {
 	}
 }
 
+// Each refusal says what to write instead.
+func TestClassifyFixes(t *testing.T) {
+	for stmt, fix := range map[string]string{
+		"CREATE TABLE IF NOT EXISTS t (a INT)":                "drop IF NOT EXISTS: each step runs once",
+		"CREATE TEMPORARY TABLE t (a INT)":                    "write CREATE TABLE without TEMPORARY",
+		"CREATE TABLE t LIKE u":                               "write CREATE TABLE <name> (<column> <type>, …)",
+		"CREATE TABLE t (a INT DEFAULT \"x\")":                "write strings in single quotes",
+		"CREATE TABLE t (a VARCHAR(5) DEFAULT 'x\\'')":        "write a quote inside a string as ''",
+		"CREATE TABLE t (a INT DEFAULT (@x))":                 "write values as literals",
+		"CREATE TABLE t (a INT DEFAULT (SELECT 1))":           "write a DEFAULT as a literal value",
+		"CREATE TABLE t (a INT) ENGINE=MEMORY":                "write ENGINE=InnoDB",
+		"CREATE TABLE t (a INT) PARTITION BY HASH(a)":         "keep to ENGINE=InnoDB, CHARSET",
+		"CREATE TABLE aicoded_migrations (a INT)":             "give your table another name",
+		"CREATE TABLE other.t (a INT)":                        "without a database in front",
+		"CREATE INDEX i ON t (a) ALGORITHM=COPY":              "leave out USING, ALGORITHM, LOCK",
+		"ALTER TABLE t ADD CHECK (a > 0)":                     "check values in the app's code",
+		"ALTER TABLE t ADD CONSTRAINT c CHECK (a > 0)":        "check values in the app's code",
+		"ALTER TABLE t ADD (c INT, d INT)":                    "write one ADD COLUMN <name> <type> clause per column",
+		"ALTER TABLE t ADD COLUMN c INT PARTITION BY HASH(c)": "leave out PARTITION clauses",
+		"ALTER TABLE t ADD COLUMN c INT NOT NULL":             "give the column a DEFAULT",
+		"/*!50000 DROP TABLE t */":                            "write the statement itself",
+	} {
+		_, err := migrate.Classify(stmt)
+		var coded *errs.Error
+		require.ErrorAs(t, err, &coded, stmt)
+		assert.Contains(t, coded.Fix, fix, stmt)
+	}
+}
+
 // Statements written to slip past a naive splitter or classifier are split and classified as
 // MySQL reads them.
 func TestCheckHidden(t *testing.T) {
