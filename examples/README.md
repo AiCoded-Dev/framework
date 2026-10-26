@@ -68,9 +68,9 @@ people is a staff directory. Its pages:
 - `deps.Deps` in [people/deps/deps.go](people/deps/deps.go), which `main` passes to `app.Main` as
   `OnStart`, opens the database and the photo store, fills the `users` table when it is empty,
   and reads `team_address`. The table comes from people's draft of schema changes,
-  [people/.aicoded/migration.sql](people/.aicoded/migration.sql). Its hubs carry live values from page to page: a `reactive.Broadcast` for
-  the open home pages and one for added users, and a `reactive.Topic` keyed by login for when a
-  viewer last opened a page.
+  [people/.aicoded/migration.sql](people/.aicoded/migration.sql). Its hubs carry live values from
+  page to page: a `reactive.Broadcast` for the open home pages and one for added users, and a
+  `reactive.Topic` keyed by login for when a viewer last opened a page.
 - Adding a user inserts it in a transaction that commits only once its photos are stored, inside
   a span of its own, and only then mails the team with the idempotency key `user-<login>`. Photos
   go to the file store `photos` as `<login>/<file name>`, and an add that fails removes the photos

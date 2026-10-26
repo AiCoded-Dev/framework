@@ -17,3 +17,8 @@ coverage.*
 
 # Working notes
 .superpowers/
+
+# The cache of published migrations; the examples' and test apps' drafts stay committed
+/examples/*/.aicoded/migrations.json
+/cmd/aicoded/internal/*/testdata/*/.aicoded/migrations.json
+/cmd/aicoded/internal/*/testdata/*/*/.aicoded/migrations.json

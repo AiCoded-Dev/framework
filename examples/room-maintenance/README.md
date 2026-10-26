@@ -202,10 +202,10 @@ func (p *DP) Subscribe(ctx context.Context, _ *web.Request, state *ReactiveState
   a ticket's text, and `pages/tickets/report/dataprovider_test.go` how the report form offers the
   rooms.
 - `deps/deps_test.go` checks the tables on the test database that `aicoded check` makes, which
-  it opens with `sqltest.Open(t)` and empties first, skipping elsewhere: the rooms, what each viewer's list holds, exact logins, a subject
-  of 512 bytes, edits by the author and by anyone else, and status changes. A list asked
-  for with no viewer and a status other than open, in progress and done are refused before the
-  database is reached.
+  it opens with `sqltest.Open(t)` and empties first, skipping elsewhere: the rooms, what each
+  viewer's list holds, exact logins, a subject of 512 bytes, edits by the author and by anyone
+  else, and status changes. A list asked for with no viewer and a status other than open, in
+  progress and done are refused before the database is reached.
 - The end-to-end tests in `cmd/aicoded/internal/e2e` run it with the other examples under
   `aicoded dev`. Over HTTP, an employee can neither open nor change another's ticket by any page
   or form, and gets the same answer for it as for a ticket that does not exist. An employee

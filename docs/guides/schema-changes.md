@@ -74,11 +74,12 @@ Everything else is refused with E-MIG-002, and the fix says what to write instea
 - what hides SQL from the checks or reaches past the app's own tables: `/*! … */` and `/*+ … */`,
   `DELIMITER`, a name with a database in front, such as `db.table`, strings in double quotes,
   backslashes in strings, variables such as `@x`, and subqueries;
-- the table `aicoded_migrations`, in any case;
+- the table `aicoded_migrations`, in any letter case;
 - a column named like a keyword, such as `modify`, unless it is in backquotes.
 
 A statement that removes, renames or changes what is there is E-MIG-003: `DROP`, `RENAME`,
-`TRUNCATE`, and `ALTER TABLE` with a `DROP`, `MODIFY`, `CHANGE`, `RENAME` or `ALTER` clause.
+`TRUNCATE`, and `ALTER TABLE` with a `DROP`, `MODIFY`, `CHANGE`, `RENAME`, `TRUNCATE` or `ALTER`
+clause.
 
 ```sql
 ALTER TABLE tickets ADD COLUMN priority TINYINT UNSIGNED NOT NULL DEFAULT 2; -- right
@@ -138,7 +139,8 @@ Once the publish passed, `aicoded publish` deletes the draft and refreshes
 `.aicoded/migrations.json`; after `--no-wait` or the `publish` tool, `aicoded status`, the
 `release_status` tool or the next publish does it. A publish that failed leaves the draft as it
 was, to fix and publish again. A draft you changed after it was sent stays. While the publish
-that carried the draft has not ended, a new publish is refused (E-MIG-001).
+that carried the draft has not ended, a new publish that still carries a draft is refused
+(E-MIG-001).
 
 ## At release
 

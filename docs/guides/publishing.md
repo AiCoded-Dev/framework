@@ -30,7 +30,7 @@ computer, `aicoded publish` refuses:
   of schema changes, `.aicoded/migration.sql`, and `.aicoded/migrations.json`;
 - a commit or an index that holds the draft (E-MIG-001): run
   `git rm --cached .aicoded/migration.sql`. While the publish that carried the draft has not
-  ended, a new publish is refused the same way;
+  ended, a new publish that still carries a draft is refused the same way;
 - with `--app <name>`, an app of another name (E-PUB-003);
 - any problem that `aicoded check --frozen --no-tests` finds (E-PUB-004). `aicoded publish`
   prints them as `aicoded check` does and sends nothing. It checks as a released `aicoded` does,
@@ -75,7 +75,6 @@ and commit what it writes.
 - The app's name, the commit, and a summary for the change record: `-m <summary>`, or else the
   commit's subject. Control characters are removed, line breaks and tabs become spaces, and the
   first 1000 characters are kept, or fewer when they take more than 3900 bytes, as emoji do.
-
 - The draft of schema changes, `.aicoded/migration.sql`, when the app has one, beside the
   bundle. Once the publish passed, `aicoded publish` deletes it, and a publish that failed leaves
   it. [Schema changes](schema-changes.md) tells what happens to it then.
