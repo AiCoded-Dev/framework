@@ -1,16 +1,24 @@
 // Package check runs aicoded check on the apps of a workspace: for each app, the precheck of the
 // lint package, generate, the check of the snapshots it holds, the check of its schema-change
-// draft, go build, go vet, the rules of the lint package and go test.
+// draft, go build, go vet, the rules of the lint package and go test, with a test database for an
+// app that declares sqldb.
 package check
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"path/filepath"
+	"strings"
 
+	"github.com/go-sql-driver/mysql"
+
+	"aicoded.dev/framework/cmd/aicoded/internal/dev"
+	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/cmd/aicoded/internal/draft"
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
 	"aicoded.dev/framework/cmd/aicoded/internal/gotool"
+	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/surface"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
@@ -31,6 +39,40 @@ type Options struct {
 	FrameworkDir string
 	// NoTests skips the tests and the probe of -race.
 	NoTests bool
+	// MySQL is the admin DSN of the MySQL server in dev.yaml, or "". With it, each app that
+	// declares sqldb gets a new test database, which aicoded check makes as aicoded dev makes a
+	// dev database and drops after the tests; the tests find the data user's DSN in
+	// AICODED_TEST_DB.
+	MySQL string
+	// Platform gives the migrations each app published, applied to its test database before its
+	// draft; with nil, they come from the app's cache.
+	Platform migrations.Platform
+}
+
+// EnvTestDB is the variable that holds, for an app's tests, the DSN of the data user of its test
+// database, or "" when it has none.
+const EnvTestDB = "AICODED_TEST_DB"
+
+// WithDatabase returns opts with the MySQL server that dev.yaml names for the workspace of dir, or
+// of a folder above it, and the platform that AICODED_PLATFORM names, which give each app that
+// declares sqldb its test database. With NoTests, it returns opts as they are.
+func WithDatabase(dir string, opts Options) (Options, error) {
+	if opts.NoTests {
+		return opts, nil
+	}
+	root, err := filepath.Abs(dir)
+	if err != nil {
+		return opts, err
+	}
+	path, err := devconfig.DefaultPath()
+	if err != nil {
+		return opts, err
+	}
+	if opts.MySQL, err = devconfig.MySQL(path, root); err != nil {
+		return opts, err
+	}
+	opts.Platform = dev.Platform()
+	return opts, nil
 }
 
 // Report is what aicoded check found.
@@ -178,7 +220,17 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 		},
 	}
 	if !opts.NoTests {
-		steps = append(steps, func() ([]*errs.Error, error) { return goTest(ctx, a.Dir, race) })
+		steps = append(steps, func() ([]*errs.Error, error) {
+			env, drop, err := testDatabase(ctx, a.Dir, m, opts, &out)
+			if coded := (*errs.Error)(nil); errors.As(err, &coded) {
+				return []*errs.Error{coded}, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			defer drop()
+			return goTest(ctx, a.Dir, race, []string{EnvTestDB + "=" + env})
+		})
 	}
 	for _, step := range steps {
 		ps, err := step()
@@ -191,6 +243,37 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 		}
 	}
 	return out, held, nil
+}
+
+// testDatabase makes the test database of the app in dir whose permission list is m, when it
+// declares sqldb and opts name a MySQL server, with the steps aicoded dev would apply, and returns
+// the DSN of its data user and a function that drops it. A warning about the published steps goes
+// to out's warnings. With no test database, the DSN is "".
+func testDatabase(ctx context.Context, dir string, m manifest.Manifest, opts Options, out *App) (string, func(), error) {
+	if !m.SQLDB() || opts.MySQL == "" {
+		return "", func() {}, nil
+	}
+	admin, err := dev.NewMySQLAdmin(opts.MySQL)
+	if err != nil {
+		return "", nil, err
+	}
+	steps, warning, err := migrations.Steps(ctx, dir, m, opts.Platform)
+	if err != nil {
+		return "", nil, err
+	}
+	if warning != "" {
+		out.Warnings = append(out.Warnings, warning)
+	}
+	env := "test-" + strings.ToLower(rand.Text()[:8])
+	drop := func() { _ = admin.Drop(context.WithoutCancel(ctx), m.App, env) }
+	users, err := admin.Migrate(ctx, m.App, env, steps)
+	if err != nil {
+		drop()
+		return "", nil, err
+	}
+	cfg := mysql.NewConfig()
+	cfg.Net, cfg.Addr, cfg.User, cfg.Passwd, cfg.DBName = users.Data.Network, users.Data.Address, users.Data.User, users.Data.Password, users.Data.Database
+	return cfg.FormatDSN(), drop, nil
 }
 
 // codedErrs returns the coded errors that err is or joins, or err itself when one of them has no

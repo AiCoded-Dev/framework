@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/json"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,7 +15,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
 	"aicoded.dev/framework/internal/testmysql"
+	"aicoded.dev/framework/migrate"
 	"aicoded.dev/framework/runnerproto"
 )
 
@@ -108,4 +112,56 @@ func TestDatabaseLoginFails(t *testing.T) {
 		assert.NotContains(t, stderr.String(), secret)
 	}
 	assert.NoFileExists(t, r.control, "nothing listens")
+}
+
+// migrationsFile writes steps as the file of --migrations and returns the flag that names it.
+func (r *run) migrationsFile(t *testing.T, steps []migrate.Step) []string {
+	data, err := json.Marshal(map[string]any{"steps": steps})
+	require.NoError(t, err)
+	file := filepath.Join(r.dir, "migrations.json")
+	require.NoError(t, os.WriteFile(file, data, 0o600))
+	return []string{"--migrations", file}
+}
+
+func TestMigrations(t *testing.T) {
+	a := l7Account(t)
+	r := folders(t, sqlYAML)
+	steps := migrations.Append(nil, "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa", []string{"CREATE TABLE notes (v TEXT)"})
+	r.start(t, r.args(append(r.dsn(t, a.dsn, 0o600, a.database), r.migrationsFile(t, steps)...)...))
+	_, err := viaSocket(t, filepath.Join(r.runnerDir, runnerproto.MySQLSocket)).ExecContext(t.Context(), "INSERT INTO notes VALUES ('a')")
+	assert.NoError(t, err, "the steps were applied before the runner served")
+}
+
+func TestMigrationsFail(t *testing.T) {
+	a := l7Account(t)
+	cfg, err := mysql.ParseDSN(a.dsn)
+	require.NoError(t, err)
+	r := folders(t, sqlYAML)
+	steps := migrations.Append(nil, "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa", []string{"CREATE TABLE notes (v TEXT)", "CREATE TABLE notes (w TEXT)"})
+	var stderr syncBuffer
+	assert.Equal(t, exitFail, Main(t.Context(), r.args(append(r.dsn(t, a.dsn, 0o600, a.database), r.migrationsFile(t, steps)...)...), &stderr))
+	assert.Contains(t, stderr.String(), "aicoded l7-runner: E-MIG-005: step pub_aaaaaaaaaaaaaaaaaaaaaaaaaa#2 failed: MySQL error 1050")
+	for _, secret := range []string{cfg.Passwd, a.user} {
+		assert.NotContains(t, stderr.String(), secret)
+	}
+	assert.NoFileExists(t, r.control, "nothing listens")
+
+	a, r = l7Account(t), folders(t, sqlYAML)
+	stderr = syncBuffer{}
+	assert.Equal(t, exitFail, Main(t.Context(), r.args(append(r.dsn(t, a.dsn, 0o600, a.database),
+		r.migrationsFile(t, migrations.Append(nil, "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa", []string{"DROP TABLE notes"}))...)...), &stderr))
+	assert.Contains(t, stderr.String(), "E-MIG-003", "the steps are classified")
+}
+
+// A step the account may not run fails with MySQL's text, which names the account; the line on
+// stderr does not.
+func TestMigrationsHideTheAccount(t *testing.T) {
+	a := l7Account(t)
+	_, err := testmysql.Admin(t).ExecContext(t.Context(), "REVOKE CREATE ON `"+a.user+`\_%`+"`.* FROM '"+a.user+"'@'%'")
+	require.NoError(t, err)
+	r := folders(t, sqlYAML)
+	var stderr syncBuffer
+	assert.Equal(t, exitFail, Main(t.Context(), r.args(append(r.dsn(t, a.dsn, 0o600, a.database), r.migrationsFile(t, nil)...)...), &stderr))
+	assert.Contains(t, stderr.String(), "MySQL error 1142: CREATE command denied to user '<hidden>'@")
+	assert.NotContains(t, stderr.String(), a.user)
 }

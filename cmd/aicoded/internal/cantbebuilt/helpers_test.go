@@ -126,17 +126,12 @@ func startApp(t *testing.T, name string) *runningApp {
 }
 
 // testDatabase returns the admin of the test MySQL for the local runner, and drops the database
-// and the user the runner makes for app when the test ends.
+// and the users the runner makes for app when the test ends.
 func testDatabase(t *testing.T, app string) *dev.MySQLAdmin {
 	t.Helper()
-	admin := testmysql.Admin(t)
 	a, err := dev.NewMySQLAdmin(testmysql.DSN(t))
 	require.NoError(t, err)
-	name := "ac-dev-" + app
-	t.Cleanup(func() {
-		_, _ = admin.ExecContext(context.Background(), "DROP USER IF EXISTS '"+name+"'@'%'")
-		_, _ = admin.ExecContext(context.Background(), "DROP DATABASE IF EXISTS `"+name+"`")
-	})
+	t.Cleanup(func() { _ = a.Drop(context.Background(), app, "dev") })
 	return a
 }
 

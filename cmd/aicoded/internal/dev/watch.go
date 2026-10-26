@@ -17,6 +17,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
+	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/watch"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
@@ -175,8 +176,9 @@ func (w *Workspace) mark(s *slot) {
 }
 
 // fingerprint returns a hash of the paths and contents of the files of the app in dir that its
-// build reads: it leaves out the folders Skip names, hidden files, and the files aicoded
-// generate writes other than the permission list.
+// build and its database read: it leaves out the folders Skip names, hidden files, the files
+// aicoded generate writes other than the permission list, and the cache of the migrations the app
+// published, which aicoded dev writes.
 func fingerprint(dir string) string {
 	h := sha256.New()
 	root, err := os.OpenRoot(dir)
@@ -193,7 +195,7 @@ func fingerprint(dir string) string {
 				return fs.SkipDir
 			}
 			return nil
-		case Skip(p), !d.Type().IsRegular(), generated(p):
+		case Skip(p), !d.Type().IsRegular(), generated(p), p == migrations.Cache:
 			return nil
 		}
 		data, err := root.ReadFile(filepath.FromSlash(p))

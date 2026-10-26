@@ -408,6 +408,25 @@ func TestRefuses(t *testing.T) {
 			return r.args(r.dsn(t, dsn, 0o600, "l7_db")...)
 		}},
 		"sqldb without database flags": {sqlYAML, "the app declares sqldb", func(_ *testing.T, r *run) []string { return r.args() }},
+		"migrations for an app without sqldb": {helloYAML, "the app does not declare sqldb", func(t *testing.T, r *run) []string {
+			return r.args(r.migrationsFile(t, nil)...)
+		}},
+		"migrations that are not a list": {sqlYAML, `--migrations does not hold a JSON object {"steps": [...]}`, func(t *testing.T, r *run) []string {
+			args := r.migrationsFile(t, nil)
+			require.NoError(t, os.WriteFile(args[1], []byte(`{"steps": [], "more": 1}`), 0o600))
+			return r.args(append(r.dsn(t, dsn, 0o600, "l7_db"), args...)...)
+		}},
+		"migrations through a symbolic link": {sqlYAML, "--migrations cannot be opened, or is a symbolic link", func(t *testing.T, r *run) []string {
+			args := r.migrationsFile(t, nil)
+			link := filepath.Join(r.dir, "link.json")
+			require.NoError(t, os.Symlink(args[1], link))
+			return r.args(append(r.dsn(t, dsn, 0o600, "l7_db"), "--migrations", link)...)
+		}},
+		"migrations over 8 MiB": {sqlYAML, "--migrations is larger than 8 MiB", func(t *testing.T, r *run) []string {
+			args := r.migrationsFile(t, nil)
+			require.NoError(t, os.WriteFile(args[1], bytes.Repeat([]byte(" "), maxMigrations+1), 0o600))
+			return r.args(append(r.dsn(t, dsn, 0o600, "l7_db"), args...)...)
+		}},
 		"a DSN that names a database": {sqlYAML, "names a database", func(t *testing.T, r *run) []string {
 			return r.args(r.dsn(t, dsn+"l7_db", 0o600, "l7_db")...)
 		}},

@@ -4,11 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
-	"database/sql"
-	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -27,14 +23,12 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/coder/websocket"
-	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/internal/testmysql"
-	"aicoded.dev/framework/migrate"
 )
 
 // teamAddress is people's setting team_address, where it mails the team.
@@ -58,24 +52,21 @@ var (
 )
 
 // startExamples runs examples/, exampleApps, once per test binary on the MySQL server of
-// AICODED_TEST_MYSQL_DSN, after dropping what a killed run may have left there. Its site is
-// people. It drops the database and the MySQL user ac-dev-<app> of each app, so the DSN must name
-// a throwaway server, not the one the developer's own dev.yaml uses.
+// AICODED_TEST_MYSQL_DSN, after dropping what a killed run may have left there; aicoded dev applies
+// each app's draft. Its site is people. It drops the database and the MySQL users of each app,
+// ac-dev-<app> and ao-dev-<app>, so the DSN must name a throwaway server, not the one the
+// developer's own dev.yaml uses.
 func startExamples(t *testing.T) *site {
 	t.Helper()
 	requireGo(t)
 	dsn := testmysql.DSN(t)
 	examplesOnce.Do(func() {
 		dropDatabases(dsn, exampleApps...)
-		root := filepath.Join("..", "..", "..", "..", "examples")
-		examplesErr = applyDrafts(dsn, root, exampleApps...)
-		if examplesErr == nil {
-			examples, examplesErr = launch(root, devconfig.Workspace{
-				MySQL:    dsn,
-				Personas: examplePersonas,
-				Apps:     map[string]devconfig.AppValues{"people": {Settings: map[string]string{"team_address": teamAddress}}},
-			})
-		}
+		examples, examplesErr = launch(filepath.Join("..", "..", "..", "..", "examples"), devconfig.Workspace{
+			MySQL:    dsn,
+			Personas: examplePersonas,
+			Apps:     map[string]devconfig.AppValues{"people": {Settings: map[string]string{"team_address": teamAddress}}},
+		})
 		if examplesErr != nil {
 			dropDatabases(dsn, exampleApps...)
 			return
@@ -84,66 +75,6 @@ func startExamples(t *testing.T) *site {
 	})
 	require.NoError(t, examplesErr)
 	return examples
-}
-
-// applyDrafts makes the database that aicoded dev gives each of apps in the folder root, and
-// applies there, as the admin of dsn, the app's draft, .aicoded/migration.sql: aicoded dev
-// applies no draft itself.
-func applyDrafts(dsn, root string, apps ...string) error {
-	cfg, err := mysql.ParseDSN(dsn)
-	if err != nil {
-		return errors.New("AICODED_TEST_MYSQL_DSN is not a valid DSN")
-	}
-	for _, app := range apps {
-		text, err := os.ReadFile(filepath.Join(root, app, ".aicoded", "migration.sql"))
-		if err != nil {
-			return err
-		}
-		stmts, err := migrate.Check(text)
-		if err != nil {
-			return err
-		}
-		steps := make([]migrate.Step, len(stmts))
-		for i, stmt := range stmts {
-			sum := sha256.Sum256([]byte(stmt))
-			steps[i] = migrate.Step{Seq: i + 1, Publish: "draft", Index: i + 1, SHA256: hex.EncodeToString(sum[:]), Statement: stmt}
-		}
-		if err := applySteps(cfg.Clone(), "ac-dev-"+app, steps); err != nil {
-			return fmt.Errorf("%s: %w", app, err)
-		}
-	}
-	return nil
-}
-
-// applySteps makes the database name with the server's dev character set, as the admin of cfg,
-// and applies steps there.
-func applySteps(cfg *mysql.Config, name string, steps []migrate.Step) error {
-	ctx := context.Background()
-	admin, err := connect(cfg)
-	if err != nil {
-		return err
-	}
-	defer admin.Close()
-	if _, err := admin.ExecContext(ctx, "CREATE DATABASE `"+name+"` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci"); err != nil {
-		return err
-	}
-	cfg.DBName = name
-	db, err := connect(cfg)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	_, err = migrate.Apply(ctx, db, steps)
-	return err
-}
-
-// connect opens a connection pool with cfg.
-func connect(cfg *mysql.Config) (*sql.DB, error) {
-	c, err := mysql.NewConnector(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return sql.OpenDB(c), nil
 }
 
 // newLogin returns a login no user has.

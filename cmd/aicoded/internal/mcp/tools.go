@@ -331,7 +331,11 @@ func (s *server) check(ctx context.Context, in checkIn) (check.Report, error) {
 	if err := validApp(in.App, true); err != nil {
 		return check.Report{}, err
 	}
-	return check.Run(ctx, s.dir, check.Options{Frozen: in.Frozen, App: in.App, FrameworkDir: s.fw.Dir})
+	opts, err := check.WithDatabase(s.dir, check.Options{Frozen: in.Frozen, App: in.App, FrameworkDir: s.fw.Dir})
+	if err != nil {
+		return check.Report{}, err
+	}
+	return check.Run(ctx, s.dir, opts)
 }
 
 func (s *server) publish(ctx context.Context, in publishIn) (publishOut, error) {
@@ -350,6 +354,11 @@ func (s *server) publish(ctx context.Context, in publishIn) (publishOut, error) 
 	if err != nil {
 		return publishOut{}, err
 	}
+	if note, err := publish.SettlePending(ctx, c, app[0].Dir); err != nil {
+		return publishOut{}, err
+	} else if note != "" {
+		fmt.Fprintln(s.logs, "aicoded mcp: "+note)
+	}
 	cm, err := publish.Prepare(ctx, app[0].Dir, publish.Options{Summary: in.Summary})
 	if ce := (*publish.CheckError)(nil); errors.As(err, &ce) {
 		return publishOut{}, checkFailed(ce)
@@ -358,8 +367,11 @@ func (s *server) publish(ctx context.Context, in publishIn) (publishOut, error) 
 		return publishOut{}, err
 	}
 	sent, err := publish.Send(ctx, c, cm)
-	if err != nil {
+	if sent.ID == "" {
 		return publishOut{}, err
+	}
+	if err != nil {
+		fmt.Fprintln(s.logs, "aicoded mcp: "+err.Error())
 	}
 	return publishOut{ID: sent.ID, App: sent.App, SHA: sent.SHA, CreatedApp: sent.CreatedApp,
 		Next: fmt.Sprintf("call release_status with id %q about every 30 seconds until its status is passed, failed, refused or error, then tell the person the outcome; the delivery pipeline takes a few minutes", sent.ID)}, nil
@@ -385,7 +397,33 @@ func (s *server) releaseStatus(ctx context.Context, in releaseStatusIn) (platfor
 	if err != nil {
 		return platform.Publish{}, err
 	}
-	return c.Publish(ctx, in.ID)
+	p, err := c.Publish(ctx, in.ID)
+	if err != nil {
+		return platform.Publish{}, err
+	}
+	if err := s.settle(ctx, c, p); err != nil {
+		return platform.Publish{}, err
+	}
+	return p, nil
+}
+
+// settle clears the draft of the app of the publish p, in the workspace, once p, which carried
+// it, has passed, as publish.Settle does.
+func (s *server) settle(ctx context.Context, c *platform.Client, p platform.Publish) error {
+	apps, err := workspace.Apps(s.dir)
+	if err != nil {
+		return nil
+	}
+	for _, a := range apps {
+		if a.Name == p.App {
+			note, err := publish.Settle(ctx, c, a.Dir, p)
+			if note != "" {
+				fmt.Fprintln(s.logs, "aicoded mcp: "+note)
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 // platformClient returns a client of the platform that AICODED_PLATFORM names.

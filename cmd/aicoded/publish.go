@@ -13,6 +13,7 @@ import (
 
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/cmd/aicoded/internal/publish"
+	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
 )
 
 // How often aicoded publish asks the platform for the outcome, and for how long.
@@ -37,6 +38,11 @@ func runPublish(args []string, stdout, stderr io.Writer) int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	note, err := publish.SettlePending(ctx, c, dirArg(rest))
+	if err != nil {
+		return fail(stderr, err)
+	}
+	printNote(stdout, note)
 	cm, err := publish.Prepare(ctx, dirArg(rest), publish.Options{App: *app, Summary: *summary})
 	if ce := (*publish.CheckError)(nil); errors.As(err, &ce) {
 		if err := ce.Report.WriteText(stdout); err != nil {
@@ -47,27 +53,44 @@ func runPublish(args []string, stdout, stderr io.Writer) int {
 		return fail(stderr, err)
 	}
 	sent, err := publish.Send(ctx, c, cm)
-	if err != nil {
+	if sent.ID == "" {
 		return fail(stderr, err)
 	}
 	if sent.CreatedApp {
 		fmt.Fprintf(stdout, "Created the app %s, which you own.\n", sent.App)
 	}
 	fmt.Fprintf(stdout, "Published %s at %s as %s.\n", sent.App, sent.SHA[:7], sent.ID)
+	if err != nil {
+		return fail(stderr, err)
+	}
 	if *noWait {
 		fmt.Fprintf(stdout, "aicoded status %s shows its outcome.\n", sent.ID)
 		return exitOK
 	}
-	return wait(ctx, c, sent.ID, stdout, stderr)
+	return wait(ctx, c, sent.ID, cm.Dir, stdout, stderr)
 }
 
-// wait waits for the outcome of the publish id, prints it and returns the exit code. When it
-// stops waiting first, it says that the publish goes on.
-func wait(ctx context.Context, c *platform.Client, id string, stdout, stderr io.Writer) int {
+// printNote prints note, a line about the draft, unless it is "".
+func printNote(stdout io.Writer, note string) {
+	if note != "" {
+		fmt.Fprintln(stdout, "aicoded: "+note)
+	}
+}
+
+// wait waits for the outcome of the publish id of the app in dir, prints it, clears the draft
+// once the publish passed, and returns the exit code. When it stops waiting first, it says that
+// the publish goes on.
+func wait(ctx context.Context, c *platform.Client, id, dir string, stdout, stderr io.Writer) int {
 	p, err := publish.Wait(ctx, c, id, pollEvery, pollFor, stdout)
 	switch {
 	case err == nil:
-		return report(p, stdout, stderr)
+		code := report(p, stdout, stderr)
+		note, err := publish.Settle(ctx, c, dir, p)
+		if err != nil {
+			return fail(stderr, err)
+		}
+		printNote(stdout, note)
+		return code
 	case errors.Is(err, publish.ErrTimeout):
 		fmt.Fprintf(stderr, "aicoded publish: no outcome after %s\n", pollFor)
 	case ctx.Err() == nil:
@@ -116,8 +139,14 @@ func runStatus(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stderr, err)
 	}
+	note, err := settleHere(ctx, c, p)
+	if err != nil {
+		return fail(stderr, err)
+	}
 	if !*asJSON {
-		return report(p, stdout, stderr)
+		code := report(p, stdout, stderr)
+		printNote(stdout, note)
+		return code
 	}
 	enc := json.NewEncoder(stdout)
 	enc.SetIndent("", "  ")
@@ -128,4 +157,19 @@ func runStatus(args []string, stdout, stderr io.Writer) int {
 		return exitFail
 	}
 	return exitOK
+}
+
+// settleHere settles, as publish.Settle does, the publish p of the app in the current folder or
+// below it whose name p names, when there is one.
+func settleHere(ctx context.Context, c *platform.Client, p platform.Publish) (string, error) {
+	apps, err := workspace.Apps(".")
+	if err != nil {
+		return "", nil
+	}
+	for _, a := range apps {
+		if a.Name == p.App {
+			return publish.Settle(ctx, c, a.Dir, p)
+		}
+	}
+	return "", nil
 }

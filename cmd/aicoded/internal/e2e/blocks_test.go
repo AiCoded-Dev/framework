@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,10 +9,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"aicoded.dev/framework/cmd/aicoded/internal/dev"
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
 	"aicoded.dev/framework/internal/testmysql"
 )
@@ -45,21 +44,13 @@ func startBlocks(t *testing.T) *site {
 
 // dropDatabases drops the databases and the users the dev runner made for apps.
 func dropDatabases(dsn string, apps ...string) {
-	cfg, err := mysql.ParseDSN(dsn)
+	a, err := dev.NewMySQLAdmin(dsn)
 	if err != nil {
 		return
 	}
-	c, err := mysql.NewConnector(cfg)
-	if err != nil {
-		return
-	}
-	db := sql.OpenDB(c)
-	defer db.Close()
 	for _, app := range apps {
-		for _, stmt := range []string{"DROP USER IF EXISTS 'ac-dev-" + app + "'@'%'", "DROP DATABASE IF EXISTS `ac-dev-" + app + "`"} {
-			if _, err := db.ExecContext(context.Background(), stmt); err != nil {
-				fmt.Fprintf(os.Stderr, "e2e: %s: %v\n", stmt, err)
-			}
+		if err := a.Drop(context.Background(), app, "dev"); err != nil {
+			fmt.Fprintf(os.Stderr, "e2e: drop %s: %v\n", app, err)
 		}
 	}
 }

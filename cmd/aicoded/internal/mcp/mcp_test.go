@@ -587,6 +587,26 @@ func TestPublishTools(t *testing.T) {
 	assert.NotRegexp(t, `aicoded_(at|rt)_`, logs.String())
 }
 
+// The publish tool sends the draft, and release_status clears it once the publish passed.
+func TestPublishToolsCarryTheDraft(t *testing.T) {
+	testhome.Set(t)
+	p := platformtest.New(t)
+	t.Setenv("AICODED_PLATFORM", p.URL)
+	p.SignIn(t)
+	dir := gittest.DatabaseApp(t, "demo", "CREATE TABLE notes (v TEXT);\n")
+	cs := connect(t, dir, io.Discard)
+	p.Answers(platformtest.Publish{Status: "running"}, platformtest.Passed())
+
+	out := result[publishOut](t, call(t, cs, "publish", map[string]any{"app": "demo", "summary": "First"}))
+	require.Len(t, p.Uploads(), 1)
+	assert.Equal(t, "CREATE TABLE notes (v TEXT);\n", p.Uploads()[0].Migration)
+	draft := filepath.Join(dir, ".aicoded", "migration.sql")
+	assert.Equal(t, "running", result[platform.Publish](t, call(t, cs, "release_status", map[string]any{"id": out.ID})).Status)
+	assert.FileExists(t, draft)
+	assert.Equal(t, "passed", result[platform.Publish](t, call(t, cs, "release_status", map[string]any{"id": out.ID})).Status)
+	assert.NoFileExists(t, draft)
+}
+
 func TestTelemetryToolsReadThePlatform(t *testing.T) {
 	home := testhome.Set(t)
 	p := platformtest.New(t)

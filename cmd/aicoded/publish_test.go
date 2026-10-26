@@ -5,6 +5,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -14,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/gittest"
+	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform/platformtest"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
@@ -160,7 +163,7 @@ func TestRunPublishStopsWaiting(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	var stdout, stderr bytes.Buffer
-	assert.Equal(t, 1, wait(ctx, platform.New(p.URL, &stdout), id, &stdout, &stderr), "as after Ctrl-C")
+	assert.Equal(t, 1, wait(ctx, platform.New(p.URL, &stdout), id, dir, &stdout, &stderr), "as after Ctrl-C")
 	assert.Equal(t, "the publish goes on: aicoded status "+id+"\n", stderr.String())
 
 	p.Close()
@@ -168,7 +171,7 @@ func TestRunPublishStopsWaiting(t *testing.T) {
 	code, _, errOut = aicoded("status", id)
 	assert.Equal(t, 1, code)
 	stderr.Reset()
-	assert.Equal(t, 1, wait(t.Context(), platform.New(p.URL, &stdout), id, &stdout, &stderr))
+	assert.Equal(t, 1, wait(t.Context(), platform.New(p.URL, &stdout), id, dir, &stdout, &stderr))
 	assert.Equal(t, strings.TrimSuffix(errOut, "\n")+"\nthe publish goes on: aicoded status "+id+"\n", stderr.String(),
 		"the fifth failure in a row ends the wait")
 }
@@ -409,4 +412,84 @@ func TestRunStatusUsage(t *testing.T) {
 	_, _, errOut := aicoded("status", "pub_1")
 	assert.Contains(t, errOut, `aicoded status: "pub_1" is not the id of a publish`)
 	assert.Zero(t, p.Requests("/v1/publishes/get"))
+}
+
+const draftText = "CREATE TABLE notes (v TEXT);\n"
+
+// draftFile returns the path of the draft of the app in dir.
+func draftFile(dir string) string { return filepath.Join(dir, ".aicoded", "migration.sql") }
+
+// The draft travels with the publish, and goes once the publish passed; the cache then holds the
+// steps the platform has.
+func TestRunPublishCarriesTheDraft(t *testing.T) {
+	p, aicoded := signedIn(t)
+	dir := gittest.DatabaseApp(t, "demo", draftText)
+	steps := migrations.Append(nil, "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa", []string{"CREATE TABLE notes (v TEXT)"})
+	p.SetMigrations("demo", steps...)
+
+	code, out, errOut := aicoded("publish", dir)
+	require.Equal(t, 0, code, errOut)
+	id := publishID(t, out)
+	assert.Contains(t, out, "aicoded: publish "+id+" passed with the schema change in .aicoded/migration.sql, which is cleared\n")
+	require.Len(t, p.Uploads(), 1)
+	assert.Equal(t, draftText, p.Uploads()[0].Migration)
+	assert.NoFileExists(t, draftFile(dir))
+	got, _ := migrations.Published(t.Context(), dir, "demo", nil)
+	assert.Equal(t, steps, got, "the cache is refreshed")
+}
+
+func TestRunPublishFailedKeepsTheDraft(t *testing.T) {
+	p, aicoded := signedIn(t)
+	dir := gittest.DatabaseApp(t, "demo", draftText)
+	p.Answers(platformtest.Failed(1, 10))
+	code, out, _ := aicoded("publish", dir)
+	assert.Equal(t, 1, code)
+	assert.Contains(t, out, "aicoded: publish "+publishID(t, out)+" failed, so .aicoded/migration.sql stays as it was\n")
+	assert.FileExists(t, draftFile(dir))
+	assert.Empty(t, migrations.Pending(dir))
+}
+
+// With --no-wait, aicoded status clears the draft once the publish passed, and so does the next
+// publish, which then sends no draft.
+func TestRunStatusClearsTheDraft(t *testing.T) {
+	p, aicoded := signedIn(t)
+	dir := gittest.DatabaseApp(t, "demo", draftText)
+	p.Answers(platformtest.Publish{Status: "running"})
+	code, out, errOut := aicoded("publish", "--no-wait", dir)
+	require.Equal(t, 0, code, errOut)
+	id := publishID(t, out)
+	t.Chdir(dir)
+	code, _, errOut = aicoded("status", id)
+	require.Equal(t, 0, code, errOut)
+	assert.FileExists(t, draftFile(dir), "the publish runs")
+
+	p.Answers(platformtest.Passed())
+	code, out, errOut = aicoded("status", id)
+	require.Equal(t, 0, code, errOut)
+	assert.Contains(t, out, "aicoded: publish "+id+" passed with the schema change")
+	assert.NoFileExists(t, draftFile(dir))
+
+	gittest.Write(t, dir, map[string]string{".aicoded/migration.sql": draftText, "notes.txt": "notes\n"})
+	gittest.Commit(t, dir, "Add notes")
+	code, _, errOut = aicoded("publish", "--no-wait", dir)
+	require.Equal(t, 0, code, errOut)
+	gittest.Write(t, dir, map[string]string{"notes.txt": "more notes\n"})
+	gittest.Commit(t, dir, "Add more notes")
+	code, out, errOut = aicoded("publish", "--no-wait", dir)
+	require.Equal(t, 0, code, errOut)
+	assert.Contains(t, out, "passed with the schema change", "the publish before passed")
+	require.Len(t, p.Uploads(), 3)
+	assert.Empty(t, p.Uploads()[2].Migration, "the draft went with the publish before")
+}
+
+func TestRunPublishRefusesATrackedDraft(t *testing.T) {
+	p, aicoded := signedIn(t)
+	dir := gittest.DatabaseApp(t, "demo", draftText)
+	require.NoError(t, os.Remove(filepath.Join(dir, ".gitignore")))
+	gittest.Commit(t, dir, "Commit the draft")
+	code, _, errOut := aicoded("publish", dir)
+	assert.Equal(t, 1, code)
+	assert.Contains(t, errOut, "E-MIG-001: the commit holds the draft .aicoded/migration.sql")
+	assert.Zero(t, p.Requests("/v1/apps/get"), "nothing reaches the platform")
+	assert.Zero(t, p.Requests("/v1/publishes/create"))
 }

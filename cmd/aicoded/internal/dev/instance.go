@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -15,11 +17,14 @@ import (
 	"time"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
+	"aicoded.dev/framework/cmd/aicoded/internal/draft"
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
 	"aicoded.dev/framework/cmd/aicoded/internal/gotool"
+	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
 	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
+	"aicoded.dev/framework/runnerproto/mysqlproxy"
 	"aicoded.dev/framework/runnerproto/server"
 )
 
@@ -43,6 +48,9 @@ type Services struct {
 	// Env is the environment the app runs in, which also names its database: devconfig.EnvDev
 	// when empty, or devconfig.EnvPreview.
 	Env devconfig.Env
+	// Platform gives the migrations each app published; with nil, they come from the app's
+	// cache, .aicoded/migrations.json.
+	Platform migrations.Platform
 }
 
 // env returns the environment of svc, devconfig.EnvDev when it names none.
@@ -55,6 +63,9 @@ type Instance struct {
 	Manifest manifest.Manifest
 
 	values devconfig.AppValues
+	dir    string
+	// draft is the draft the instance's database got, as draftOf returns it.
+	draft  string
 	srv    *server.Server
 	files  *fileStore
 	store  *store
@@ -126,21 +137,22 @@ func launch(ctx context.Context, dir, bin string, m manifest.Manifest, values de
 	if err != nil {
 		return nil, err
 	}
-	i := &Instance{Name: m.App, Manifest: m, values: values, store: st, runDir: runDir, exited: make(chan struct{})}
-	if err := i.run(ctx, dir, bin, svc, signer); err != nil {
+	i := &Instance{Name: m.App, Manifest: m, values: values, dir: dir, store: st, runDir: runDir, exited: make(chan struct{})}
+	if err := i.run(ctx, bin, svc, signer); err != nil {
 		i.Stop()
 		return nil, err
 	}
 	return i, nil
 }
 
-// launchByHand serves the runner of the app of m in runDir, for a process the developer starts
-// by hand as often as they like. The instance has no process, and Stop leaves runDir in place.
-func launchByHand(ctx context.Context, runDir string, m manifest.Manifest, values devconfig.AppValues, svc Services, signer *Signer, st *store) (*Instance, error) {
+// launchByHand serves the runner of the app of m in dir in runDir, for a process the developer
+// starts by hand as often as they like. The instance has no process, and Stop leaves runDir in
+// place.
+func launchByHand(ctx context.Context, dir, runDir string, m manifest.Manifest, values devconfig.AppValues, svc Services, signer *Signer, st *store) (*Instance, error) {
 	if err := checkStart(m, values, svc); err != nil {
 		return nil, err
 	}
-	i := &Instance{Name: m.App, Manifest: m, values: values, store: st, runDir: runDir, exited: make(chan struct{}), byHand: true}
+	i := &Instance{Name: m.App, Manifest: m, values: values, dir: dir, store: st, runDir: runDir, exited: make(chan struct{}), byHand: true}
 	if err := i.serve(ctx, svc, signer); err != nil {
 		i.Stop()
 		return nil, err
@@ -148,14 +160,14 @@ func launchByHand(ctx context.Context, runDir string, m manifest.Manifest, value
 	return i, nil
 }
 
-func (i *Instance) run(ctx context.Context, dir, bin string, svc Services, signer *Signer) error {
+func (i *Instance) run(ctx context.Context, bin string, svc Services, signer *Signer) error {
 	if err := i.serve(ctx, svc, signer); err != nil {
 		return err
 	}
 
 	// Stop ends the app with SIGTERM; the context only bounds the start-up.
 	i.cmd = exec.CommandContext(context.WithoutCancel(ctx), bin)
-	i.cmd.Dir = dir
+	i.cmd.Dir = i.dir
 	i.cmd.Env = []string{runnerproto.EnvRunnerDir + "=" + i.runDir}
 	i.cmd.SysProcAttr = appSysProcAttr()
 	i.cmd.Stdout, i.cmd.Stderr = i.store.writer(sourceApp), i.store.writer(sourceApp)
@@ -180,9 +192,15 @@ func (i *Instance) run(ctx context.Context, dir, bin string, svc Services, signe
 }
 
 // serve serves the runner protocol on runner.sock in the run folder through the runner server,
-// and the database on mysql.sock when the app declares sqldb, with a fresh form key.
+// and the database on mysql.sock when the app declares sqldb, with a fresh form key. Before the
+// server starts, it applies the app's migrations to its database, as the database's owner, and
+// the proxy on mysql.sock then logs in as the data user.
 func (i *Instance) serve(ctx context.Context, svc Services, signer *Signer) error {
 	m := i.Manifest
+	database, err := i.migrate(ctx, svc)
+	if err != nil {
+		return err
+	}
 	files, err := newFileStore(filepath.Join(svc.StateDir, "files", m.App), m.Stores())
 	if err != nil {
 		return err
@@ -198,12 +216,8 @@ func (i *Instance) serve(ctx context.Context, svc Services, signer *Signer) erro
 		CSRFKey:    newCSRFKey(),
 		Providers:  providers(m, files, i.store, i.values, svc.Router),
 	}
-	if m.SQLDB() {
-		up, err := svc.MySQL.Prepare(ctx, m.App, string(svc.env()))
-		if err != nil {
-			return err
-		}
-		opts.Database = &up
+	if database != nil {
+		opts.Database = database
 		opts.OnDatabaseError = func(err error) { i.store.add(sourceRunner, "ERROR", "database: "+err.Error(), true) }
 	}
 	if i.byHand {
@@ -211,6 +225,41 @@ func (i *Instance) serve(ctx context.Context, svc Services, signer *Signer) erro
 	}
 	i.srv, err = server.New(ctx, opts)
 	return err
+}
+
+// migrate applies to the database of an app that declares sqldb the migrations it published and
+// its draft, as Services.MySQL.Migrate does, and returns where the data user logs in. For any other
+// app, it only refuses a draft, which the app has no database for.
+func (i *Instance) migrate(ctx context.Context, svc Services) (*mysqlproxy.Upstream, error) {
+	m := i.Manifest
+	i.draft = draftOf(i.dir)
+	if !m.SQLDB() {
+		_, err := draft.Check(i.dir, m)
+		return nil, err
+	}
+	steps, warning, err := migrations.Steps(ctx, i.dir, m, svc.Platform)
+	if err != nil {
+		return nil, err
+	}
+	if warning != "" {
+		i.store.add(sourceRunner, "WARN", warning, true)
+	}
+	users, err := svc.MySQL.Migrate(ctx, m.App, string(svc.env()), steps)
+	if err != nil {
+		return nil, err
+	}
+	return &users.Data, nil
+}
+
+// draftOf returns the hex SHA-256 of the draft of the app in dir, or "" when it has none or it
+// cannot be read.
+func draftOf(dir string) string {
+	text, err := draft.Read(dir)
+	if err != nil || text == nil {
+		return ""
+	}
+	sum := sha256.Sum256(text)
+	return hex.EncodeToString(sum[:])
 }
 
 // Stop sends SIGTERM, waits for the app to exit (killing it after 15s) and removes its sockets.

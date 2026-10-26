@@ -25,6 +25,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/cmd/aicoded/internal/devui"
 	"aicoded.dev/framework/cmd/aicoded/internal/devui/deps"
+	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/watch"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
@@ -54,6 +55,9 @@ type Config struct {
 	// Login prints the login link of the dev UI, which holds its access token. Without it, the
 	// line names only the dev UI's address.
 	Login bool
+	// Platform gives the migrations each app published, which aicoded dev applies to the app's
+	// database before its draft; with nil, they come from the app's cache.
+	Platform migrations.Platform
 }
 
 // Workspace runs the apps under a folder on the local runner. Each app has a slot that
@@ -157,7 +161,7 @@ func newWorkspace(ctx context.Context, cfg Config, apps []workspace.App, l net.L
 		return nil, err
 	}
 	w := &Workspace{cfg: cfg, out: &lockedWriter{w: cfg.Out}, port: l.Addr().(*net.TCPAddr).Port, signer: signer, changes: newChanges()}
-	w.svc = Services{StateDir: cfg.State, Router: server.NewRouter(signer), Env: cfg.Dev.Env}
+	w.svc = Services{StateDir: cfg.State, Router: server.NewRouter(signer), Env: cfg.Dev.Env, Platform: cfg.Platform}
 	if cfg.Dev.MySQL != "" {
 		if w.svc.MySQL, err = NewMySQLAdmin(cfg.Dev.MySQL); err != nil {
 			return nil, err

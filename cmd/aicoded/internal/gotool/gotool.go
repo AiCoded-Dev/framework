@@ -52,13 +52,14 @@ func Vet(ctx context.Context, dir string) ([]*errs.Error, error) {
 }
 
 // Test runs the tests of every package of the module in dir, with the race detector when race
-// is set. It takes no result from the test cache, where a test could have written one.
-func Test(ctx context.Context, dir string, race bool) ([]*errs.Error, error) {
+// is set, and with env, each KEY=value, in their environment in place of the variables of those
+// names. It takes no result from the test cache, where a test could have written one.
+func Test(ctx context.Context, dir string, race bool, env []string) ([]*errs.Error, error) {
 	args := []string{"test", "-json", "-count=1", "./..."}
 	if race {
 		args = []string{"test", "-json", "-count=1", "-race", "./..."}
 	}
-	r, err := run(ctx, dir, args...)
+	r, err := runEnv(ctx, dir, env, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +150,12 @@ func (r result) stopped() *errs.Error {
 // run runs go with args in dir. An exit status other than 0 is not an error; the error is a
 // failure to run go at all.
 func run(ctx context.Context, dir string, args ...string) (result, error) {
+	return runEnv(ctx, dir, nil, args...)
+}
+
+// runEnv is run with env, each KEY=value, in the environment of go in place of the variables of
+// those names.
+func runEnv(ctx context.Context, dir string, env []string, args ...string) (result, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return result{}, err
@@ -156,6 +163,9 @@ func run(ctx context.Context, dir string, args ...string) (result, error) {
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = dir
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	cmd.WaitDelay = 5 * time.Second
 	err = cmd.Run()

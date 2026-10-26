@@ -126,13 +126,13 @@ func TestVetVerbose(t *testing.T) {
 
 func TestTestFailures(t *testing.T) {
 	requireGo(t)
-	ps, err := Test(t.Context(), module(t, "failing"), false)
+	ps, err := Test(t.Context(), module(t, "failing"), false, nil)
 	require.NoError(t, err)
 	assert.Equal(t, []brief{{"E-CHK-004", "calc/calc_test.go:12",
 		"TestAddWrong failed: calc_test.go:12: adding\ncalc_test.go:14: Add(2, 2) = 4, want 5"}}, briefs(ps))
 	assert.Equal(t, "fix the code or the test until go test passes", ps[0].Fix)
 
-	ps, err = Test(t.Context(), module(t, "broken"), false)
+	ps, err = Test(t.Context(), module(t, "broken"), false, nil)
 	require.NoError(t, err)
 	assert.Equal(t, []brief{
 		{"E-CHK-002", "main.go:4", "undefined: undefinedMain"},
@@ -144,7 +144,7 @@ func TestTestFailures(t *testing.T) {
 func TestTestStoppedBySignal(t *testing.T) {
 	requireGo(t)
 	t.Setenv("GOTMPDIR", t.TempDir())
-	ps, err := Test(t.Context(), module(t, "stopped"), false)
+	ps, err := Test(t.Context(), module(t, "stopped"), false, nil)
 	require.NoError(t, err)
 	assert.Equal(t, []brief{{"E-CHK-008", "", "go test was stopped by signal 9 (killed)"}}, briefs(ps))
 	assert.Equal(t, "do not signal, kill or wait on other processes in tests; when no test does, or no test ran, give the go command more memory, then run the command again", ps[0].Fix)
@@ -163,12 +163,38 @@ func TestTestTakesNothingFromTheCache(t *testing.T) {
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	dir := module(t, "ok")
 	for _, race := range []bool{false, true} {
-		_, err := Test(t.Context(), dir, race)
+		_, err := Test(t.Context(), dir, race, nil)
 		require.NoError(t, err)
 	}
 	args, err := os.ReadFile(log)
 	require.NoError(t, err)
 	assert.Equal(t, "test -json -count=1 ./...\ntest -json -count=1 -race ./...\n", string(args))
+}
+
+// The variables Test is given reach the tests in place of those of the same name.
+func TestTestEnv(t *testing.T) {
+	requireGo(t)
+	t.Setenv("AICODED_TEST_DB", "from the parent")
+	dir := module(t, "ok")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "env_test.go"), []byte(`package main
+
+import (
+	"os"
+	"testing"
+)
+
+func TestEnv(t *testing.T) {
+	if got := os.Getenv("AICODED_TEST_DB"); got != "given" {
+		t.Errorf("AICODED_TEST_DB is %q", got)
+	}
+}
+`), 0o600))
+	ps, err := Test(t.Context(), dir, false, []string{"AICODED_TEST_DB=given"})
+	require.NoError(t, err)
+	assert.Empty(t, ps)
+	ps, err = Test(t.Context(), dir, false, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []brief{{"E-CHK-004", "env_test.go:10", `TestEnv failed: env_test.go:10: AICODED_TEST_DB is "from the parent"`}}, briefs(ps))
 }
 
 func TestTestRace(t *testing.T) {
@@ -179,7 +205,7 @@ func TestTestRace(t *testing.T) {
 	if !ok {
 		t.Skip("no -race here: " + why)
 	}
-	ps, err := Test(t.Context(), dir, true)
+	ps, err := Test(t.Context(), dir, true, nil)
 	require.NoError(t, err)
 	assert.Empty(t, ps)
 }

@@ -141,3 +141,23 @@ func TestLoadRefusesPersonaNames(t *testing.T) {
 	require.NoError(t, err, "a name of 512 bytes")
 	assert.Len(t, ws.Personas[0].Name, 512)
 }
+
+func TestMySQL(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dev.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(`workspaces:
+  /src/apps:
+    mysql: root:pw@unix(/var/run/mysqld/mysqld.sock)/
+  /src/apps/rooms:
+    port: 9100
+`), 0o600))
+	for dir, want := range map[string]string{
+		"/src/apps":           "root:pw@unix(/var/run/mysqld/mysqld.sock)/",
+		"/src/apps/rooms/api": "root:pw@unix(/var/run/mysqld/mysqld.sock)/",
+		"/src":                "",
+		"/elsewhere":          "",
+	} {
+		got, err := devconfig.MySQL(path, dir)
+		require.NoError(t, err)
+		assert.Equal(t, want, got, dir)
+	}
+}

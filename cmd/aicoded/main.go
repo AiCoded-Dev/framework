@@ -271,7 +271,11 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	fw, _ := scaffold.Detect(frameworkDir)
-	report, err := check.Run(ctx, dirArg(rest), check.Options{Frozen: *frozen, NoTests: *noTests, App: *app, FrameworkDir: fw.Dir})
+	opts, err := check.WithDatabase(dirArg(rest), check.Options{Frozen: *frozen, NoTests: *noTests, App: *app, FrameworkDir: fw.Dir})
+	if err != nil {
+		return fail(stderr, err)
+	}
+	report, err := check.Run(ctx, dirArg(rest), opts)
 	if err != nil {
 		return fail(stderr, err)
 	}

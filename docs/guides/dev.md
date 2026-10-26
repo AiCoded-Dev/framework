@@ -83,13 +83,51 @@ list is the one a new browser gets.
 
 - An app that declares `sqldb` needs `mysql:` in its workspace: the admin DSN of a MySQL 8 server
   on this machine, over a Unix socket, `127.0.0.1` or `::1` (E-DEV-006, E-DEV-007). `aicoded dev`
-  creates the app's own database and user there, both `ac-dev-<app>` (`ac-preview-<app>` under
-  `env: preview`), and gives the user a new password on every start. See
+  creates the app's own database there, `ac-dev-<app>` (`ac-preview-<app>` under `env: preview`),
+  and two users, each with a new password on every start: the data user `ac-dev-<app>`, which
+  may only read and write rows (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) and which the app's
+  `mysql.sock` logs in as, and the owner `ao-dev-<app>`, which only the migrations run as. A
+  `CREATE TABLE` or any other schema change from the app gets MySQL's access-denied error. See
   [the SQL database](sql-database.md).
+- Before every start and restart of such an app, `aicoded dev` applies its migrations to its
+  database as the owner (see [Migrations](#migrations)).
 - File stores live in a private state folder, readable by you only:
   `~/.local/state/aicoded/<hash>/files/<app>/<store>` (E-DEV-009).
 - Mail is caught instead of sent. It is still checked against the mail rules and the permission
   list. See [mail](mail.md).
+
+## Migrations
+
+An app's tables come from its migrations, never from its code. Before it starts an app that
+declares `sqldb`, `aicoded dev` applies to the app's database, as the owner:
+
+1. the migrations the app published, which it asks the platform for with your sign-in and keeps
+   in `.aicoded/migrations.json`. When you are not signed in or the platform cannot be reached,
+   it applies the ones kept there and prints one warning line, or, with none kept, only the
+   draft;
+2. then the statements of the draft, `.aicoded/migration.sql`, the next schema change.
+
+The database's journal, the table `aicoded_migrations`, holds what ran. A draft that grows is
+applied on top. When the draft changes otherwise, or the journal holds steps that the published
+migrations and the draft do not start with, as after a publish, `aicoded dev` drops the app's dev
+database, makes it again and applies everything: its data is test data. It never touches another
+app's database. A draft that `aicoded check` refuses (E-MIG-001 to E-MIG-003, E-MIG-006) or a step
+that fails (E-MIG-005) stops the app, and its problems show at its address, on the dev UI and in
+`what_broke`.
+
+The draft and `.aicoded/migrations.json` stay out of git: a new app's `.gitignore` lists both, and
+`aicoded publish` refuses a commit that holds the draft (E-MIG-001). `aicoded publish` sends the
+draft with the commit, and once that publish passed, deletes it and refreshes
+`.aicoded/migrations.json`; a publish that failed leaves the draft as it was. When you publish with
+`--no-wait`, or with the `publish` tool, `aicoded status`, `release_status` or the next publish
+does that once the publish has ended. A draft you changed after the publish was sent stays, to be
+cut down to what is still to publish.
+
+`aicoded check`, when the workspace's `dev.yaml` (or that of a folder above it) names `mysql:`,
+makes a new test database for each app that declares `sqldb`, applies the same steps, runs the
+app's tests with `AICODED_TEST_DB` set to the data user's DSN, and drops the database and its
+users after. A test opens it with `sqltest.Open(t)` from `aicoded.dev/framework/sqldb/sqltest`,
+which skips the test when there is no test database.
 
 ## Watching
 
@@ -103,8 +141,9 @@ is not rebuilt, and an app you run by hand is only generated.
 An app that fails stops alone, and its address shows its problems, with code, `file:line` and
 fix, until a change builds or you start it again: Start or Restart on the dev UI, or the
 `preview` tool. It fails when it does not generate, holds a broken snapshot, does not build,
-lacks values in `dev.yaml` (E-DEV-003), exits or is not ready within 30 seconds of starting
-(E-DEV-004), or gets a new name on its `app:` line while `aicoded dev` runs (E-DEV-015).
+lacks values in `dev.yaml` (E-DEV-003), has a draft that is refused or a migration that fails
+(E-MIG-001 to E-MIG-006), exits or is not ready within 30 seconds of starting (E-DEV-004), or
+gets a new name on its `app:` line while `aicoded dev` runs (E-DEV-015).
 
 Only problems of the whole workspace stop `aicoded dev`:
 

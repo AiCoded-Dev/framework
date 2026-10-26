@@ -25,7 +25,8 @@ const MaxBundle = 32 << 20
 // uploadTimeout bounds the sending of a bundle, which takes longer than other requests.
 const uploadTimeout = 10 * time.Minute
 
-// maxMeta is the size of the largest meta part of an upload the platform takes: 4 KiB.
+// maxMeta is the size of the largest meta part of an upload the platform takes, without its
+// migration: 4 KiB.
 const maxMeta = 4 << 10
 
 // maxPublish is the largest answer about a publish read from the platform, which holds its
@@ -95,7 +96,10 @@ type Last struct{ ID, SHA, Status string }
 // Upload is a commit of an app to publish, with the git bundle that carries it.
 type Upload struct {
 	App, SHA, Summary string
-	Bundle            []byte
+	// Migration is the app's schema-change draft, .aicoded/migration.sql, or "" when it has
+	// none.
+	Migration string
+	Bundle    []byte
 }
 
 // Created is the platform's answer to an upload.
@@ -195,14 +199,16 @@ func (c *Client) App(ctx context.Context, name string) (app App, found bool, err
 // publish of a name creates the app. A bundle whose prerequisite is no longer the app's base is
 // ErrBaseChanged; the other refusals have the code the platform gives, E-PUB-005 to E-PUB-010.
 func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
-	var meta bytes.Buffer
-	enc := json.NewEncoder(&meta)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(map[string]string{"app": u.App, "sha": u.SHA, "summary": u.Summary}); err != nil {
+	short, err := encodeMeta(map[string]string{"app": u.App, "sha": u.SHA, "summary": u.Summary})
+	if err != nil {
 		return Created{}, err
 	}
-	if meta.Len() > maxMeta {
+	if len(short) > maxMeta {
 		return Created{}, errors.New("the summary of the publish is too long for the platform")
+	}
+	meta, err := encodeMeta(map[string]string{"app": u.App, "sha": u.SHA, "summary": u.Summary, "migration": u.Migration})
+	if err != nil {
+		return Created{}, err
 	}
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
@@ -210,7 +216,7 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 		disposition, contentType string
 		data                     []byte
 	}{
-		{`form-data; name="meta"`, "application/json", meta.Bytes()},
+		{`form-data; name="meta"`, "application/json", meta},
 		{`form-data; name="bundle"; filename="app.bundle"`, "application/octet-stream", u.Bundle},
 	} {
 		w, err := mw.CreatePart(textproto.MIMEHeader{"Content-Disposition": {p.disposition}, "Content-Type": {p.contentType}})
@@ -252,6 +258,15 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 		return Created{}, errors.New("the platform's answer to the publish is not valid")
 	}
 	return Created{ID: a.ID, CreatedApp: a.CreatedApp}, nil
+}
+
+// encodeMeta returns the JSON of meta, with no escapes for HTML.
+func encodeMeta(meta map[string]string) ([]byte, error) {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	err := enc.Encode(meta)
+	return b.Bytes(), err
 }
 
 // Publish returns the publish id, which must match PublishID. It reads an answer of up to 8 MiB,

@@ -3,6 +3,7 @@ package check
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"os"
@@ -19,7 +20,9 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/surface"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/internal/testmysql"
 	"aicoded.dev/framework/lint"
+	"aicoded.dev/framework/sqldb/sqltest"
 )
 
 func requireGo(t *testing.T) {
@@ -127,9 +130,9 @@ func record(t *testing.T) *[]string {
 		ran = append(ran, "lint "+filepath.Base(dir))
 		return analyze(ctx, dir, cfg)
 	}
-	goTest = func(ctx context.Context, dir string, race bool) ([]*errs.Error, error) {
+	goTest = func(ctx context.Context, dir string, race bool, env []string) ([]*errs.Error, error) {
 		ran = append(ran, "test "+filepath.Base(dir))
-		return test(ctx, dir, race)
+		return test(ctx, dir, race, env)
 	}
 	return &ran
 }
@@ -638,4 +641,97 @@ aicoded check: 2 problems in 1 app
 	out.Reset()
 	require.NoError(t, r.WriteText(&out))
 	assert.Equal(t, "ok  billing\naicoded check: ok\ntests did not run (--no-tests)\n", out.String())
+}
+
+// ledger copies the one-page app testdata/shop into root/name, with sqldb in its permission list,
+// draft as its draft, and a test that writes and reads a row of the table the draft makes and may
+// not change the schema. The test fails rather than skips when LEDGER_NEEDS_DB is set.
+func ledger(t *testing.T, root, name, draft string) string {
+	dir := pagesApp(t, root, name)
+	withDraft(t, dir, draft)
+	gomod := filepath.Join(dir, "go.mod")
+	write(t, gomod, read(t, gomod)+"\nrequire (\n\tfilippo.io/edwards25519 v1.2.0 // indirect\n\tgithub.com/go-sql-driver/mysql v1.10.1 // indirect\n)\n")
+	write(t, filepath.Join(dir, "ledger", "ledger.go"), "// Package ledger keeps entries.\npackage ledger\n")
+	write(t, filepath.Join(dir, "ledger", "ledger_test.go"), `package ledger
+
+import (
+	"os"
+	"strings"
+	"testing"
+
+	"aicoded.dev/framework/sqldb/sqltest"
+)
+
+func TestEntries(t *testing.T) {
+	if os.Getenv("LEDGER_NEEDS_DB") != "" && os.Getenv(sqltest.EnvDB) == "" {
+		t.Fatal("no test database")
+	}
+	db := sqltest.Open(t)
+	if _, err := db.ExecContext(t.Context(), "INSERT INTO entries (amount) VALUES (?)", 5); err != nil {
+		t.Fatal(err)
+	}
+	var sum int
+	if err := db.QueryRowContext(t.Context(), "SELECT SUM(amount) FROM entries").Scan(&sum); err != nil || sum != 5 {
+		t.Fatalf("sum %d, %v", sum, err)
+	}
+	var name string
+	if err := db.QueryRowContext(t.Context(), "SELECT DATABASE()").Scan(&name); err != nil || !strings.HasPrefix(name, "ac-test-") {
+		t.Fatalf("database %q, %v", name, err)
+	}
+	if _, err := db.ExecContext(t.Context(), "CREATE TABLE more (x INT)"); err == nil || !strings.Contains(err.Error(), "denied") {
+		t.Fatalf("the tests changed the schema: %v", err)
+	}
+}
+`)
+	return dir
+}
+
+// leftovers returns the databases and users of app that aicoded check made for its tests and left.
+func leftovers(t *testing.T, app string) []string {
+	rows, err := testmysql.Admin(t).QueryContext(t.Context(),
+		"SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE ? UNION ALL SELECT user FROM mysql.user WHERE user LIKE ? OR user LIKE ?",
+		"ac-test-%-"+app, "ac-test-%-"+app, "ao-test-%-"+app)
+	require.NoError(t, err)
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var s string
+		require.NoError(t, rows.Scan(&s))
+		out = append(out, s)
+	}
+	require.NoError(t, rows.Err())
+	return out
+}
+
+func TestCheckTestDatabase(t *testing.T) {
+	requireGo(t)
+	t.Setenv("LEDGER_NEEDS_DB", "1")
+	root, app := tempRoot(t), "ledger-"+strings.ToLower(rand.Text()[:6])
+	dir := ledger(t, root, app, "CREATE TABLE entries (id BIGINT AUTO_INCREMENT PRIMARY KEY, amount INT NOT NULL);\n")
+	r, err := Run(t.Context(), root, Options{MySQL: testmysql.DSN(t), FrameworkDir: checkout(t)})
+	require.NoError(t, err)
+	require.True(t, r.OK(), "%+v", r.Apps)
+	assert.Empty(t, leftovers(t, app), "the test database and its users are dropped")
+	assert.FileExists(t, filepath.Join(dir, ".aicoded", "migration.sql"), "the draft stays")
+
+	write(t, filepath.Join(dir, ".aicoded", "migration.sql"), "CREATE TABLE entries (id BIGINT AUTO_INCREMENT PRIMARY KEY, amount NOSUCHTYPE);\n")
+	r, err = Run(t.Context(), root, Options{MySQL: testmysql.DSN(t), FrameworkDir: checkout(t)})
+	require.NoError(t, err)
+	require.Len(t, r.Apps[0].Problems, 1)
+	assert.Equal(t, "E-MIG-005", r.Apps[0].Problems[0].Code)
+	assert.Contains(t, r.Apps[0].Problems[0].Message, "step draft#1 failed: MySQL error 1064")
+	assert.Empty(t, leftovers(t, app), "a test database whose steps failed is dropped too")
+}
+
+// Without a MySQL server, the tests find AICODED_TEST_DB empty, whatever the environment holds,
+// and skip what needs it.
+func TestCheckNoTestDatabase(t *testing.T) {
+	requireGo(t)
+	assert.Equal(t, sqltest.EnvDB, EnvTestDB)
+	t.Setenv(EnvTestDB, "not a DSN")
+	root := tempRoot(t)
+	ledger(t, root, "ledger", "CREATE TABLE entries (id BIGINT AUTO_INCREMENT PRIMARY KEY, amount INT NOT NULL);\n")
+	r, err := Run(t.Context(), root, Options{FrameworkDir: checkout(t)})
+	require.NoError(t, err)
+	assert.True(t, r.OK(), "%+v", r.Apps)
 }

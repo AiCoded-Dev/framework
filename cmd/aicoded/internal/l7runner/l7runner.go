@@ -2,21 +2,25 @@
 // the simulated attacks on one app:
 //
 //	aicoded l7-runner --app <tree> --runner-dir <dir> --control <socket path> --state <dir>
-//	                  [--mysql-dsn-file <file> --mysql-database <name>]
+//	                  [--mysql-dsn-file <file> --mysql-database <name> [--migrations <file>]]
 //
 // It serves the runner protocol to the app through the runner server with the providers of
 // aicoded dev, in the environment preview, and builds and starts nothing: the pipeline starts
-// the app, as another user, once the runner answers on its control socket. The control API, for
+// the app, as another user, once the runner answers on its control socket. Before it serves, it
+// applies to the app's database, with migrate.Apply, the steps in the file of --migrations, a
+// JSON object {"steps": [...]} of the app's migrations as the platform lists them. The control API, for
 // the pipeline alone, reports the app's state, mints viewer tokens and returns the app's spans.
 // Nothing listens on TCP, and nothing is logged but one line on stderr when the command fails or
 // cannot open the app's database.
 package l7runner
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -39,6 +43,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/lint"
 	"aicoded.dev/framework/manifest"
+	"aicoded.dev/framework/migrate"
 	"aicoded.dev/framework/runnerproto"
 	"aicoded.dev/framework/runnerproto/mysqlproxy"
 	"aicoded.dev/framework/runnerproto/socket"
@@ -57,6 +62,7 @@ const (
 	maxSocketPath = 107
 	maxDSNFile    = 4 << 10
 	maxManifest   = 1 << 20
+	maxMigrations = 8 << 20
 	secretBytes   = 16
 	loginTimeout  = 10 * time.Second
 )
@@ -77,6 +83,8 @@ type config struct {
 	state     string
 	// database is where the proxy on mysql.sock logs in; nil for an app without sqldb.
 	database *mysqlproxy.Upstream
+	// steps are the migrations applied to the database before the runner serves.
+	steps []migrate.Step
 }
 
 // Main runs aicoded l7-runner with args, the arguments after the command, until ctx is done,
@@ -121,8 +129,8 @@ func load(args []string, uid int) (*config, error) {
 	switch {
 	case m.SQLDB() && f.dsnFile == "":
 		return nil, errors.New("the app declares sqldb: give --mysql-dsn-file and --mysql-database")
-	case !m.SQLDB() && f.dsnFile != "":
-		return nil, errors.New("the app does not declare sqldb: leave out --mysql-dsn-file and --mysql-database")
+	case !m.SQLDB() && (f.dsnFile != "" || f.migrations != ""):
+		return nil, errors.New("the app does not declare sqldb: leave out --mysql-dsn-file, --mysql-database and --migrations")
 	case f.dsnFile != "":
 		dsn, err := readDSN(f.dsnFile, uid)
 		if err != nil {
@@ -130,12 +138,17 @@ func load(args []string, uid int) (*config, error) {
 		}
 		cfg.database = &mysqlproxy.Upstream{Network: dsn.Net, Address: dsn.Addr, User: dsn.User, Password: dsn.Passwd, Database: f.database}
 	}
+	if f.migrations != "" {
+		if cfg.steps, err = readMigrations(f.migrations, uid); err != nil {
+			return nil, err
+		}
+	}
 	return cfg, nil
 }
 
 // flags are the values of the command line.
 type flags struct {
-	app, runnerDir, control, state, dsnFile, database string
+	app, runnerDir, control, state, dsnFile, database, migrations string
 }
 
 // parseFlags parses args. Its errors name a flag, never a value.
@@ -149,6 +162,7 @@ func parseFlags(args []string) (flags, error) {
 	fs.StringVar(&f.state, "state", "", "")
 	fs.StringVar(&f.dsnFile, "mysql-dsn-file", "", "")
 	fs.StringVar(&f.database, "mysql-database", "", "")
+	fs.StringVar(&f.migrations, "migrations", "", "")
 	if err := fs.Parse(args); err != nil {
 		return f, err
 	}
@@ -161,7 +175,7 @@ func parseFlags(args []string) (flags, error) {
 		required bool
 	}{
 		{"--app", &f.app, true}, {"--runner-dir", &f.runnerDir, true}, {"--control", &f.control, true},
-		{"--state", &f.state, true}, {"--mysql-dsn-file", &f.dsnFile, false},
+		{"--state", &f.state, true}, {"--mysql-dsn-file", &f.dsnFile, false}, {"--migrations", &f.migrations, false},
 	}
 	for _, p := range paths {
 		switch {
@@ -273,10 +287,47 @@ func readDSN(name string, uid int) (*mysql.Config, error) {
 	return cfg, nil
 }
 
+// readMigrations reads the steps in the file name: a regular file of the user uid's, not a
+// symbolic link, of at most 8 MiB, that holds a JSON object {"steps": [...]} and nothing else.
+func readMigrations(name string, uid int) ([]migrate.Step, error) {
+	f, err := os.OpenFile(filepath.Clean(name), os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return nil, errors.New("--migrations cannot be opened, or is a symbolic link")
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, errors.New("--migrations cannot be read")
+	}
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	if !fi.Mode().IsRegular() || !ok || int64(st.Uid) != int64(uid) {
+		return nil, errors.New("--migrations must be a regular file of this user's own")
+	}
+	data, err := io.ReadAll(io.LimitReader(f, maxMigrations+1))
+	if err != nil {
+		return nil, errors.New("--migrations cannot be read")
+	}
+	if len(data) > maxMigrations {
+		return nil, errors.New("--migrations is larger than 8 MiB")
+	}
+	var list struct {
+		Steps []migrate.Step `json:"steps"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if dec.Decode(&list) != nil || dec.Decode(&struct{}{}) != io.EOF {
+		return nil, errors.New(`--migrations does not hold a JSON object {"steps": [...]}`)
+	}
+	return list.Steps, nil
+}
+
 // serve serves the app of cfg until ctx is done.
 func serve(ctx context.Context, cfg *config, stderr io.Writer) error {
 	if cfg.database != nil {
 		if err := checkLogin(ctx, *cfg.database); err != nil {
+			return err
+		}
+		if err := applySteps(ctx, *cfg.database, cfg.steps); err != nil {
 			return err
 		}
 	}
@@ -323,15 +374,10 @@ func serve(ctx context.Context, cfg *config, stderr io.Writer) error {
 // checkLogin logs in to up's database as the proxy will, so that a database the runner cannot
 // open fails the run before the app starts. Its error names the server's error number only.
 func checkLogin(ctx context.Context, up mysqlproxy.Upstream) error {
-	cfg := mysql.NewConfig()
-	cfg.Net, cfg.Addr, cfg.User, cfg.Passwd, cfg.DBName = up.Network, up.Address, up.User, up.Password, up.Database
-	cfg.Timeout = loginTimeout
-	cfg.Logger = log.New(io.Discard, "", 0)
-	conn, err := mysql.NewConnector(cfg)
+	db, err := open(up)
 	if err != nil {
-		return errors.New("the DSN in --mysql-dsn-file cannot be used")
+		return err
 	}
-	db := sql.OpenDB(conn)
 	defer db.Close()
 	ctx, cancel := context.WithTimeout(ctx, loginTimeout)
 	defer cancel()
@@ -339,6 +385,39 @@ func checkLogin(ctx context.Context, up mysqlproxy.Upstream) error {
 		return errors.New("cannot open --mysql-database with the account of --mysql-dsn-file: " + reason(err))
 	}
 	return nil
+}
+
+// applySteps applies steps to up's database with migrate.Apply, as up's account. Its error never
+// names the account or its password.
+func applySteps(ctx context.Context, up mysqlproxy.Upstream, steps []migrate.Step) error {
+	db, err := open(up)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	if _, err := migrate.Apply(ctx, db, steps); err != nil {
+		msg := err.Error()
+		for _, secret := range []string{up.Password, up.User} {
+			if secret != "" {
+				msg = strings.ReplaceAll(msg, secret, "<hidden>")
+			}
+		}
+		return errors.New(msg)
+	}
+	return nil
+}
+
+// open opens up's database as up's account, with no log.
+func open(up mysqlproxy.Upstream) (*sql.DB, error) {
+	cfg := mysql.NewConfig()
+	cfg.Net, cfg.Addr, cfg.User, cfg.Passwd, cfg.DBName = up.Network, up.Address, up.User, up.Password, up.Database
+	cfg.Timeout = loginTimeout
+	cfg.Logger = log.New(io.Discard, "", 0)
+	conn, err := mysql.NewConnector(cfg)
+	if err != nil {
+		return nil, errors.New("the DSN in --mysql-dsn-file cannot be used")
+	}
+	return sql.OpenDB(conn), nil
 }
 
 // reason describes a failed login without the server's text, which names the account.

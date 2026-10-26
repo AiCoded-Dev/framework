@@ -81,6 +81,7 @@ func main() {
 </html>
 `, read(t, dir, "pages/index.html"))
 	assert.Equal(t, agents, read(t, dir, "AGENTS.md"))
+	assert.Equal(t, "/.aicoded/migration.sql\n/.aicoded/migrations.json\n", read(t, dir, ".gitignore"))
 	for _, rel := range []string{"pages/route_gen.go", "pages/handler_gen.go", "pages/dataprovider.go"} {
 		assert.FileExists(t, filepath.Join(dir, rel))
 	}
@@ -230,4 +231,21 @@ func TestReleased(t *testing.T) {
 		assert.Empty(t, released(info(dep)), name)
 	}
 	assert.Empty(t, released(nil))
+}
+
+// The draft and the cache of the published migrations stay out of git; the snapshot of the
+// functions an app serves is committed.
+func TestGitignore(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not on PATH")
+	}
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(gitignore), 0o600))
+	require.NoError(t, exec.CommandContext(t.Context(), "git", "init", "-q", dir).Run())
+	for rel, ignored := range map[string]bool{
+		".aicoded/migration.sql": true, ".aicoded/migrations.json": true, ".aicoded/rpc.json": false, "pages/migration.sql": false,
+	} {
+		err := exec.CommandContext(t.Context(), "git", "-C", dir, "check-ignore", "-q", "--no-index", rel).Run()
+		assert.Equal(t, ignored, err == nil, rel)
+	}
 }

@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"aicoded.dev/framework/cmd/aicoded/internal/draft"
 	"aicoded.dev/framework/cmd/aicoded/internal/gittest"
+	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
 	"aicoded.dev/framework/internal/errs"
 )
 
@@ -132,4 +134,42 @@ func TestHeader(t *testing.T) {
 		_, _, ok := header([]byte(b))
 		assert.False(t, ok, b)
 	}
+}
+
+const draftText = "CREATE TABLE notes (v TEXT);\n"
+
+func TestPrepareCarriesTheDraft(t *testing.T) {
+	dir := gittest.DatabaseApp(t, "demo", draftText)
+	gittest.Write(t, dir, map[string]string{".aicoded/migrations.json": `{"steps": []}`})
+	cm, err := Prepare(t.Context(), dir, Options{})
+	require.NoError(t, err)
+	assert.Equal(t, draftText, cm.Migration)
+
+	git(t, dir, "rm", "-q", ".gitignore")
+	git(t, dir, "commit", "-q", "-m", "Forget the .gitignore")
+	cm, err = Prepare(t.Context(), dir, Options{})
+	require.NoError(t, err, "an untracked draft and cache are no change of the commit")
+	assert.Equal(t, draftText, cm.Migration)
+}
+
+func TestGitNamesTheDraftAndTheCache(t *testing.T) {
+	assert.Equal(t, draft.File, draftFile)
+	assert.Equal(t, migrations.Cache, cacheFile)
+}
+
+func TestPrepareRefusesATrackedDraft(t *testing.T) {
+	dir := gittest.DatabaseApp(t, "demo", draftText)
+	git(t, dir, "add", "-f", ".aicoded/migration.sql")
+	_, err := Prepare(t.Context(), dir, Options{})
+	assert.Equal(t, "E-MIG-001", errs.Code(err), "a staged draft")
+
+	gittest.Commit(t, dir, "Commit the draft")
+	_, err = Prepare(t.Context(), dir, Options{})
+	assert.Equal(t, "E-MIG-001", errs.Code(err), "a committed draft")
+	require.ErrorContains(t, err, "the commit holds the draft .aicoded/migration.sql, which travels with a publish, not in git\n"+
+		"  fix: run git rm --cached .aicoded/migration.sql, add .aicoded/migration.sql to .gitignore and commit")
+
+	git(t, dir, "rm", "-q", "--cached", ".aicoded/migration.sql")
+	_, err = Prepare(t.Context(), dir, Options{})
+	assert.Equal(t, "E-MIG-001", errs.Code(err), "a draft out of the index that the commit still holds")
 }

@@ -205,6 +205,7 @@ func testApp(t *testing.T, test string) string {
 }
 
 func TestRunCheck(t *testing.T) {
+	testhome.Set(t)
 	var out, errOut bytes.Buffer
 	assert.Equal(t, 2, run([]string{"check", "a", "b"}, &out, &errOut))
 	assert.Equal(t, 2, run([]string{"check", "--nope"}, &out, &errOut))

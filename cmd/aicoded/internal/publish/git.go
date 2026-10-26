@@ -28,6 +28,13 @@ var (
 	commitSHA  = regexp.MustCompile(`^[0-9a-f]{40}$`)
 )
 
+// draftFile and cacheFile are draft.File and migrations.Cache, which git takes as constant
+// arguments.
+const (
+	draftFile = ".aicoded/migration.sql"
+	cacheFile = ".aicoded/migrations.json"
+)
+
 // errTooLong is the error of run when git prints more than its caller takes.
 var errTooLong = errors.New("git printed more than aicoded takes")
 
@@ -170,9 +177,11 @@ func head(ctx context.Context, dir string) (string, error) {
 }
 
 // clean refuses, with E-PUB-002, a working tree with changes that are not committed, untracked
-// files included.
+// files included, but for the draft and the cache of the published migrations, which stay out of
+// git.
 func clean(ctx context.Context, dir string) error {
-	out, err := run(exec.CommandContext(ctx, "git", "-c", "core.fsmonitor=", "status", "--porcelain=v1", "--untracked-files=all"), dir, "", 64<<10)
+	out, err := run(exec.CommandContext(ctx, "git", "-c", "core.fsmonitor=", "status", "--porcelain=v1", "--untracked-files=all",
+		"--", ".", ":(exclude)"+draftFile, ":(exclude)"+cacheFile), dir, "", 64<<10)
 	if err != nil && !errors.Is(err, errTooLong) {
 		return err
 	}
@@ -189,6 +198,24 @@ func clean(ctx context.Context, dir string) error {
 		msg += " and more"
 	}
 	return errs.New("E-PUB-002", msg, platform.Fix("E-PUB-002"))
+}
+
+// untracked refuses, with E-MIG-001, a draft that the commit HEAD or the index holds: the draft
+// travels with a publish, not in git.
+func untracked(ctx context.Context, dir string) error {
+	staged, err := run(exec.CommandContext(ctx, "git", "ls-files", "--cached", "--", draftFile), dir, "", 4096)
+	if err != nil {
+		return err
+	}
+	committed, err := run(exec.CommandContext(ctx, "git", "ls-tree", "--name-only", "HEAD", "--", draftFile), dir, "", 4096)
+	if err != nil {
+		return err
+	}
+	if len(staged) > 0 || len(committed) > 0 {
+		return errs.New("E-MIG-001", "the commit holds the draft "+draftFile+", which travels with a publish, not in git",
+			"run git rm --cached "+draftFile+", add "+draftFile+" to .gitignore and commit")
+	}
+	return nil
 }
 
 // subject returns the subject of the commit HEAD.

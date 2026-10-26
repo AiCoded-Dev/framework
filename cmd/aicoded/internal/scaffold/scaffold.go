@@ -69,6 +69,7 @@ func Create(ctx context.Context, parent, name string, fw Framework, out io.Write
 // fill writes the files of the app name into dir, generates it and tidies its go.mod.
 func fill(ctx context.Context, dir, name string, fw Framework) error {
 	files := map[string]string{
+		".gitignore":       gitignore,
 		"AGENTS.md":        agents,
 		"go.mod":           goMod(name, fw),
 		manifest.FileName:  "app: " + name + "\n",
@@ -101,6 +102,10 @@ func goMod(name string, fw Framework) string {
 	return fmt.Sprintf("module %s\n\ngo 1.26.0\n\nrequire %s %s\n\nreplace %s => %s\n",
 		name, lint.Framework, unreleased, lint.Framework, strconv.Quote(fw.Dir))
 }
+
+// gitignore keeps out of git the schema-change draft, which travels with a publish, and the cache
+// of the migrations the app published.
+const gitignore = "/.aicoded/migration.sql\n/.aicoded/migrations.json\n"
 
 const mainGo = `package main
 

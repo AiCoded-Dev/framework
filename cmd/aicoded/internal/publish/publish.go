@@ -15,6 +15,8 @@ import (
 	"unicode/utf8"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/check"
+	"aicoded.dev/framework/cmd/aicoded/internal/draft"
+	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/manifest"
@@ -42,6 +44,8 @@ type Commit struct {
 	App     string
 	SHA     string
 	Summary string
+	// Migration is the app's draft, .aicoded/migration.sql, which the publish carries, or "".
+	Migration string
 }
 
 // CheckError is E-PUB-004, with the report of aicoded check, which found problems.
@@ -56,9 +60,11 @@ func (e *CheckError) Unwrap() error { return e.err }
 
 // Prepare checks the commit HEAD of the app in dir, before any of it leaves the computer: dir
 // holds aicoded.yaml and is the top level of a git repository with a commit (E-PUB-001); git
-// is 2.31 or later (E-PUB-012); nothing is left uncommitted (E-PUB-002); opts.App, when set, is
-// the app's name (E-PUB-003); and aicoded check --frozen --no-tests finds no problem, with no
-// replace line allowed (E-PUB-004, a *CheckError).
+// is 2.31 or later (E-PUB-012); neither the commit nor the index holds the draft (E-MIG-001);
+// nothing is left uncommitted but the draft and the cache of the published migrations
+// (E-PUB-002); opts.App, when set, is the app's name (E-PUB-003); and aicoded check --frozen
+// --no-tests finds no problem, with no replace line allowed (E-PUB-004, a *CheckError). The
+// commit carries the draft that aicoded check checked.
 func Prepare(ctx context.Context, dir string, opts Options) (Commit, error) {
 	dir, err := filepath.Abs(dir)
 	if err != nil {
@@ -73,6 +79,9 @@ func Prepare(ctx context.Context, dir string, opts Options) (Commit, error) {
 	}
 	sha, err := head(ctx, dir)
 	if err != nil {
+		return Commit{}, err
+	}
+	if err := untracked(ctx, dir); err != nil {
 		return Commit{}, err
 	}
 	if err := clean(ctx, dir); err != nil {
@@ -90,6 +99,10 @@ func Prepare(ctx context.Context, dir string, opts Options) (Commit, error) {
 		return Commit{}, &CheckError{Report: report, err: errs.New("E-PUB-004",
 			"aicoded check --frozen --no-tests found problems in "+m.App+", so nothing was sent", platform.Fix("E-PUB-004"))}
 	}
+	migration, err := draft.Read(dir)
+	if err != nil {
+		return Commit{}, err
+	}
 	summary := summarize(opts.Summary)
 	if summary == "" {
 		s, err := subject(ctx, dir)
@@ -98,7 +111,7 @@ func Prepare(ctx context.Context, dir string, opts Options) (Commit, error) {
 		}
 		summary = summarize(s)
 	}
-	return Commit{Dir: dir, App: m.App, SHA: sha, Summary: summary}, nil
+	return Commit{Dir: dir, App: m.App, SHA: sha, Summary: summary, Migration: string(migration)}, nil
 }
 
 // summarize returns s without control or format characters, with a space for each line break or
@@ -146,9 +159,10 @@ type Sent struct {
 }
 
 // Send sends the commit to the platform's delivery pipeline: the history since the app's base,
-// which it asks the platform for, or all of it. An archived app is E-PUB-006, and a commit the
-// app has published already E-PUB-007. When another publish changes the base meanwhile, it asks
-// again and sends once more.
+// which it asks the platform for, or all of it, and the draft. An archived app is E-PUB-006, and
+// a commit the app has published already E-PUB-007. When another publish changes the base
+// meanwhile, it asks again and sends once more. The cache of the published migrations then keeps
+// the publish that carried the draft, so that Settle can clear the draft once it passed.
 func Send(ctx context.Context, c *platform.Client, cm Commit) (Sent, error) {
 	for retried := false; ; retried = true {
 		app, _, err := c.App(ctx, cm.App)
@@ -166,15 +180,43 @@ func Send(ctx context.Context, c *platform.Client, cm Commit) (Sent, error) {
 		if err != nil {
 			return Sent{}, err
 		}
-		created, err := c.CreatePublish(ctx, platform.Upload{App: cm.App, SHA: cm.SHA, Summary: cm.Summary, Bundle: b})
+		created, err := c.CreatePublish(ctx, platform.Upload{App: cm.App, SHA: cm.SHA, Summary: cm.Summary, Migration: cm.Migration, Bundle: b})
 		switch {
 		case errors.Is(err, platform.ErrBaseChanged) && !retried:
 			continue
 		case err != nil:
 			return Sent{}, err
 		}
-		return Sent{ID: created.ID, App: cm.App, SHA: cm.SHA, CreatedApp: created.CreatedApp}, nil
+		sent := Sent{ID: created.ID, App: cm.App, SHA: cm.SHA, CreatedApp: created.CreatedApp}
+		if cm.Migration != "" {
+			return sent, migrations.MarkSent(cm.Dir, created.ID, []byte(cm.Migration))
+		}
+		return sent, nil
 	}
+}
+
+// Settle clears the draft of the app in dir once p, a publish that carried it, has passed, as
+// migrations.Settle does, and returns a line for the builder about the draft, or "". It does
+// nothing while p runs.
+func Settle(ctx context.Context, c *platform.Client, dir string, p platform.Publish) (string, error) {
+	if !p.Done() {
+		return "", nil
+	}
+	return migrations.Settle(ctx, dir, p.App, p.ID, p.Status, c)
+}
+
+// SettlePending settles, as Settle does, the publish that last carried the draft of the app in
+// dir, once it has ended. When the platform cannot say, it leaves it for later.
+func SettlePending(ctx context.Context, c *platform.Client, dir string) (string, error) {
+	id := migrations.Pending(dir)
+	if id == "" {
+		return "", nil
+	}
+	p, err := c.Publish(ctx, id)
+	if err != nil {
+		return "", nil
+	}
+	return Settle(ctx, c, dir, p)
 }
 
 // ErrTimeout is the error of Wait when the publish has not ended in time.

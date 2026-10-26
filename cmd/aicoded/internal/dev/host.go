@@ -13,8 +13,11 @@ import (
 
 	"aicoded.dev/framework/cmd/aicoded/internal/control"
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
+	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
+	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/cmd/aicoded/internal/workspace"
 	"aicoded.dev/framework/internal/errs"
+	"aicoded.dev/framework/migrate"
 )
 
 // pingTimeout bounds the wait for an answer from an aicoded dev that may be running.
@@ -82,6 +85,7 @@ func Host(ctx context.Context, dir string, out io.Writer, opts Options) (*Worksp
 		return nil, err
 	}
 	w, err := Open(ctx, Config{Root: root, State: state, Dev: ws, Out: out, Watch: true, Manual: opts.Manual, Login: opts.Login,
+		Platform: Platform(),
 		Values: func(app string) (devconfig.AppValues, error) {
 			ws, err := devconfig.Load(cfg, root)
 			if err != nil {
@@ -108,6 +112,22 @@ func Host(ctx context.Context, dir string, out io.Writer, opts Options) (*Worksp
 	})
 	return w, nil
 }
+
+// Platform returns the client of the platform that AICODED_PLATFORM names, which gives the
+// migrations the apps published with the builder's sign-in. When AICODED_PLATFORM is not valid,
+// asking it fails with that error.
+func Platform() migrations.Platform {
+	address, err := platform.Address()
+	if err != nil {
+		return unreachable{err}
+	}
+	return platform.New(address, io.Discard)
+}
+
+// unreachable is a platform that cannot be asked, for err.
+type unreachable struct{ err error }
+
+func (u unreachable) Migrations(context.Context, string) ([]migrate.Step, error) { return nil, u.err }
 
 // FindRunning returns the root and control socket of an aicoded dev that runs for dir or a
 // folder above it. One that answers with another control protocol counts as running.

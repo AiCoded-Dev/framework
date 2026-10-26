@@ -231,14 +231,15 @@ func (w *Workspace) report(s *slot, source string, ps []problem.Problem) {
 
 // runByHand keeps the runner of the app of s up in the run folder of manual mode, for a process
 // the developer starts. It keeps the running runner, with its CSRF key and database, unless
-// renew is set or the permission list m or the values changed. When manual mode ended since the
+// renew is set or the permission list m, the values or the draft changed. When manual mode ended since the
 // cycle began, it only stops the runner and leaves the rest to the cycle that follows; once ctx
 // is done, it leaves the app stopped. The caller holds s.cycling.
 func (w *Workspace) runByHand(ctx context.Context, s *slot, m manifest.Manifest, values devconfig.AppValues, renew bool) {
 	s.mu.Lock()
 	old := s.inst
 	s.mu.Unlock()
-	if !renew && old != nil && old.byHand && reflect.DeepEqual(old.Manifest, m) && reflect.DeepEqual(old.values, values) {
+	if !renew && old != nil && old.byHand && reflect.DeepEqual(old.Manifest, m) && reflect.DeepEqual(old.values, values) &&
+		old.draft == draftOf(s.dir) {
 		s.set(devapi.Manual, nil)
 		return
 	}
@@ -264,7 +265,7 @@ func (w *Workspace) runByHand(ctx context.Context, s *slot, m manifest.Manifest,
 		s.runDir = dir
 		s.mu.Unlock()
 	}
-	inst, err := launchByHand(ctx, dir, m, values, w.svc, w.signer, s.store)
+	inst, err := launchByHand(ctx, s.dir, dir, m, values, w.svc, w.signer, s.store)
 	if err != nil {
 		w.failed(ctx, s, sourceRunner, err)
 		return

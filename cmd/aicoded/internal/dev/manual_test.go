@@ -111,6 +111,19 @@ func TestManualModeRegenerates(t *testing.T) {
 	serves(t, w, "hello", "/", http.StatusServiceUnavailable, "is not running now")
 }
 
+// A new draft brings up a new runner for an app run by hand, which applies it: here hello has no
+// database, so it fails with E-MIG-006.
+func TestManualModeTakesTheDraft(t *testing.T) {
+	requireGo(t)
+	shortRuntimeDir(t)
+	root := copyHello(t, t.TempDir(), "hello")
+	w := openManual(t, root, io.Discard, "hello")
+	settle(t, w)
+	writeFile(t, filepath.Join(root, ".aicoded", "migration.sql"), "CREATE TABLE notes (v TEXT);\n")
+	require.Eventually(t, func() bool { return appState(t, w, "hello").State == devapi.Failed }, 30*time.Second, 50*time.Millisecond)
+	assert.Equal(t, "E-MIG-006", appState(t, w, "hello").Problems[0].Code)
+}
+
 // regenerated waits until a cycle of app in w has seen the app's files as they are now.
 func regenerated(t *testing.T, w *Workspace, app string) {
 	t.Helper()

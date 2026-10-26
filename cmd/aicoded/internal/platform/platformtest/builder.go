@@ -17,10 +17,15 @@ import (
 	"unicode"
 
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
+	"aicoded.dev/framework/migrate"
 )
 
 // maxBundle is the size of the largest bundle the platform takes.
 const maxBundle = 32 << 20
+
+// maxMeta is the size of the largest meta part of an upload the platform takes: 4 KiB, and the
+// JSON of a draft of 64 KiB.
+const maxMeta = 4<<10 + 6*64<<10
 
 var (
 	appName   = regexp.MustCompile(`^[a-z][a-z0-9-]{0,61}[a-z0-9]$`)
@@ -91,8 +96,8 @@ func Failed(n, size int) Publish {
 
 // Upload is a publish the fake took.
 type Upload struct {
-	App, SHA, Summary string
-	Bundle            []byte
+	App, SHA, Summary, Migration string
+	Bundle                       []byte
 }
 
 // builder is the state of the fake builder API.
@@ -110,6 +115,8 @@ type builder struct {
 	telemetry        map[string][]map[string]any
 	reads            []string
 	telemetryRefusal *refusal
+	// migrations holds the steps /v1/apps/migrations answers for each app.
+	migrations map[string][]migrate.Step
 }
 
 type fakeApp struct {
@@ -136,13 +143,15 @@ type refusal struct {
 
 // uploadMeta is the meta part of an upload.
 type uploadMeta struct {
-	App     string `json:"app"`
-	SHA     string `json:"sha"`
-	Summary string `json:"summary"`
+	App       string `json:"app"`
+	SHA       string `json:"sha"`
+	Summary   string `json:"summary"`
+	Migration string `json:"migration"`
 }
 
 func newBuilder() builder {
-	return builder{newApps: 10, answers: []Publish{Passed()}, requests: map[string]int{}, telemetry: map[string][]map[string]any{}}
+	return builder{newApps: 10, answers: []Publish{Passed()}, requests: map[string]int{}, telemetry: map[string][]map[string]any{},
+		migrations: map[string][]migrate.Step{}}
 }
 
 // SignIn keeps a sign-in to the fake in the test's home, as aicoded login does.
@@ -229,6 +238,14 @@ func (p *Platform) RefuseTelemetry(status int, errorCode, code string) {
 	if status != 0 {
 		p.telemetryRefusal = &refusal{status, errorCode, code}
 	}
+}
+
+// SetMigrations makes /v1/apps/migrations answer steps about the app name, as they are, from now
+// on.
+func (p *Platform) SetMigrations(name string, steps ...migrate.Step) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.migrations[name] = steps
 }
 
 // Reads returns the reads of telemetry the fake answered, each its path and query, oldest first.
@@ -378,6 +395,33 @@ func (p *Platform) getPublish(w http.ResponseWriter, r *http.Request) {
 	apiError(w, http.StatusNotFound, "not_found", "E-PUB-013", "no publish has that id")
 }
 
+// getMigrations answers as the platform does about the migrations of an app the token carries the
+// status scope of.
+func (p *Platform) getMigrations(w http.ResponseWriter, r *http.Request) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var in struct {
+		App string `json:"app"`
+	}
+	s, ok := p.builderCall(w, r, &in)
+	if !ok {
+		return
+	}
+	a := p.app(in.App)
+	switch {
+	case a == nil:
+		apiError(w, http.StatusNotFound, "not_found", "E-PUB-019", "your organisation has no app of that name")
+	case !may(s, a, "status"):
+		notYours(w, a)
+	default:
+		steps := p.migrations[a.name]
+		if steps == nil {
+			steps = []migrate.Step{}
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"steps": steps})
+	}
+}
+
 // readTelemetry answers a read of an app's logs, spans or trace as the platform does: the app must be
 // one the token carries the logs scope of, and env preview or production.
 func (p *Platform) readTelemetry(w http.ResponseWriter, r *http.Request) {
@@ -436,7 +480,7 @@ func (p *Platform) createPublish(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxBundle+64<<10)
+	r.Body = http.MaxBytesReader(w, r.Body, maxBundle+maxMeta+64<<10)
 	var meta uploadMeta
 	bundle, err := readUpload(r, &meta)
 	var tooLarge *http.MaxBytesError
@@ -487,12 +531,12 @@ func (p *Platform) createPublish(w http.ResponseWriter, r *http.Request) {
 	}
 	pub := &fakePublish{id: publishID(), sha: meta.SHA, summary: meta.Summary, app: a, created: time.Now()}
 	p.pubs = append(p.pubs, pub)
-	p.uploads = append(p.uploads, Upload{App: meta.App, SHA: meta.SHA, Summary: meta.Summary, Bundle: bundle})
+	p.uploads = append(p.uploads, Upload{App: meta.App, SHA: meta.SHA, Summary: meta.Summary, Migration: meta.Migration, Bundle: bundle})
 	a.base = meta.SHA
 	writeJSON(w, http.StatusCreated, map[string]any{"id": pub.id, "app_id": a.id, "created_app": created})
 }
 
-// readUpload reads the parts of an upload: meta, a JSON object of at most 4 KiB that it decodes
+// readUpload reads the parts of an upload: meta, a JSON object of at most maxMeta bytes that it decodes
 // into meta, refusing unknown fields, then bundle, which it returns, cut after 32 MiB and a byte.
 func readUpload(r *http.Request, meta *uploadMeta) ([]byte, error) {
 	mr, err := r.MultipartReader()
@@ -503,9 +547,9 @@ func readUpload(r *http.Request, meta *uploadMeta) ([]byte, error) {
 	if err != nil || part.FormName() != "meta" {
 		return nil, errors.New("the first part is not meta")
 	}
-	b, err := io.ReadAll(io.LimitReader(part, 4<<10+1))
-	if err != nil || len(b) > 4<<10 {
-		return nil, errors.New("meta is larger than 4 KiB")
+	b, err := io.ReadAll(io.LimitReader(part, maxMeta+1))
+	if err != nil || len(b) > maxMeta {
+		return nil, errors.New("meta is larger than the platform takes")
 	}
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
@@ -513,7 +557,7 @@ func readUpload(r *http.Request, meta *uploadMeta) ([]byte, error) {
 		return nil, fmt.Errorf("meta is not valid: %w", err)
 	}
 	if !appName.MatchString(meta.App) || !commitSHA.MatchString(meta.SHA) || len([]rune(meta.Summary)) > 1000 ||
-		strings.ContainsFunc(meta.Summary, unicode.IsControl) {
+		strings.ContainsFunc(meta.Summary, unicode.IsControl) || len(meta.Migration) > 64<<10 {
 		return nil, errors.New("meta is not valid")
 	}
 	part, err = mr.NextPart()

@@ -75,6 +75,7 @@ func New(t testing.TB) *Platform {
 	mux.HandleFunc("POST /oauth/revoke", p.revoke)
 	mux.HandleFunc("GET /v1/whoami", p.whoami)
 	mux.HandleFunc("POST /v1/apps/get", p.getApp)
+	mux.HandleFunc("POST /v1/apps/migrations", p.getMigrations)
 	mux.HandleFunc("POST /v1/publishes/create", p.createPublish)
 	mux.HandleFunc("POST /v1/publishes/get", p.getPublish)
 	mux.HandleFunc("GET /v1/apps/{app}/logs", p.readTelemetry)

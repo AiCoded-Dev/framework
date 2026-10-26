@@ -29,7 +29,9 @@ func TestDatabaseOpenedWithPassword(t *testing.T) {
 // sqldb and runs under the local runner with a real database; aicoded check would refuse its
 // code, which runs here as code that got past the checks would. It finds only
 // AICODED_RUNNER_DIR in its environment and only sockets in its runner folder, and yet it writes
-// a row to its database through sqldb and reads it back.
+// a row to its database through sqldb and reads it back. The table comes from its draft, which
+// aicoded dev applies as the database's owner; the app's own CREATE TABLE, run at run time,
+// gets MySQL's access-denied error, since the app's user only reads and writes rows.
 func TestNothingToLeak(t *testing.T) {
 	a := startApp(t, "key-hunt")
 	code, body := a.send(t, request(t, http.MethodGet, "/", nil, a.token(t, devconfig.Persona{Name: "ana"})))
@@ -38,6 +40,7 @@ func TestNothingToLeak(t *testing.T) {
 		Env    []string
 		Folder map[string]string
 		Row    string
+		Schema string
 	}
 	require.NoError(t, json.Unmarshal([]byte(body), &found))
 
@@ -45,4 +48,5 @@ func TestNothingToLeak(t *testing.T) {
 	assert.Equal(t, map[string]string{"app.sock": "socket", "mysql.sock": "socket", "runner.sock": "socket"},
 		found.Folder, "its runner folder")
 	assert.Equal(t, "written and read back", found.Row, "its database works")
+	assert.Contains(t, found.Schema, "Error 1142 (42000): CREATE command denied", "it changes no schema")
 }

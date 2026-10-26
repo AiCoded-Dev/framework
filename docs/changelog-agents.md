@@ -4,6 +4,24 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `aicoded dev` gives an app that declares `sqldb` a data-only database user: `mysql.sock` logs in
+  as `ac-dev-<app>`, which may only `SELECT`, `INSERT`, `UPDATE` and `DELETE`, so a schema change
+  from app code gets MySQL's access-denied error. Before every start, it applies, as the owner
+  `ao-dev-<app>`, the migrations the app published, fetched from the platform with the sign-in and
+  cached in `.aicoded/migrations.json`, then the draft, `.aicoded/migration.sql`. A changed draft,
+  or a database whose journal does not match, makes the dev database again. A refused draft or a
+  failed step stops the app (E-MIG-001 to E-MIG-006).
+- `aicoded check` makes a test database for each app that declares `sqldb`, when `dev.yaml` names
+  `mysql:`, and runs its tests with `AICODED_TEST_DB` set. New package
+  `aicoded.dev/framework/sqldb/sqltest`: `sqltest.Open(t)` opens it as the data user, and skips
+  the test without it.
+- `aicoded publish` and the `publish` tool send the draft with the commit, and refuse a commit or
+  index that holds it (E-MIG-001). Once the publish passed, the draft is deleted and the cache
+  refreshed, by `aicoded publish`, `aicoded status`, `release_status` or the next publish; a
+  failed publish leaves it. New apps' `.gitignore` lists `.aicoded/migration.sql` and
+  `.aicoded/migrations.json`.
+- `aicoded l7-runner --migrations <file>` applies the steps in the file, `{"steps": [...]}`, to the
+  app's database before it serves.
 - E-LINT-013: app code may not change the schema. SQL passed to `database/sql` that starts with
   `CREATE`, `ALTER`, `DROP`, `RENAME` or `TRUNCATE` is refused; write the change in
   `.aicoded/migration.sql`. SQL that names `aicoded_migrations`, the platform's journal of

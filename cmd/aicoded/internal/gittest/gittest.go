@@ -31,6 +31,19 @@ func NewApp(t testing.TB, name string) string {
 	return dir
 }
 
+// DatabaseApp is NewApp for an app that declares sqldb, whose draft is draft, which its
+// .gitignore keeps out of git, as it does the cache of the published migrations.
+func DatabaseApp(t testing.TB, name, draft string) string {
+	t.Helper()
+	dir := NewApp(t, name)
+	Write(t, dir, map[string]string{"aicoded.yaml": "app: " + name + "\ndata:\n  - source: sqldb\n    classes: [internal]\n" +
+		"# access is written by aicoded generate from <ssr:access>; do not edit it\naccess: {}\n",
+		".gitignore": "/.aicoded/migration.sql\n/.aicoded/migrations.json\n"})
+	Commit(t, dir, "Keep data")
+	Write(t, dir, map[string]string{".aicoded/migration.sql": draft})
+	return dir
+}
+
 // Init makes dir a git repository with no commit. Its git starts no maintenance in the
 // background, which could still be writing in dir when the test removes it.
 func Init(t testing.TB, dir string) {

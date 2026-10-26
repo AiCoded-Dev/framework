@@ -134,6 +134,22 @@ func Load(path, root string) (Workspace, error) {
 	return withDefaults(c.Workspaces[root]), nil
 }
 
+// MySQL returns the MySQL admin DSN for the folder dir, an absolute path: that of the workspace of
+// the nearest folder at or above dir that names one in the dev.yaml at path, or "".
+func MySQL(path, dir string) (string, error) {
+	for {
+		ws, err := Load(path, dir)
+		if err != nil || ws.MySQL != "" {
+			return ws.MySQL, err
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", nil
+		}
+		dir = parent
+	}
+}
+
 // badPersona returns the line of the first persona in doc, in any workspace, whose name is empty
 // or longer than viewer.MaxSubject bytes, or 0 when there is none. It reads aliases and merge keys
 // as the decoder does.

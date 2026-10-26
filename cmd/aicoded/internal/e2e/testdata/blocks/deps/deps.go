@@ -21,13 +21,10 @@ type Deps struct {
 	Docs *filestore.Store
 }
 
-// Start opens the database and the docs store and creates the items table.
+// Start opens the database, whose items table .aicoded/migration.sql makes, and the docs store.
 func (d *Deps) Start(ctx context.Context) error {
 	db, err := sqldb.Open(ctx)
 	if err != nil {
-		return err
-	}
-	if _, err := db.ExecContext(ctx, "CREATE TABLE IF NOT EXISTS items (id BIGINT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(200) NOT NULL)"); err != nil {
 		return err
 	}
 	docs, err := filestore.Open(ctx, "docs")
