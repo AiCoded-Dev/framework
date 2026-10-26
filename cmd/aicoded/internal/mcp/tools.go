@@ -12,6 +12,8 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/check"
 	"aicoded.dev/framework/cmd/aicoded/internal/describe"
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
+	"aicoded.dev/framework/cmd/aicoded/internal/draft"
+	"aicoded.dev/framework/cmd/aicoded/internal/migrations"
 	"aicoded.dev/framework/cmd/aicoded/internal/platform"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/publish"
@@ -111,6 +113,20 @@ type publishOut struct {
 	SHA        string `json:"sha"`
 	CreatedApp bool   `json:"created_app"`
 	Next       string `json:"next"`
+	draftState
+}
+
+// draftState is what became of the app's draft, .aicoded/migration.sql: "sent" with a publish
+// that has not ended, "settled" once that publish ended, or "none".
+type draftState struct {
+	Draft     string `json:"draft"`
+	DraftNote string `json:"draft_note,omitempty"`
+}
+
+// releaseStatusOut is a publish, and what became of the app's draft.
+type releaseStatusOut struct {
+	platform.Publish
+	draftState
 }
 
 type releaseStatusIn struct {
@@ -292,9 +308,9 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 		InputSchema: publishSchema,
 		Description: "Send the committed app to the platform's delivery pipeline, only when the person asks: it refuses changes that are not committed, runs aicoded check --frozen without the tests, sends the commit and returns the publish's id at once. The first publish of a name creates the app."},
 		s.publish)
-	tool(srv, &mcpsdk.Tool{Name: "release_status", Annotations: &mcpsdk.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &yes},
+	tool(srv, &mcpsdk.Tool{Name: "release_status", Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &yes},
 		InputSchema: releaseStatusSchema,
-		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, the problems with their code, file:line and fix, and the notes, in the same shape, which do not stop the publish."},
+		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, the problems with their code, file:line and fix, and the notes, in the same shape, which do not stop the publish; and draft, what became of the app's schema-change draft, .aicoded/migration.sql: sent with a publish that has not ended, settled (deleted once that publish passed, or kept, as draft_note says), or none."},
 		s.releaseStatus)
 }
 
@@ -354,10 +370,9 @@ func (s *server) publish(ctx context.Context, in publishIn) (publishOut, error) 
 	if err != nil {
 		return publishOut{}, err
 	}
-	if note, err := publish.SettlePending(ctx, c, app[0].Dir); err != nil {
+	settled, err := publish.SettlePending(ctx, c, app[0].Dir)
+	if err != nil {
 		return publishOut{}, err
-	} else if note != "" {
-		fmt.Fprintln(s.logs, "aicoded mcp: "+note)
 	}
 	cm, err := publish.Prepare(ctx, app[0].Dir, publish.Options{Summary: in.Summary})
 	if ce := (*publish.CheckError)(nil); errors.As(err, &ce) {
@@ -370,10 +385,14 @@ func (s *server) publish(ctx context.Context, in publishIn) (publishOut, error) 
 	if sent.ID == "" {
 		return publishOut{}, err
 	}
-	if err != nil {
-		fmt.Fprintln(s.logs, "aicoded mcp: "+err.Error())
+	state := draftState{Draft: "none", DraftNote: settled}
+	if cm.Migration != "" {
+		state = draftState{Draft: "sent", DraftNote: "the draft " + draft.File + " went with this publish; release_status deletes it once the publish passed"}
 	}
-	return publishOut{ID: sent.ID, App: sent.App, SHA: sent.SHA, CreatedApp: sent.CreatedApp,
+	if err != nil {
+		state.DraftNote = err.Error()
+	}
+	return publishOut{ID: sent.ID, App: sent.App, SHA: sent.SHA, CreatedApp: sent.CreatedApp, draftState: state,
 		Next: fmt.Sprintf("call release_status with id %q about every 30 seconds until its status is passed, failed, refused or error, then tell the person the outcome; the delivery pipeline takes a few minutes", sent.ID)}, nil
 }
 
@@ -389,41 +408,45 @@ func checkFailed(ce *publish.CheckError) error {
 	return errors.New(strings.Join(append(lines, ce.Error()), "\n"))
 }
 
-func (s *server) releaseStatus(ctx context.Context, in releaseStatusIn) (platform.Publish, error) {
+func (s *server) releaseStatus(ctx context.Context, in releaseStatusIn) (releaseStatusOut, error) {
 	if !platform.PublishID.MatchString(in.ID) {
-		return platform.Publish{}, errors.New("the id of a publish is pub_ and 26 lowercase letters and digits")
+		return releaseStatusOut{}, errors.New("the id of a publish is pub_ and 26 lowercase letters and digits")
 	}
 	c, err := s.platformClient()
 	if err != nil {
-		return platform.Publish{}, err
+		return releaseStatusOut{}, err
 	}
 	p, err := c.Publish(ctx, in.ID)
 	if err != nil {
-		return platform.Publish{}, err
+		return releaseStatusOut{}, err
 	}
-	if err := s.settle(ctx, c, p); err != nil {
-		return platform.Publish{}, err
-	}
-	return p, nil
+	return releaseStatusOut{Publish: p, draftState: s.settle(ctx, c, p)}, nil
 }
 
 // settle clears the draft of the app of the publish p, in the workspace, once p, which carried
-// it, has passed, as publish.Settle does.
-func (s *server) settle(ctx context.Context, c *platform.Client, p platform.Publish) error {
+// it, has passed, as publish.Settle does, and returns what became of the draft. A draft it
+// cannot read or delete stays, and the note says why.
+func (s *server) settle(ctx context.Context, c *platform.Client, p platform.Publish) draftState {
 	apps, err := workspace.Apps(s.dir)
 	if err != nil {
-		return nil
+		return draftState{Draft: "none"}
 	}
 	for _, a := range apps {
-		if a.Name == p.App {
-			note, err := publish.Settle(ctx, c, a.Dir, p)
-			if note != "" {
-				fmt.Fprintln(s.logs, "aicoded mcp: "+note)
-			}
-			return err
+		if a.Name != p.App {
+			continue
+		}
+		pending := migrations.Pending(a.Dir) == p.ID
+		note, err := publish.Settle(ctx, c, a.Dir, p)
+		switch {
+		case err != nil:
+			return draftState{Draft: "sent", DraftNote: err.Error()}
+		case note != "":
+			return draftState{Draft: "settled", DraftNote: note}
+		case pending:
+			return draftState{Draft: "sent", DraftNote: "the draft " + draft.File + " went with this publish, which has not ended"}
 		}
 	}
-	return nil
+	return draftState{Draft: "none"}
 }
 
 // platformClient returns a client of the platform that AICODED_PLATFORM names.

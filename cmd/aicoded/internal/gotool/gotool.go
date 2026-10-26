@@ -163,9 +163,7 @@ func runEnv(ctx context.Context, dir string, env []string, args ...string) (resu
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = dir
-	if len(env) > 0 {
-		cmd.Env = append(os.Environ(), env...)
-	}
+	cmd.Env = append(os.Environ(), env...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	cmd.WaitDelay = 5 * time.Second
 	err = cmd.Run()

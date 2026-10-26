@@ -10,6 +10,7 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/go-sql-driver/mysql"
 
@@ -39,11 +40,12 @@ type Options struct {
 	FrameworkDir string
 	// NoTests skips the tests and the probe of -race.
 	NoTests bool
-	// MySQL is the admin DSN of the MySQL server in dev.yaml, or "". With it, each app that
-	// declares sqldb gets a new test database, which aicoded check makes as aicoded dev makes a
-	// dev database and drops after the tests; the tests find the data user's DSN in
-	// AICODED_TEST_DB.
-	MySQL string
+	// MySQL returns the admin DSN of the MySQL server in dev.yaml, or ""; nil is "". aicoded check
+	// asks for it once, and only when the tests of an app that declares sqldb run. With a server,
+	// each such app gets a new test database, which aicoded check makes as aicoded dev makes a dev
+	// database and drops after the tests; the tests find the data user's DSN in AICODED_TEST_DB.
+	// An error of MySQL, or a DSN that is not valid (E-DEV-007), stops the whole check.
+	MySQL func() (string, error)
 	// Platform gives the migrations each app published, applied to its test database before its
 	// draft; with nil, they come from the app's cache.
 	Platform migrations.Platform
@@ -54,8 +56,9 @@ type Options struct {
 const EnvTestDB = "AICODED_TEST_DB"
 
 // WithDatabase returns opts with the MySQL server that dev.yaml names for the workspace of dir, or
-// of a folder above it, and the platform that AICODED_PLATFORM names, which give each app that
-// declares sqldb its test database. With NoTests, it returns opts as they are.
+// of a folder above it, read only when an app needs it, and the platform that AICODED_PLATFORM
+// names, which give each app that declares sqldb its test database. With NoTests, it returns opts
+// as they are.
 func WithDatabase(dir string, opts Options) (Options, error) {
 	if opts.NoTests {
 		return opts, nil
@@ -64,12 +67,12 @@ func WithDatabase(dir string, opts Options) (Options, error) {
 	if err != nil {
 		return opts, err
 	}
-	path, err := devconfig.DefaultPath()
-	if err != nil {
-		return opts, err
-	}
-	if opts.MySQL, err = devconfig.MySQL(path, root); err != nil {
-		return opts, err
+	opts.MySQL = func() (string, error) {
+		path, err := devconfig.DefaultPath()
+		if err != nil {
+			return "", err
+		}
+		return devconfig.MySQL(path, root)
 	}
 	opts.Platform = dev.Platform()
 	return opts, nil
@@ -158,6 +161,16 @@ func Run(ctx context.Context, dir string, opts Options) (Report, error) {
 		}
 	}
 	names := workspace.Names(all)
+	admin := sync.OnceValues(func() (*dev.MySQLAdmin, error) {
+		if opts.MySQL == nil {
+			return nil, nil
+		}
+		dsn, err := opts.MySQL()
+		if err != nil || dsn == "" {
+			return nil, err
+		}
+		return dev.NewMySQLAdmin(dsn)
+	})
 	for _, a := range apps {
 		if err := ctx.Err(); err != nil {
 			return Report{}, err
@@ -166,7 +179,7 @@ func Run(ctx context.Context, dir string, opts Options) (Report, error) {
 			r.Apps = append(r.Apps, App{Name: a.Name, Dir: a.Dir, Problems: problem.FromErrs(a.Name, ps)})
 			continue
 		}
-		app, held, err := checkApp(ctx, a, names, opts, r.Race)
+		app, held, err := checkApp(ctx, a, names, opts, r.Race, admin)
 		if err != nil {
 			return Report{}, err
 		}
@@ -177,8 +190,10 @@ func Run(ctx context.Context, dir string, opts Options) (Report, error) {
 }
 
 // checkApp checks the app a of the workspace names, which passed lint's precheck, and returns
-// the notes of its held snapshots. Its error stops the whole check.
-func checkApp(ctx context.Context, a workspace.App, names map[string]string, opts Options, race bool) (App, []string, error) {
+// the notes of its held snapshots. admin gives the MySQL server of the test databases, or nil.
+// Its error stops the whole check.
+func checkApp(ctx context.Context, a workspace.App, names map[string]string, opts Options, race bool,
+	admin func() (*dev.MySQLAdmin, error)) (App, []string, error) {
 	out := App{Name: a.Name, Dir: a.Dir}
 	res, err := generate.Run(a.Dir, generate.Options{Workspace: names, Frozen: opts.Frozen})
 	out.Changed, out.Warnings = res.Changed, res.Warnings
@@ -221,7 +236,15 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 	}
 	if !opts.NoTests {
 		steps = append(steps, func() ([]*errs.Error, error) {
-			env, drop, err := testDatabase(ctx, a.Dir, m, opts, &out)
+			var server *dev.MySQLAdmin
+			if m.SQLDB() {
+				got, err := admin()
+				if err != nil {
+					return nil, err
+				}
+				server = got
+			}
+			env, drop, err := testDatabase(ctx, a.Dir, m, server, opts.Platform, &out)
 			if coded := (*errs.Error)(nil); errors.As(err, &coded) {
 				return []*errs.Error{coded}, nil
 			}
@@ -245,19 +268,16 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 	return out, held, nil
 }
 
-// testDatabase makes the test database of the app in dir whose permission list is m, when it
-// declares sqldb and opts name a MySQL server, with the steps aicoded dev would apply, and returns
-// the DSN of its data user and a function that drops it. A warning about the published steps goes
-// to out's warnings. With no test database, the DSN is "".
-func testDatabase(ctx context.Context, dir string, m manifest.Manifest, opts Options, out *App) (string, func(), error) {
-	if !m.SQLDB() || opts.MySQL == "" {
+// testDatabase makes, on the server of admin, the test database of the app in dir whose
+// permission list is m, when it declares sqldb and admin is not nil, with the steps aicoded dev
+// would apply with the migrations of p, and returns the DSN of its data user and a function that
+// drops it. A warning about the published steps goes to out's warnings. With no test database,
+// the DSN is "".
+func testDatabase(ctx context.Context, dir string, m manifest.Manifest, admin *dev.MySQLAdmin, p migrations.Platform, out *App) (string, func(), error) {
+	if !m.SQLDB() || admin == nil {
 		return "", func() {}, nil
 	}
-	admin, err := dev.NewMySQLAdmin(opts.MySQL)
-	if err != nil {
-		return "", nil, err
-	}
-	steps, warning, err := migrations.Steps(ctx, dir, m, opts.Platform)
+	steps, warning, err := migrations.Steps(ctx, dir, m, p)
 	if err != nil {
 		return "", nil, err
 	}

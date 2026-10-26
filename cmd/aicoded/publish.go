@@ -87,7 +87,7 @@ func wait(ctx context.Context, c *platform.Client, id, dir string, stdout, stder
 		code := report(p, stdout, stderr)
 		note, err := publish.Settle(ctx, c, dir, p)
 		if err != nil {
-			return fail(stderr, err)
+			fmt.Fprintln(stderr, "aicoded: the draft stays: "+err.Error())
 		}
 		printNote(stdout, note)
 		return code
@@ -141,7 +141,7 @@ func runStatus(args []string, stdout, stderr io.Writer) int {
 	}
 	note, err := settleHere(ctx, c, p)
 	if err != nil {
-		return fail(stderr, err)
+		fmt.Fprintln(stderr, "aicoded: the draft stays: "+err.Error())
 	}
 	if !*asJSON {
 		code := report(p, stdout, stderr)

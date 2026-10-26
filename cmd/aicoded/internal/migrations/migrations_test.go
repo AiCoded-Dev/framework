@@ -184,3 +184,30 @@ func TestStepsSkipAPublishedDraft(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, steps, 3)
 }
+
+func TestPublishedFromTheCache(t *testing.T) {
+	dir := app(t, "")
+	steps, _ := Published(t.Context(), dir, "notes", fake{steps: published})
+	require.Equal(t, published, steps)
+
+	steps, warning := Published(t.Context(), dir, "notes", fake{err: ErrUseCache})
+	assert.Equal(t, published, steps)
+	assert.Empty(t, warning, "the cache is the answer")
+
+	steps, warning = Published(t.Context(), dir, "notes", fake{})
+	assert.Empty(t, steps, "the platform's answer is applied")
+	assert.Equal(t, "the platform lists no migrations of notes, but .aicoded/migrations.json holds 1 steps: check that "+
+		"AICODED_PLATFORM names the platform you publish to; the platform's answer is applied", warning)
+}
+
+func TestForget(t *testing.T) {
+	dir := app(t, draftB)
+	require.NoError(t, MarkSent(dir, pub, []byte(draftB)))
+	require.NoError(t, Forget(dir, "pub_bbbbbbbbbbbbbbbbbbbbbbbbbb"))
+	assert.Equal(t, pub, Pending(dir), "another publish")
+	require.NoError(t, Forget(dir, pub))
+	assert.Empty(t, Pending(dir))
+	assert.True(t, exists(dir, ".aicoded/migration.sql"), "the draft stays")
+}
+
+const draftB = "CREATE TABLE b (y INT);\n"

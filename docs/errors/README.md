@@ -93,7 +93,7 @@ Publishing uses these codes:
 Schema changes use these codes:
 
 - E-MIG-001: a draft too large, not UTF-8, with no statement, not a file in the app's folder,
-  or committed to git.
+  committed to git, or sent with a publish that has not ended.
 - E-MIG-002: a statement that a schema change may not hold, such as one that changes data, an
   executable comment, `DELIMITER` or a name with a database in front.
 - E-MIG-003: a destructive statement: `DROP`, `RENAME`, `TRUNCATE`, or `ALTER TABLE` with a

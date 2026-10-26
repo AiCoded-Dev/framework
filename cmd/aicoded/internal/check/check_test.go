@@ -708,14 +708,14 @@ func TestCheckTestDatabase(t *testing.T) {
 	t.Setenv("LEDGER_NEEDS_DB", "1")
 	root, app := tempRoot(t), "ledger-"+strings.ToLower(rand.Text()[:6])
 	dir := ledger(t, root, app, "CREATE TABLE entries (id BIGINT AUTO_INCREMENT PRIMARY KEY, amount INT NOT NULL);\n")
-	r, err := Run(t.Context(), root, Options{MySQL: testmysql.DSN(t), FrameworkDir: checkout(t)})
+	r, err := Run(t.Context(), root, Options{MySQL: mysqlDSN(t), FrameworkDir: checkout(t)})
 	require.NoError(t, err)
 	require.True(t, r.OK(), "%+v", r.Apps)
 	assert.Empty(t, leftovers(t, app), "the test database and its users are dropped")
 	assert.FileExists(t, filepath.Join(dir, ".aicoded", "migration.sql"), "the draft stays")
 
 	write(t, filepath.Join(dir, ".aicoded", "migration.sql"), "CREATE TABLE entries (id BIGINT AUTO_INCREMENT PRIMARY KEY, amount NOSUCHTYPE);\n")
-	r, err = Run(t.Context(), root, Options{MySQL: testmysql.DSN(t), FrameworkDir: checkout(t)})
+	r, err = Run(t.Context(), root, Options{MySQL: mysqlDSN(t), FrameworkDir: checkout(t)})
 	require.NoError(t, err)
 	require.Len(t, r.Apps[0].Problems, 1)
 	assert.Equal(t, "E-MIG-005", r.Apps[0].Problems[0].Code)
@@ -734,4 +734,32 @@ func TestCheckNoTestDatabase(t *testing.T) {
 	r, err := Run(t.Context(), root, Options{FrameworkDir: checkout(t)})
 	require.NoError(t, err)
 	assert.True(t, r.OK(), "%+v", r.Apps)
+}
+
+// mysqlDSN returns Options.MySQL for the test MySQL.
+func mysqlDSN(t *testing.T) func() (string, error) {
+	dsn := testmysql.DSN(t)
+	return func() (string, error) { return dsn, nil }
+}
+
+// dev.yaml is read only for the tests of an app that declares sqldb, and its problems, such as a
+// DSN that is not valid, stop the whole check rather than fail the app.
+func TestCheckReadsTheMySQLOnlyWhenNeeded(t *testing.T) {
+	requireGo(t)
+	broken := func() (string, error) {
+		return "", errs.New("E-DEV-001", "dev.yaml can be read by other users", "run: chmod 600")
+	}
+	root := tempRoot(t)
+	calc(t, root, "calc", false)
+	r, err := Run(t.Context(), root, Options{MySQL: broken})
+	require.NoError(t, err)
+	assert.True(t, r.OK(), "no app needs a database")
+
+	ledger(t, root, "ledger", "CREATE TABLE entries (id BIGINT AUTO_INCREMENT PRIMARY KEY, amount INT NOT NULL);\n")
+	_, err = Run(t.Context(), root, Options{MySQL: broken, FrameworkDir: checkout(t)})
+	assert.Equal(t, "E-DEV-001", errs.Code(err))
+	_, err = Run(t.Context(), root, Options{FrameworkDir: checkout(t),
+		MySQL: func() (string, error) { return "root:s3cret@tcp(10.0.0.5:3306)/", nil }})
+	assert.Equal(t, "E-DEV-007", errs.Code(err), "a DSN that is not valid is a problem of dev.yaml")
+	assert.NotContains(t, err.Error(), "s3cret")
 }

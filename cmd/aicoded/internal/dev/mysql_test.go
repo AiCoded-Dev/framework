@@ -431,3 +431,43 @@ func TestWorkspaceFailsOnTheDraft(t *testing.T) {
 	assert.Equal(t, "E-MIG-003", st.Problems[0].Code)
 	assert.Equal(t, ".aicoded/migration.sql:2", st.Problems[0].Pos)
 }
+
+// A list that Apply refuses for itself, here one whose hash does not match, stops the app with
+// that refusal, and the dev database stays as it was.
+func TestMigrateKeepsTheDatabaseOnARefusedList(t *testing.T) {
+	a, app, _ := prepared(t)
+	users, err := a.Migrate(t.Context(), app, "dev", steps("CREATE TABLE notes (v TEXT)"))
+	require.NoError(t, err)
+	_, err = direct(t, users.Data).ExecContext(t.Context(), "INSERT INTO notes VALUES ('kept')")
+	require.NoError(t, err)
+
+	bad := steps("CREATE TABLE notes (v TEXT)", "CREATE TABLE tags (v TEXT)")
+	bad[1].SHA256 = bad[0].SHA256
+	_, err = a.Migrate(t.Context(), app, "dev", bad)
+	assert.Equal(t, "E-MIG-004", errs.Code(err))
+	require.ErrorContains(t, err, "step draft#2: its sha256 does not match its statement")
+	users, err = a.Prepare(t.Context(), app, "dev")
+	require.NoError(t, err)
+	assert.Equal(t, 1, rows(t, users.Data, "notes"), "the database was not made again")
+}
+
+// The platform is asked at the app's first start and at a restart a minute later, not at each
+// restart.
+func TestWorkspaceAsksThePlatformOnce(t *testing.T) {
+	requireGo(t)
+	root, app, _ := sqlWorkspace(t, "CREATE TABLE tags (v TEXT);\n")
+	p := &counted{}
+	w, err := Open(t.Context(), Config{Root: root, State: t.TempDir(), Out: io.Discard, Platform: p,
+		Dev: devconfig.Workspace{MySQL: testmysql.DSN(t), Apps: map[string]devconfig.AppValues{app: helloValues}}})
+	require.NoError(t, err)
+	t.Cleanup(w.Close)
+	_, err = w.Restart(t.Context(), app)
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), p.n.Load())
+	later := time.Now().Add(time.Minute)
+	w.session.now = func() time.Time { return later }
+	st, err := w.Restart(t.Context(), app)
+	require.NoError(t, err)
+	assert.Equal(t, devapi.Running, st.State)
+	assert.Equal(t, int32(2), p.n.Load())
+}

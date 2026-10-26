@@ -56,7 +56,9 @@ type Config struct {
 	// line names only the dev UI's address.
 	Login bool
 	// Platform gives the migrations each app published, which aicoded dev applies to the app's
-	// database before its draft; with nil, they come from the app's cache.
+	// database before its draft. It is asked at the app's first start, and at an explicit start or
+	// restart once its last answer is a minute old; otherwise, and with nil, they come from the
+	// app's cache.
 	Platform migrations.Platform
 }
 
@@ -90,6 +92,8 @@ type Workspace struct {
 
 	// control stops the control socket that Host serves; nil when there is none.
 	control func()
+	// session asks the platform for the apps' published migrations; nil without Config.Platform.
+	session *session
 }
 
 // Open serves the dev UI, then starts the apps under cfg.Root, each after the apps it calls, and
@@ -161,7 +165,11 @@ func newWorkspace(ctx context.Context, cfg Config, apps []workspace.App, l net.L
 		return nil, err
 	}
 	w := &Workspace{cfg: cfg, out: &lockedWriter{w: cfg.Out}, port: l.Addr().(*net.TCPAddr).Port, signer: signer, changes: newChanges()}
-	w.svc = Services{StateDir: cfg.State, Router: server.NewRouter(signer), Env: cfg.Dev.Env, Platform: cfg.Platform}
+	w.svc = Services{StateDir: cfg.State, Router: server.NewRouter(signer), Env: cfg.Dev.Env}
+	if cfg.Platform != nil {
+		w.session = newSession(cfg.Platform)
+		w.svc.Platform = w.session
+	}
 	if cfg.Dev.MySQL != "" {
 		if w.svc.MySQL, err = NewMySQLAdmin(cfg.Dev.MySQL); err != nil {
 			return nil, err
@@ -255,6 +263,7 @@ func (w *Workspace) Restart(_ context.Context, app string) (devapi.App, error) {
 	s.mu.Lock()
 	s.stopped = false
 	s.mu.Unlock()
+	w.refresh(app)
 	s.cycling.Lock()
 	w.runCycle(w.ctx, s, false)
 	s.cycling.Unlock()
@@ -270,7 +279,16 @@ func (w *Workspace) Stop(app string) error {
 // Start starts the app named app, or restarts it when it runs; for an app run by hand, it brings
 // up a new runner. It returns at once and starts the app in the background.
 func (w *Workspace) Start(app string) error {
+	w.refresh(app)
 	return w.ask(app, func(s *slot) { s.stopped, s.forced = false, true })
+}
+
+// refresh has the next start of app ask the platform for its published migrations again, as
+// session.refresh does.
+func (w *Workspace) refresh(app string) {
+	if w.session != nil {
+		w.session.refresh(app)
+	}
 }
 
 // SetManual switches the app named app into manual mode, where the developer runs it by hand,

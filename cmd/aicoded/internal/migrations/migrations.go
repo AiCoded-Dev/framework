@@ -40,10 +40,13 @@ const (
 )
 
 // Platform returns the steps of the migrations that an app published, as the platform's client
-// does.
+// does. A Platform that has nothing newer than the cache to give returns ErrUseCache.
 type Platform interface {
 	Migrations(ctx context.Context, app string) ([]migrate.Step, error)
 }
+
+// ErrUseCache is the error of a Platform whose answer is the cache.
+var ErrUseCache = errors.New("use the cache")
 
 // cache is the content of .aicoded/migrations.json.
 type cache struct {
@@ -88,7 +91,7 @@ func publishedDraft(dir string, published []migrate.Step) bool {
 }
 
 // Published returns the steps of the migrations that the app app in dir published, as Steps
-// does.
+// does. When the platform lists none but the cache holds some, warning says so.
 func Published(ctx context.Context, dir, app string, p Platform) (steps []migrate.Step, warning string) {
 	c, found, cerr := read(dir)
 	if p == nil {
@@ -97,6 +100,9 @@ func Published(ctx context.Context, dir, app string, p Platform) (steps []migrat
 	fctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	steps, err := p.Migrations(fctx, app)
 	cancel()
+	if errors.Is(err, ErrUseCache) {
+		return c.Steps, ""
+	}
 	if err != nil {
 		why := "could not get the migrations " + app + " published from the platform: " + reason(err)
 		switch {
@@ -107,11 +113,15 @@ func Published(ctx context.Context, dir, app string, p Platform) (steps []migrat
 		}
 		return nil, why + "; only the draft is applied"
 	}
+	if len(steps) == 0 && len(c.Steps) > 0 {
+		warning = fmt.Sprintf("the platform lists no migrations of %s, but %s holds %d steps: check that AICODED_PLATFORM names the "+
+			"platform you publish to; the platform's answer is applied", app, Cache, len(c.Steps))
+	}
 	if found && !slices.Equal(steps, c.Steps) || !found && (len(steps) > 0 || cerr != nil) {
 		c.Steps = steps
 		_ = write(dir, c)
 	}
-	return steps, ""
+	return steps, warning
 }
 
 // Append returns steps followed by stmts, as the steps of the publish pub, numbered on.
@@ -142,6 +152,17 @@ func Pending(dir string) string {
 		return ""
 	}
 	return c.Sent.Publish
+}
+
+// Forget makes the cache of the app in dir stop waiting for the publish id, which the platform
+// does not know, and leaves the draft as it is.
+func Forget(dir, id string) error {
+	c, _, err := read(dir)
+	if err != nil || c.Sent == nil || c.Sent.Publish != id {
+		return nil
+	}
+	c.Sent = nil
+	return write(dir, c)
 }
 
 // Settle ends the wait of the cache of the app app in dir for the publish id, which ended with

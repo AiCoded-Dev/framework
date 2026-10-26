@@ -232,7 +232,7 @@ func TestToolsListed(t *testing.T) {
 	assert.Equal(t, map[string]bool{
 		"app_create": false, "check": false, "preview": false, "mail_receive": false, "publish": false,
 		"what_broke": true, "describe": true, "howto": true, "logs": true, "traces": true, "trace": true,
-		"mail_list": true, "mail_get": true, "release_status": true,
+		"mail_list": true, "mail_get": true, "release_status": false,
 	}, readOnly)
 	assert.ElementsMatch(t, []string{"publish", "release_status", "logs", "traces", "trace"}, openWorld, "only these reach the platform")
 }
@@ -542,7 +542,8 @@ func TestPublishTools(t *testing.T) {
 
 	out := result[publishOut](t, callTool("publish", map[string]any{"app": "demo", "summary": "First"}))
 	assert.Regexp(t, `^pub_[a-z2-7]{26}$`, out.ID)
-	assert.Equal(t, publishOut{ID: out.ID, App: "demo", SHA: gittest.Head(t, dir), CreatedApp: true, Next: out.Next}, out)
+	assert.Equal(t, publishOut{ID: out.ID, App: "demo", SHA: gittest.Head(t, dir), CreatedApp: true, Next: out.Next,
+		draftState: draftState{Draft: "none"}}, out)
 	assert.Contains(t, out.Next, `call release_status with id "`+out.ID+`"`)
 	require.Len(t, p.Uploads(), 1)
 	assert.Equal(t, "First", p.Uploads()[0].Summary)
@@ -587,7 +588,8 @@ func TestPublishTools(t *testing.T) {
 	assert.NotRegexp(t, `aicoded_(at|rt)_`, logs.String())
 }
 
-// The publish tool sends the draft, and release_status clears it once the publish passed.
+// The publish tool sends the draft, and release_status clears it once the publish passed and
+// says so. A second publish while the first runs is refused, since it would send the draft again.
 func TestPublishToolsCarryTheDraft(t *testing.T) {
 	testhome.Set(t)
 	p := platformtest.New(t)
@@ -595,15 +597,27 @@ func TestPublishToolsCarryTheDraft(t *testing.T) {
 	p.SignIn(t)
 	dir := gittest.DatabaseApp(t, "demo", "CREATE TABLE notes (v TEXT);\n")
 	cs := connect(t, dir, io.Discard)
-	p.Answers(platformtest.Publish{Status: "running"}, platformtest.Passed())
+	p.Answers(platformtest.Publish{Status: "running"}, platformtest.Publish{Status: "running"}, platformtest.Passed())
 
 	out := result[publishOut](t, call(t, cs, "publish", map[string]any{"app": "demo", "summary": "First"}))
+	assert.Equal(t, "sent", out.Draft)
 	require.Len(t, p.Uploads(), 1)
 	assert.Equal(t, "CREATE TABLE notes (v TEXT);\n", p.Uploads()[0].Migration)
 	draft := filepath.Join(dir, ".aicoded", "migration.sql")
-	assert.Equal(t, "running", result[platform.Publish](t, call(t, cs, "release_status", map[string]any{"id": out.ID})).Status)
+	got := result[releaseStatusOut](t, call(t, cs, "release_status", map[string]any{"id": out.ID}))
+	assert.Equal(t, draftState{Draft: "sent", DraftNote: "the draft .aicoded/migration.sql went with this publish, which has not ended"}, got.draftState)
 	assert.FileExists(t, draft)
-	assert.Equal(t, "passed", result[platform.Publish](t, call(t, cs, "release_status", map[string]any{"id": out.ID})).Status)
+
+	gittest.Write(t, dir, map[string]string{"notes.txt": "notes\n"})
+	gittest.Commit(t, dir, "Add notes")
+	res := call(t, cs, "publish", map[string]any{"app": "demo", "summary": "Again"})
+	assert.True(t, res.IsError)
+	assert.Contains(t, text(res), "E-MIG-001: the draft .aicoded/migration.sql went with publish "+out.ID+", which has not ended")
+	assert.Len(t, p.Uploads(), 1, "nothing was sent")
+
+	got = result[releaseStatusOut](t, call(t, cs, "release_status", map[string]any{"id": out.ID}))
+	assert.Equal(t, "passed", got.Status)
+	assert.Equal(t, draftState{Draft: "settled", DraftNote: "publish " + out.ID + " passed with the schema change in .aicoded/migration.sql, which is cleared"}, got.draftState)
 	assert.NoFileExists(t, draft)
 }
 

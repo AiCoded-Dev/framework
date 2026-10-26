@@ -109,32 +109,26 @@ func (a *MySQLAdmin) Prepare(ctx context.Context, app, env string) (Users, error
 }
 
 // Migrate prepares the database and the users of app in env as Prepare does, and applies steps
-// there as the owner with migrate.Apply. When the database ran steps that steps do not start with,
-// or more steps than steps holds, Migrate drops the database, makes it again and applies every
-// step: the database holds test data. It drops no other database. It returns the users.
+// there as the owner with migrate.Apply. When the database's journal does not start steps, or
+// holds more steps than steps, Migrate first drops the database and makes it again, since it holds
+// test data; it drops no other database. Every refusal of Apply, such as a list over its limits,
+// is returned as it is. It returns the users.
 func (a *MySQLAdmin) Migrate(ctx context.Context, app, env string, steps []migrate.Step) (Users, error) {
 	users, err := a.Prepare(ctx, app, env)
 	if err != nil {
 		return Users{}, err
 	}
-	ran, err := journalLength(ctx, users.Owner)
+	ran, err := journal(ctx, users.Owner)
 	if err != nil {
 		return Users{}, err
 	}
-	if ran <= len(steps) {
-		err := apply(ctx, users.Owner, steps)
-		switch {
-		case err == nil:
-			return users, nil
-		case errs.Code(err) != "E-MIG-004":
+	if len(ran) > len(steps) || migrate.Extends(ran, steps) != nil {
+		if err := a.exec(ctx, nil, app, "DROP DATABASE IF EXISTS "+quoteName(dbName(app, env))); err != nil {
 			return Users{}, err
 		}
-	}
-	if err := a.exec(ctx, nil, app, "DROP DATABASE IF EXISTS "+quoteName(dbName(app, env))); err != nil {
-		return Users{}, err
-	}
-	if users, err = a.Prepare(ctx, app, env); err != nil {
-		return Users{}, err
+		if users, err = a.Prepare(ctx, app, env); err != nil {
+			return Users{}, err
+		}
 	}
 	if err := apply(ctx, users.Owner, steps); err != nil {
 		return Users{}, err
@@ -196,23 +190,39 @@ func apply(ctx context.Context, up mysqlproxy.Upstream, steps []migrate.Step) er
 	return err
 }
 
-// journalLength returns how many steps the database of up ran, as its journal holds them: 0
-// when it has no journal.
-func journalLength(ctx context.Context, up mysqlproxy.Upstream) (int, error) {
+// journal returns the steps the database of up ran, as its journal holds them, without their
+// statements: none when it has no journal.
+func journal(ctx context.Context, up mysqlproxy.Upstream) ([]migrate.Step, error) {
 	db, err := owner(up)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer db.Close()
-	var n int
-	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM aicoded_migrations").Scan(&n)
+	rows, err := db.QueryContext(ctx, "SELECT seq, publish, step, sha256 FROM aicoded_migrations ORDER BY seq")
 	if me := (*mysql.MySQLError)(nil); errors.As(err, &me) && me.Number == errNoTable {
-		return 0, nil
+		return nil, nil
 	}
 	if err != nil {
-		return 0, errs.New("E-MIG-005", "cannot read the journal aicoded_migrations: "+reason(err), "check that the MySQL server runs, then start the app again")
+		return nil, unreadJournal(err)
 	}
-	return n, nil
+	defer rows.Close()
+	var ran []migrate.Step
+	for rows.Next() {
+		var st migrate.Step
+		if err := rows.Scan(&st.Seq, &st.Publish, &st.Index, &st.SHA256); err != nil {
+			return nil, unreadJournal(err)
+		}
+		ran = append(ran, st)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, unreadJournal(err)
+	}
+	return ran, nil
+}
+
+// unreadJournal is E-MIG-005 for a journal that cannot be read.
+func unreadJournal(err error) error {
+	return errs.New("E-MIG-005", "cannot read the journal aicoded_migrations: "+reason(err), "check that the MySQL server runs, then start the app again")
 }
 
 // reason describes a failed statement without its text, which can quote a password.

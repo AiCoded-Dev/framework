@@ -206,15 +206,26 @@ func Settle(ctx context.Context, c *platform.Client, dir string, p platform.Publ
 }
 
 // SettlePending settles, as Settle does, the publish that last carried the draft of the app in
-// dir, once it has ended. When the platform cannot say, it leaves it for later.
+// dir, once it has ended. While that publish runs and the app has a draft, it refuses with
+// E-MIG-001, since a publish now would send the draft a second time. A publish the platform does
+// not know is forgotten. When the platform cannot say, it leaves it for later.
 func SettlePending(ctx context.Context, c *platform.Client, dir string) (string, error) {
 	id := migrations.Pending(dir)
 	if id == "" {
 		return "", nil
 	}
 	p, err := c.Publish(ctx, id)
-	if err != nil {
+	switch {
+	case errs.Code(err) == "E-PUB-013":
+		return "", migrations.Forget(dir, id)
+	case err != nil:
 		return "", nil
+	case !p.Done():
+		if text, err := draft.Read(dir); err != nil || text == nil {
+			return "", nil
+		}
+		return "", errs.New("E-MIG-001", fmt.Sprintf("the draft %s went with publish %s, which has not ended, and a publish now would send it again", draft.File, id),
+			fmt.Sprintf("wait until publish %s ends, as aicoded status %s or the release_status tool shows, then publish again", id, id))
 	}
 	return Settle(ctx, c, dir, p)
 }

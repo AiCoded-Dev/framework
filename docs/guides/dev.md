@@ -102,15 +102,19 @@ An app's tables come from its migrations, never from its code. Before it starts 
 declares `sqldb`, `aicoded dev` applies to the app's database, as the owner:
 
 1. the migrations the app published, which it asks the platform for with your sign-in and keeps
-   in `.aicoded/migrations.json`. When you are not signed in or the platform cannot be reached,
-   it applies the ones kept there and prints one warning line, or, with none kept, only the
-   draft;
+   in `.aicoded/migrations.json`. It asks at the app's first start, and again at a Start or
+   Restart on the dev UI or the `preview` tool once its last answer is a minute old; a rebuild
+   after a change takes the kept ones. When you are not signed in or the platform cannot be
+   reached, it applies the ones kept there and prints one warning line, or, with none kept, only
+   the draft;
 2. then the statements of the draft, `.aicoded/migration.sql`, the next schema change.
 
 The database's journal, the table `aicoded_migrations`, holds what ran. A draft that grows is
 applied on top. When the draft changes otherwise, or the journal holds steps that the published
 migrations and the draft do not start with, as after a publish, `aicoded dev` drops the app's dev
-database, makes it again and applies everything: its data is test data. It never touches another
+database, makes it again and applies everything: its data is test data. A list of steps that
+`aicoded dev` cannot apply at all, such as one over 2000 steps or 1 MiB, stops the app with
+E-MIG-004 and leaves the database as it is. It never touches another
 app's database. A draft that `aicoded check` refuses (E-MIG-001 to E-MIG-003, E-MIG-006) or a step
 that fails (E-MIG-005) stops the app, and its problems show at its address, on the dev UI and in
 `what_broke`.
@@ -120,13 +124,17 @@ The draft and `.aicoded/migrations.json` stay out of git: a new app's `.gitignor
 draft with the commit, and once that publish passed, deletes it and refreshes
 `.aicoded/migrations.json`; a publish that failed leaves the draft as it was. When you publish with
 `--no-wait`, or with the `publish` tool, `aicoded status`, `release_status` or the next publish
-does that once the publish has ended. A draft you changed after the publish was sent stays, to be
-cut down to what is still to publish.
+does that once the publish has ended; `release_status` and the `publish` tool say what became of
+the draft in `draft` (`sent`, `settled` or `none`) and `draft_note`. A draft you changed after the
+publish was sent stays, to be cut down to what is still to publish. While the publish that carried
+the draft has not ended, `aicoded publish` and the `publish` tool refuse to send the draft again
+(E-MIG-001): wait for its outcome first.
 
 `aicoded check`, when the workspace's `dev.yaml` (or that of a folder above it) names `mysql:`,
-makes a new test database for each app that declares `sqldb`, applies the same steps, runs the
-app's tests with `AICODED_TEST_DB` set to the data user's DSN, and drops the database and its
-users after. A test opens it with `sqltest.Open(t)` from `aicoded.dev/framework/sqldb/sqltest`,
+makes a new test database for each app that declares `sqldb`; it reads `dev.yaml` only for the
+tests of such an app, and a `dev.yaml` it cannot use stops the whole check. It applies the same
+steps, runs the app's tests with `AICODED_TEST_DB` set to the data user's DSN, and drops the
+database and its users after. A test opens it with `sqltest.Open(t)` from `aicoded.dev/framework/sqldb/sqltest`,
 which skips the test when there is no test database.
 
 ## Watching

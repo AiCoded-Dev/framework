@@ -493,3 +493,44 @@ func TestRunPublishRefusesATrackedDraft(t *testing.T) {
 	assert.Zero(t, p.Requests("/v1/apps/get"), "nothing reaches the platform")
 	assert.Zero(t, p.Requests("/v1/publishes/create"))
 }
+
+// A publish while the one that carried the draft runs would send the draft again: it is refused
+// before anything is sent. A publish the platform does not know holds nothing back.
+func TestRunPublishWaitsForTheDraftsPublish(t *testing.T) {
+	p, aicoded := signedIn(t)
+	dir := gittest.DatabaseApp(t, "demo", draftText)
+	p.Answers(platformtest.Publish{Status: "running"})
+	code, out, errOut := aicoded("publish", "--no-wait", dir)
+	require.Equal(t, 0, code, errOut)
+	id := publishID(t, out)
+	gittest.Write(t, dir, map[string]string{"notes.txt": "notes\n"})
+	gittest.Commit(t, dir, "Add notes")
+
+	code, _, errOut = aicoded("publish", "--no-wait", dir)
+	assert.Equal(t, 1, code)
+	assert.Contains(t, errOut, "E-MIG-001: the draft .aicoded/migration.sql went with publish "+id+", which has not ended")
+	assert.Contains(t, errOut, "fix: wait until publish "+id+" ends, as aicoded status "+id+" or the release_status tool shows, then publish again")
+	assert.Len(t, p.Uploads(), 1, "nothing more was sent")
+
+	require.NoError(t, migrations.MarkSent(dir, "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa", []byte(draftText)))
+	code, _, errOut = aicoded("publish", "--no-wait", dir)
+	require.Equal(t, 0, code, errOut)
+	require.Len(t, p.Uploads(), 2)
+	assert.Equal(t, draftText, p.Uploads()[1].Migration)
+}
+
+// A draft that cannot be read stays, and aicoded status still reports the publish.
+func TestRunStatusWithAnUnreadableDraft(t *testing.T) {
+	_, aicoded := signedIn(t)
+	dir := gittest.DatabaseApp(t, "demo", draftText)
+	code, out, errOut := aicoded("publish", "--no-wait", dir)
+	require.Equal(t, 0, code, errOut)
+	id := publishID(t, out)
+	require.NoError(t, os.Remove(draftFile(dir)))
+	require.NoError(t, os.Mkdir(draftFile(dir), 0o700))
+	t.Chdir(dir)
+	code, out, errOut = aicoded("status", id)
+	assert.Equal(t, 0, code)
+	assert.Contains(t, out, "\npassed\n")
+	assert.Contains(t, errOut, "aicoded: the draft stays: .aicoded/migration.sql: E-MIG-001: the draft is not a regular file")
+}

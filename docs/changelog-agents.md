@@ -18,8 +18,10 @@ Changes to the API that AI assistants build apps with. Newest first.
 - `aicoded publish` and the `publish` tool send the draft with the commit, and refuse a commit or
   index that holds it (E-MIG-001). Once the publish passed, the draft is deleted and the cache
   refreshed, by `aicoded publish`, `aicoded status`, `release_status` or the next publish; a
-  failed publish leaves it. New apps' `.gitignore` lists `.aicoded/migration.sql` and
-  `.aicoded/migrations.json`.
+  failed publish leaves it. While the publish that carried the draft has not ended, a new
+  publish is refused (E-MIG-001). The `publish` and `release_status` tools add `draft` (`sent`,
+  `settled` or `none`) and `draft_note` to their answers. New apps' `.gitignore` lists
+  `.aicoded/migration.sql` and `.aicoded/migrations.json`.
 - `aicoded l7-runner --migrations <file>` applies the steps in the file, `{"steps": [...]}`, to the
   app's database before it serves.
 - E-LINT-013: app code may not change the schema. SQL passed to `database/sql` that starts with

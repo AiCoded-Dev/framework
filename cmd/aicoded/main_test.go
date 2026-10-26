@@ -205,7 +205,9 @@ func testApp(t *testing.T, test string) string {
 }
 
 func TestRunCheck(t *testing.T) {
-	testhome.Set(t)
+	home := testhome.Set(t)
+	testhome.DevYAML(t, home, "workspaces: {}\n")
+	require.NoError(t, os.Chmod(filepath.Join(home, ".config", "aicoded", "dev.yaml"), 0o644), "a dev.yaml no app needs")
 	var out, errOut bytes.Buffer
 	assert.Equal(t, 2, run([]string{"check", "a", "b"}, &out, &errOut))
 	assert.Equal(t, 2, run([]string{"check", "--nope"}, &out, &errOut))
