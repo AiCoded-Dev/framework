@@ -17,6 +17,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | PUB | `aicoded publish` and `aicoded status`, and the `publish` and `release_status` tools of `aicoded mcp` |
 | GATE | the security checks of the platform's delivery pipeline, in the problems and notes of a publish |
 | REL | the platform's release of a publish to production |
+| MIG | schema changes: the draft `.aicoded/migration.sql` in `aicoded check`, `aicoded dev` and the delivery pipeline, and the migrations applied to a database |
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
 | MAIL | mail rules, the mailbox where a target keeps none, the messages a runner takes at once, and the operator's mail domains |
@@ -87,6 +88,17 @@ Publishing uses these codes:
   the checks read.
 - E-GATE-038 is a note, which does not stop a publish: a page the simulated attacks did not
   reach.
+
+Schema changes use these codes:
+
+- E-MIG-001: a draft too large, not UTF-8, with no statement, or committed to git.
+- E-MIG-002: a statement that a schema change may not hold, such as one that changes data, an
+  executable comment, `DELIMITER` or a name with a database in front.
+- E-MIG-003: a destructive statement: `DROP`, `RENAME`, `TRUNCATE`, or `ALTER TABLE` with a
+  `DROP`, `MODIFY`, `CHANGE`, `RENAME` or `ALTER` clause.
+- E-MIG-004: migrations that differ from those the database ran.
+- E-MIG-005: a step that failed while it was applied.
+- E-MIG-006: a draft while the permission list declares no `sqldb`.
 
 Releasing uses these codes, each a release that the platform refuses before anything runs:
 

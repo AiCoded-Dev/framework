@@ -4,6 +4,14 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- New package `migrate`, for the aicoded CLI and the platform: it checks a schema-change draft,
+  `.aicoded/migration.sql`, and applies migrations to a database. A draft may only add:
+  `CREATE TABLE`, `CREATE INDEX` and `ALTER TABLE … ADD`, with a new `NOT NULL` column given a
+  `DEFAULT`. New codes: E-MIG-001 (a draft over 64 KiB or 100 statements, not UTF-8, empty, or
+  committed), E-MIG-002 (a statement not allowed, such as `INSERT`, `/*! … */` or `db.table`),
+  E-MIG-003 (a destructive statement), E-MIG-004 (migrations that differ from what the database
+  ran), E-MIG-005 (a step that failed) and E-MIG-006 (a draft without `sqldb`). App code may not
+  import `migrate` (E-LINT-001).
 - E-RUN-012: on the platform, the runner bounds an app's reads of its secrets to 100 at once, then
   20 a second, and 8 under way at once, all its instances together; past either, `secrets.Get`
   fails with E-RUN-012 and nothing is read. Read each secret once, when the app starts or first

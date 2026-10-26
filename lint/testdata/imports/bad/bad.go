@@ -7,6 +7,7 @@ import (
 	_ "reflect"
 
 	_ "aicoded.dev/framework/manifest"
+	_ "aicoded.dev/framework/migrate"
 	_ "aicoded.dev/framework/runnerproto"
 	_ "aicoded.dev/framework/runnerproto/server"
 	_ "google.golang.org/protobuf/proto"
