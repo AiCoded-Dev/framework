@@ -4,6 +4,10 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `migrate.Normalize` returns the form of a statement in which two statements that MySQL reads
+  alike are the same. The platform compares a draft with the app's published steps in that form,
+  so a published statement sent again with other spacing or keyword case is refused with
+  E-MIG-001, as its page says.
 - A step whose statement ran but whose row could not be added to the journal
   `aicoded_migrations` is tried twice more on new connections, under the database's migration
   lock. When it still cannot be added, E-MIG-005 says the step `ran but was not recorded`: on the

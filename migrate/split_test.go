@@ -60,3 +60,22 @@ func TestSplitNamesTheLine(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), ".aicoded/migration.sql:3: E-MIG-002: ")
 }
+
+func TestNormalize(t *testing.T) {
+	for stmt, want := range map[string]string{
+		"CREATE TABLE a (x INT)":                          "CREATE TABLE a ( X INT )",
+		"create  table a(\n\tx int\n);":                   "CREATE TABLE a ( X INT )",
+		"CREATE /* new */ TABLE a (x INT) -- notes":       "CREATE TABLE a ( X INT )",
+		"CREATE TABLE Notes (x INT)":                      "CREATE TABLE Notes ( X INT )",
+		"create index i on Notes (x)":                     "CREATE INDEX I ON Notes ( X )",
+		"alter table Notes add column y int default 0x1f": "ALTER TABLE Notes ADD COLUMN Y INT DEFAULT 0x1f",
+		"ALTER TABLE n ADD FOREIGN KEY (x) REFERENCES Owners (id) on delete cascade": "ALTER TABLE n ADD FOREIGN KEY ( X ) " +
+			"REFERENCES Owners ( ID ) ON DELETE CASCADE",
+		"CREATE TABLE a (x INT) COMMENT 'Two  spaces'": "CREATE TABLE a ( X INT ) COMMENT 'Two  spaces'",
+		"CREATE TABLE `My  Notes` (`Body` TEXT)":       "CREATE TABLE `My  Notes` ( `Body` TEXT )",
+		"  CREATE TABLE a (x INT) COMMENT 'it''s'  ":   "CREATE TABLE a ( X INT ) COMMENT 'it''s'",
+		"CREATE TABLE a (x INT) COMMENT 'goes on":      "CREATE TABLE a (x INT) COMMENT 'goes on",
+	} {
+		assert.Equal(t, want, migrate.Normalize(stmt), stmt)
+	}
+}

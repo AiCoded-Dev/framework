@@ -159,8 +159,9 @@ journal, the table `aicoded_migrations`, which app code may not read or write (E
   them is ever released, `aicoded status` and `release_status` show E-MIG-005 on each, with the
   step, and the app's migrations become the steps that ran. Put a corrected version of the
   unreleased changes in `.aicoded/migration.sql`, leaving out the steps that ran, and publish
-  again: the platform refuses a publish whose draft repeats one of them (E-MIG-001). `aicoded dev`
-  then makes the dev database again from the app's migrations and the new draft.
+  again: the platform refuses a publish whose draft repeats one of them, whatever its spacing and
+  keyword case (E-MIG-001). `aicoded dev` then makes the dev database again from the app's
+  migrations and the new draft.
 - When the step could not finish, through a lock wait, a deadlock, a time limit or a broken
   connection, nothing is rejected: the publish shows E-MIG-005 as a note, and the next release
   tries the step again.
