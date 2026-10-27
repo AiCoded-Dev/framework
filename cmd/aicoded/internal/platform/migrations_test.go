@@ -110,5 +110,15 @@ func TestCreatePublishCarriesTheDraft(t *testing.T) {
 	_, err := c.CreatePublish(t.Context(), u)
 	require.NoError(t, err, "a draft of 64 KiB, whose JSON is larger")
 	require.Len(t, p.Uploads(), 1)
+	assert.True(t, p.Uploads()[0].MigrationSent)
 	assert.Equal(t, u.Migration, p.Uploads()[0].Migration)
+}
+
+// A publish without a draft sends no key migration, which a control plane older than drafts refuses.
+func TestCreatePublishWithoutADraft(t *testing.T) {
+	p, c := signedIn(t)
+	_, err := c.CreatePublish(t.Context(), upload(sha))
+	require.NoError(t, err)
+	require.Len(t, p.Uploads(), 1)
+	assert.False(t, p.Uploads()[0].MigrationSent)
 }

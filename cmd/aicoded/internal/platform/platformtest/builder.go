@@ -97,7 +97,9 @@ func Failed(n, size int) Publish {
 // Upload is a publish the fake took.
 type Upload struct {
 	App, SHA, Summary, Migration string
-	Bundle                       []byte
+	// MigrationSent is whether the upload's meta held the key migration.
+	MigrationSent bool
+	Bundle        []byte
 }
 
 // builder is the state of the fake builder API.
@@ -143,10 +145,10 @@ type refusal struct {
 
 // uploadMeta is the meta part of an upload.
 type uploadMeta struct {
-	App       string `json:"app"`
-	SHA       string `json:"sha"`
-	Summary   string `json:"summary"`
-	Migration string `json:"migration"`
+	App       string  `json:"app"`
+	SHA       string  `json:"sha"`
+	Summary   string  `json:"summary"`
+	Migration *string `json:"migration"`
 }
 
 func newBuilder() builder {
@@ -531,7 +533,11 @@ func (p *Platform) createPublish(w http.ResponseWriter, r *http.Request) {
 	}
 	pub := &fakePublish{id: publishID(), sha: meta.SHA, summary: meta.Summary, app: a, created: time.Now()}
 	p.pubs = append(p.pubs, pub)
-	p.uploads = append(p.uploads, Upload{App: meta.App, SHA: meta.SHA, Summary: meta.Summary, Migration: meta.Migration, Bundle: bundle})
+	u := Upload{App: meta.App, SHA: meta.SHA, Summary: meta.Summary, MigrationSent: meta.Migration != nil, Bundle: bundle}
+	if meta.Migration != nil {
+		u.Migration = *meta.Migration
+	}
+	p.uploads = append(p.uploads, u)
 	a.base = meta.SHA
 	writeJSON(w, http.StatusCreated, map[string]any{"id": pub.id, "app_id": a.id, "created_app": created})
 }
@@ -557,7 +563,7 @@ func readUpload(r *http.Request, meta *uploadMeta) ([]byte, error) {
 		return nil, fmt.Errorf("meta is not valid: %w", err)
 	}
 	if !appName.MatchString(meta.App) || !commitSHA.MatchString(meta.SHA) || len([]rune(meta.Summary)) > 1000 ||
-		strings.ContainsFunc(meta.Summary, unicode.IsControl) || len(meta.Migration) > 64<<10 {
+		strings.ContainsFunc(meta.Summary, unicode.IsControl) || meta.Migration != nil && len(*meta.Migration) > 64<<10 {
 		return nil, errors.New("meta is not valid")
 	}
 	part, err = mr.NextPart()

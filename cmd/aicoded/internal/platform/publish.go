@@ -228,6 +228,7 @@ func (c *Client) App(ctx context.Context, name string) (app App, found bool, err
 // CreatePublish sends the upload to the delivery pipeline and returns the new publish. The first
 // publish of a name creates the app. A bundle whose prerequisite is no longer the app's base is
 // ErrBaseChanged; the other refusals have the code the platform gives, E-PUB-005 to E-PUB-010.
+// Its meta holds the key migration only with a draft.
 func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 	short, err := encodeMeta(map[string]string{"app": u.App, "sha": u.SHA, "summary": u.Summary})
 	if err != nil {
@@ -236,9 +237,11 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 	if len(short) > maxMeta {
 		return Created{}, errors.New("the summary of the publish is too long for the platform")
 	}
-	meta, err := encodeMeta(map[string]string{"app": u.App, "sha": u.SHA, "summary": u.Summary, "migration": u.Migration})
-	if err != nil {
-		return Created{}, err
+	meta := short
+	if u.Migration != "" {
+		if meta, err = encodeMeta(map[string]string{"app": u.App, "sha": u.SHA, "summary": u.Summary, "migration": u.Migration}); err != nil {
+			return Created{}, err
+		}
 	}
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
