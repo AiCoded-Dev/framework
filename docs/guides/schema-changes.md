@@ -164,6 +164,10 @@ journal, the table `aicoded_migrations`, which app code may not read or write (E
 - When the step could not finish, through a lock wait, a deadlock, a time limit or a broken
   connection, nothing is rejected: the publish shows E-MIG-005 as a note, and the next release
   tries the step again.
+- When the step ran but was not recorded, since the connection broke right after it ran and its
+  row could not be added to the journal even on a new connection, nothing is rejected either: the
+  publish shows E-MIG-005 as a note, and the platform's operator records the step before the next
+  release. Nothing in the app needs to change.
 - A rollback to an older release, whose steps the database ran already, applies nothing.
 - A release whose migrations do not start with what the database ran, such as one from another
   line of publishes, is refused (E-MIG-004), and so is a release of a publish whose schema changes

@@ -126,6 +126,30 @@ func TestApplyContinuesAfterAFailure(t *testing.T) {
 	assert.Equal(t, ran(list), journal(t, db))
 }
 
+// A step whose row the journal keeps refusing is reported as run but not recorded, which an
+// operator must record, and not as a step that failed.
+func TestApplyReportsAStepNotRecorded(t *testing.T) {
+	db, admin, name := database(t)
+	for _, s := range []string{
+		"CREATE TABLE `" + name + "`.aicoded_migrations (seq INT PRIMARY KEY, publish VARCHAR(40) NOT NULL, step INT NOT NULL, " +
+			"sha256 CHAR(64) NOT NULL, applied_at BIGINT NOT NULL)",
+		"CREATE TRIGGER `" + name + "`.refuse BEFORE INSERT ON `" + name + "`.aicoded_migrations FOR EACH ROW " +
+			"SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'refused'",
+	} {
+		_, err := admin.ExecContext(t.Context(), s)
+		require.NoError(t, err)
+	}
+
+	applied, err := migrate.Apply(t.Context(), db, steps(1, "p1", "CREATE TABLE a (x INT)", "CREATE TABLE b (x INT)"))
+	assert.Equal(t, "E-MIG-005", errs.Code(err))
+	require.ErrorContains(t, err, "step p1#1 ran but was not recorded in the journal aicoded_migrations: MySQL error 1644: refused")
+	require.ErrorContains(t, err, "an operator must add the step's row")
+	assert.Empty(t, applied)
+	var tables int
+	require.NoError(t, admin.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN ('a', 'b')", name).Scan(&tables))
+	assert.Equal(t, 1, tables, "the step ran, and the next did not")
+}
+
 // Two appliers at once on one database run each step once.
 func TestApplyConcurrently(t *testing.T) {
 	db, _, _ := database(t)

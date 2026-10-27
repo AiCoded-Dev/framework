@@ -4,6 +4,12 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- A step whose statement ran but whose row could not be added to the journal
+  `aicoded_migrations` is tried twice more on new connections, under the database's migration
+  lock. When it still cannot be added, E-MIG-005 says the step `ran but was not recorded`: on the
+  platform nothing is rejected, the publish shows it as a note, and the platform's operator
+  records the step before the next release. The pages of E-MIG-005, `guides/publishing` and
+  `guides/schema-changes` say so.
 - A step of the migrations that MySQL refuses on production data stops the release, and the
   version that runs keeps serving; the schema changes after the steps that ran are rejected, so no
   publish that holds them is ever released. `aicoded status` and `release_status` show E-MIG-005

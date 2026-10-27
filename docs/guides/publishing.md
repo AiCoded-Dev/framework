@@ -262,6 +262,10 @@ data.
 - **The step could not finish**, through a lock wait, a deadlock, a time limit or a broken
   connection. Nothing is rejected: the publish shows E-MIG-005 as a note, and the next release
   tries the step again.
+- **The step ran but was not recorded**: the connection broke right after the step ran, and its
+  row could not be added to the journal even on a new connection. Nothing is rejected: the
+  publish shows E-MIG-005 as a note, and the platform's operator records the step before the next
+  release. Nothing in the app needs to change.
 
 ## What security sees
 

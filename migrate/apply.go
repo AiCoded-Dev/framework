@@ -50,8 +50,15 @@ const (
 	createJournal = "CREATE TABLE IF NOT EXISTS aicoded_migrations (seq INT PRIMARY KEY, publish VARCHAR(40) NOT NULL, " +
 		"step INT NOT NULL, sha256 CHAR(64) NOT NULL, applied_at BIGINT NOT NULL)"
 
-	listFix = "apply the list as the platform gave it: steps numbered from 1, each with the sha256 of its statement"
-	failFix = "after a lock wait or a timeout, release again when the table is less busy; when a draft's statement fails, change the draft"
+	// recordTries is how many times a step's row is tried in the journal.
+	recordTries = 3
+	// recordPause is the pause before the second try of a step's row, and twice that before the third.
+	recordPause = 200 * time.Millisecond
+
+	listFix   = "apply the list as the platform gave it: steps numbered from 1, each with the sha256 of its statement"
+	failFix   = "after a lock wait or a timeout, release again when the table is less busy; when a draft's statement fails, change the draft"
+	recordFix = "the step ran but is not in the journal, so the next release would run it again: an operator must add the step's row " +
+		"to the journal aicoded_migrations of the app's database before the next release"
 )
 
 // Apply runs on db the steps that its journal, the table aicoded_migrations, lacks, in order,
@@ -63,7 +70,9 @@ const (
 // It refuses, before running anything, a list whose steps are not numbered from 1 or whose
 // hash does not match its statement (E-MIG-004), a list the journal does not agree with
 // (E-MIG-004, see Extends) and a step to run that Classify refuses. A step that fails stops
-// Apply with E-MIG-005; the journal keeps the steps that ran.
+// Apply with E-MIG-005; the journal keeps the steps that ran. So does a step that ran but whose row
+// could not be added to the journal, even on a new connection; its message says it ran but was not
+// recorded.
 func Apply(ctx context.Context, db *sql.DB, steps []Step) (applied []Step, err error) {
 	if err := valid(steps); err != nil {
 		return nil, err
@@ -220,14 +229,105 @@ func (s *session) run(ctx context.Context, st Step) error {
 		}
 		return failed("step "+st.name()+" failed", err)
 	}
-	jctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+	return s.record(ctx, st)
+}
+
+// record adds the row of st, a step that ran, to the journal, within 30 seconds even when ctx has
+// ended. When the session's connection cannot add it, record tries twice more, each time on a new
+// connection: while the session still holds the migration lock, or after it takes the lock at
+// once on the new connection, which the session then goes on with, so that no other applier runs
+// in between. A row that the journal already holds is not added again. A step it cannot record
+// is E-MIG-005, saying that the step ran but was not recorded, at once when another applier holds
+// the lock or the journal holds other steps from st's place.
+func (s *session) record(ctx context.Context, st Step) error {
+	rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
 	defer cancel()
-	_, err := s.conn.ExecContext(jctx, "INSERT INTO aicoded_migrations (seq, publish, step, sha256, applied_at) VALUES (?, ?, ?, ?, ?)",
-		st.Seq, st.Publish, st.Index, st.SHA256, time.Now().UnixMilli())
+	err := insert(rctx, s.conn, st)
+	for try := 1; err != nil && try < recordTries && !errors.Is(err, errOtherApplier); try++ {
+		select {
+		case <-time.After(time.Duration(try) * recordPause):
+		case <-rctx.Done():
+		}
+		if rctx.Err() != nil {
+			break
+		}
+		err = s.recordAgain(rctx, st)
+	}
 	if err != nil {
-		return failed("step "+st.name()+" ran, but its row in the journal aicoded_migrations could not be added", err)
+		return errs.New("E-MIG-005", "step "+st.name()+" ran but was not recorded in the journal aicoded_migrations: "+cause(err), recordFix)
 	}
 	return nil
+}
+
+// recordAgain adds st's row on a new connection, under the session's migration lock.
+func (s *session) recordAgain(ctx context.Context, st Step) error {
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	var holder sql.NullInt64
+	var id int64
+	if err := conn.QueryRowContext(ctx, "SELECT IS_USED_LOCK(?), CONNECTION_ID()", s.lock).Scan(&holder, &id); err != nil {
+		_ = conn.Close()
+		return err
+	}
+	if holder.Valid && holder.Int64 == s.id {
+		defer conn.Close()
+		return recorded(ctx, conn, st)
+	}
+	var got sql.NullInt64
+	if err := conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, 0)", s.lock).Scan(&got); err != nil {
+		_ = conn.Close()
+		return err
+	}
+	if got.Int64 != 1 {
+		_ = conn.Close()
+		return errOtherApplier
+	}
+	s.discard()
+	s.conn, s.id = conn, id
+	if _, err := conn.ExecContext(ctx, "SET SESSION lock_wait_timeout = 30"); err != nil {
+		return err
+	}
+	return recorded(ctx, conn, st)
+}
+
+// errOtherApplier is why record stops trying: another applier may have run since the step did.
+var errOtherApplier = errors.New("another applier took the database's migration lock, or the journal holds other steps")
+
+// recorded adds st's row on conn unless the journal holds it, and returns errOtherApplier when the
+// journal holds any other row from st's place.
+func recorded(ctx context.Context, conn *sql.Conn, st Step) error {
+	rows, err := conn.QueryContext(ctx, "SELECT seq, publish, step, sha256 FROM aicoded_migrations WHERE seq >= ? ORDER BY seq", st.Seq)
+	if err != nil {
+		return err
+	}
+	var held []Step
+	for rows.Next() {
+		var r Step
+		if err := rows.Scan(&r.Seq, &r.Publish, &r.Index, &r.SHA256); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		held = append(held, r)
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return err
+	}
+	switch {
+	case len(held) == 0:
+		return insert(ctx, conn, st)
+	case len(held) == 1 && held[0] == Step{Seq: st.Seq, Publish: st.Publish, Index: st.Index, SHA256: st.SHA256}:
+		return nil
+	}
+	return errOtherApplier
+}
+
+// insert adds st's row to the journal on conn.
+func insert(ctx context.Context, conn *sql.Conn, st Step) error {
+	_, err := conn.ExecContext(ctx, "INSERT INTO aicoded_migrations (seq, publish, step, sha256, applied_at) VALUES (?, ?, ?, ?, ?)",
+		st.Seq, st.Publish, st.Index, st.SHA256, time.Now().UnixMilli())
+	return err
 }
 
 // failed returns E-MIG-005 for what failed, and stops the session when ctx ended.
@@ -280,9 +380,14 @@ func lockName(database string) string {
 
 // failed returns E-MIG-005 for what failed, naming MySQL's error number.
 func failed(what string, err error) error {
+	return errs.New("E-MIG-005", what+": "+cause(err), failFix)
+}
+
+// cause words err, naming MySQL's error number.
+func cause(err error) string {
 	var me *mysql.MySQLError
 	if errors.As(err, &me) {
-		return errs.New("E-MIG-005", fmt.Sprintf("%s: MySQL error %d: %s", what, me.Number, me.Message), failFix)
+		return fmt.Sprintf("MySQL error %d: %s", me.Number, me.Message)
 	}
-	return errs.New("E-MIG-005", fmt.Sprintf("%s: %v", what, err), failFix)
+	return err.Error()
 }
