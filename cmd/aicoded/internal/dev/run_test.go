@@ -187,14 +187,14 @@ func TestRunWorkspaceRefusesTwoAppsWithOneName(t *testing.T) {
 	root := t.TempDir()
 	for _, dir := range []string{"a", "b"} {
 		require.NoError(t, os.Mkdir(filepath.Join(root, dir), 0o750))
-		require.NoError(t, os.WriteFile(filepath.Join(root, dir, manifest.FileName), []byte("app: shop\n"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(root, dir, manifest.FileName), []byte("app: shop\naudience: {internal: [everyone]}\n"), 0o600))
 	}
 	err := RunWorkspace(t.Context(), root, devconfig.Workspace{}, t.TempDir(), io.Discard)
 	assert.Equal(t, "E-DEV-010", errs.Code(err))
 	require.ErrorContains(t, err, filepath.Join(root, "a")+" and "+filepath.Join(root, "b"))
 	data, err := os.ReadFile(filepath.Join(root, "a", manifest.FileName))
 	require.NoError(t, err)
-	assert.Equal(t, "app: shop\n", string(data), "nothing is generated")
+	assert.Equal(t, "app: shop\naudience: {internal: [everyone]}\n", string(data), "nothing is generated")
 }
 
 // calling returns the permission list of app, which calls the apps callees.
@@ -235,7 +235,7 @@ func TestRunChecksTheMySQLServer(t *testing.T) {
 // pagesApp returns an app folder whose only page is page.
 func pagesApp(t *testing.T, page string) string {
 	root := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(root, "aicoded.yaml"), []byte("app: hello\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "aicoded.yaml"), []byte("app: hello\naudience: {internal: [everyone]}\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "go.mod"), []byte("module hello\n"), 0o600))
 	require.NoError(t, os.Mkdir(filepath.Join(root, "pages"), 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(root, "pages", "index.html"), []byte(page), 0o600))

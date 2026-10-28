@@ -56,17 +56,18 @@ func TestDescribe(t *testing.T) {
 	s, err := Describe(t.Context(), root, "")
 	require.NoError(t, err)
 	all := []string{"*"}
+	everyone := &Audience{Internal: []string{"everyone"}}
 	noParams, noCalls, noForms := []generate.ParamInfo{}, []string{}, []generate.FormInfo{}
 	assert.Equal(t, Summary{Apps: []App{
-		{Name: "billing", Dir: filepath.Join(root, "billing"), Serves: []Serve{
+		{Name: "billing", Dir: filepath.Join(root, "billing"), Audience: everyone, Serves: []Serve{
 			{Name: "Fail", Callers: []string{"shop"}, Require: all},
 			{Name: "GetInvoice", Callers: []string{"shop"}, Require: []string{"editor"}},
 			{Name: "Missing", Callers: []string{"shop"}, Require: all},
 			{Name: "Ping", Callers: []string{"shop"}, Apps: true},
 			{Name: "Secret", Callers: []string{"shop"}, Require: []string{"admin"}},
 		}, Surface: surface.Surface{Size: 5, EntryPoints: 5}},
-		{Name: "hello", Dir: filepath.Join(root, "hello"), Settings: []string{"greeting"}, Secrets: []string{"token"}},
-		{Name: "shop", Dir: filepath.Join(root, "shop"), Pages: []Page{
+		{Name: "hello", Dir: filepath.Join(root, "hello"), Audience: everyone, Settings: []string{"greeting"}, Secrets: []string{"token"}},
+		{Name: "shop", Dir: filepath.Join(root, "shop"), Audience: everyone, Pages: []Page{
 			{Path: "/checks", Require: all},
 			{Path: "/invoices/{id}", Require: all, Shared: true},
 			{Path: "/status", Require: all},
@@ -86,8 +87,8 @@ func TestDescribe(t *testing.T) {
 	require.Len(t, s.Apps, 1)
 	data, err := json.Marshal(s)
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"apps": [{"name": "hello", "dir": `+quote(filepath.Join(root, "hello"))+`, "settings": ["greeting"], "secrets": ["token"],
-		"surface": {"size": 0, "entry_points": 0, "effects": 0}}]}`, string(data))
+	assert.JSONEq(t, `{"apps": [{"name": "hello", "dir": `+quote(filepath.Join(root, "hello"))+`, "audience": {"internal": ["everyone"]},
+		"settings": ["greeting"], "secrets": ["token"], "surface": {"size": 0, "entry_points": 0, "effects": 0}}]}`, string(data))
 }
 
 // The room-maintenance and people examples, described in text and JSON, match their golden
@@ -172,8 +173,8 @@ func TestDescribeModules(t *testing.T) {
 	require.NoError(t, err)
 	data, err = json.Marshal(s)
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"apps": [{"name": "hello", "dir": `+quote(filepath.Join(root, "hello"))+`, "settings": ["greeting"], "secrets": ["token"],
-		"modules": ["golang.org/x/text"], "surface": {"size": 0, "entry_points": 0, "effects": 0}}]}`, string(data))
+	assert.JSONEq(t, `{"apps": [{"name": "hello", "dir": `+quote(filepath.Join(root, "hello"))+`, "audience": {"internal": ["everyone"]},
+		"settings": ["greeting"], "secrets": ["token"], "modules": ["golang.org/x/text"], "surface": {"size": 0, "entry_points": 0, "effects": 0}}]}`, string(data))
 }
 
 func TestDescribeReach(t *testing.T) {
@@ -181,9 +182,8 @@ func TestDescribeReach(t *testing.T) {
 	yaml := filepath.Join(root, "hello", "aicoded.yaml")
 	data, err := os.ReadFile(yaml)
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(yaml, append(data, `audience:
-  external: [magic-link]
-data:
+	data = bytes.Replace(data, []byte("  internal: [everyone]\n"), []byte("  external: [magic-link]\n"), 1)
+	require.NoError(t, os.WriteFile(yaml, append(data, `data:
   - source: connector:crm
     classes: [internal]
 egress: [api.partner.example, hooks.partner.example]

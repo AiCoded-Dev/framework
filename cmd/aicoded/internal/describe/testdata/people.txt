@@ -1,4 +1,5 @@
 app people (/apps/people)
+  audience everyone
   page /contact  require *
   page /home  require *
   page /users/add  require staff, hr

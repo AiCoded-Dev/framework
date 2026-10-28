@@ -18,7 +18,7 @@ func app(t *testing.T, root, rel, name string) string {
 	t.Helper()
 	dir := filepath.Join(root, filepath.FromSlash(rel))
 	require.NoError(t, os.MkdirAll(dir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "aicoded.yaml"), []byte("app: "+name+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "aicoded.yaml"), []byte("app: "+name+"\naudience: {internal: [everyone]}\n"), 0o600))
 	dir, err := filepath.EvalSymlinks(dir)
 	require.NoError(t, err)
 	return dir

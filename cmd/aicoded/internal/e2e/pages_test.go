@@ -69,6 +69,8 @@ func TestAccessSection(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(s.dir, "aicoded.yaml"))
 	require.NoError(t, err)
 	assert.Equal(t, `app: site
+audience:
+  internal: [everyone]
 # access is written by aicoded generate from <ssr:access>; do not edit it
 access:
   "/admin/live":

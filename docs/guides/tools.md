@@ -33,8 +33,8 @@ reports a problem and 2 when the command line is not valid. `aicoded dev` has it
 ## aicoded init
 
 `aicoded init <name>` creates an app in a new folder `<name>`: `go.mod`, a permission list with
-`app: <name>`, `main.go`, one page and `AGENTS.md`, the rules for AI assistants that build the
-app. It then runs `aicoded generate` and `go mod tidy`.
+`app: <name>` and an audience of everyone in the company, `main.go`, one page and `AGENTS.md`, the
+rules for AI assistants that build the app. It then runs `aicoded generate` and `go mod tidy`.
 
 - The name is 2 to 63 lowercase letters, digits and dashes, starting with a letter and ending
   with a letter or digit, and no folder there may have it (E-CLI-002).

@@ -375,7 +375,7 @@ func sqlWorkspace(t *testing.T, text string) (root, app, dir string) {
 	root, app = t.TempDir(), testApp()
 	drop(t, testmysql.Admin(t), app)
 	dir = copyHello(t, filepath.Join(root, app), app)
-	writeFile(t, filepath.Join(dir, manifest.FileName), "app: "+app+"\nsettings: [greeting]\nsecrets: [token]\n"+
+	writeFile(t, filepath.Join(dir, manifest.FileName), "app: "+app+"\naudience: {internal: [everyone]}\nsettings: [greeting]\nsecrets: [token]\n"+
 		"data:\n  - source: sqldb\n    classes: [internal]\n")
 	writeFile(t, filepath.Join(dir, ".aicoded", "migration.sql"), text)
 	return root, app, dir

@@ -18,7 +18,7 @@ var traceID = strings.Repeat("ab", 16)
 // demoDir returns a folder that holds the permission list of demo.
 func demoDir(t *testing.T) string {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "aicoded.yaml"), []byte("app: demo\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "aicoded.yaml"), []byte("app: demo\naudience: {internal: [everyone]}\n"), 0o600))
 	return dir
 }
 

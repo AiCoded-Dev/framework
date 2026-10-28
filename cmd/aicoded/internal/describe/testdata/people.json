@@ -3,6 +3,11 @@
     {
       "name": "people",
       "dir": "/apps/people",
+      "audience": {
+        "internal": [
+          "everyone"
+        ]
+      },
       "pages": [
         {
           "path": "/contact",

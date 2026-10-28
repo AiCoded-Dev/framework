@@ -19,7 +19,7 @@ func app(t *testing.T, root, name string, files map[string]string) string {
 	t.Helper()
 	dir := filepath.Join(root, name)
 	files["go.mod"] = "module example.com/" + name + "\n\ngo 1.26.0\n"
-	files["aicoded.yaml"] = "app: " + name + "\n"
+	files["aicoded.yaml"] = "app: " + name + "\naudience: {internal: [everyone]}\n"
 	for rel, content := range files {
 		p := filepath.Join(dir, filepath.FromSlash(rel))
 		require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o755))

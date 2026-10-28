@@ -43,8 +43,8 @@ services:
 ```
 
 You or your AI assistant write every section but `access` and `services`, which `aicoded
-generate` adds and keeps current. Only `app` is required: a section left out, or left empty, is
-not stated.
+generate` adds and keeps current. `app` and `audience` are required; any other section left out,
+or left empty, is not stated.
 
 ## The sections you write
 
@@ -61,8 +61,14 @@ not stated.
   - `external` lists outside people: `idp:<name>` for the users of a partner's identity
     provider, with a lower-case name, or `magic-link` for known outside users who sign in with
     a link sent to their email.
-- `data` lists the sources of data the app reaches, each with the `classes` of data it holds,
-  such as `internal`: at least one, each a lower-case name (E-MAN-008).
+
+  An audience that lists no one is *Not allowed* (E-MAN-024): every app is used by people who
+  sign in. `aicoded init` starts with `internal: [everyone]`.
+- `data` lists the sources of data the app reaches, each with the `classes` of data it holds:
+  at least one of `public`, `internal`, `confidential` and `personal`, from the least sensitive
+  to the most (E-MAN-008). The app type sets the highest class its apps may hold. Health, HR and
+  payment card data, the classes `health`, `hr` and `card`, are *Not allowed* in any app
+  (E-MAN-024).
   - `sqldb` is the app's own SQL database; see [the SQL database](sql-database.md).
   - `filestore:<name>` is one of its file stores; see [file stores](file-stores.md).
   - `connector:<name>` names a company system the app reads with each viewer's own access. No

@@ -166,7 +166,7 @@ func TestBrokenHeldSnapshotFailsOnlyItsApps(t *testing.T) {
 	requireGo(t)
 	root := t.TempDir()
 	for _, app := range []string{"billing", "shop"} {
-		writeFile(t, filepath.Join(root, app, manifest.FileName), "app: "+app+"\n")
+		writeFile(t, filepath.Join(root, app, manifest.FileName), "app: "+app+"\naudience: {internal: [everyone]}\n")
 		writeFile(t, filepath.Join(root, app, "go.mod"), "module "+app+"\n\ngo 1.26.0\n")
 	}
 	held := filepath.Join(root, "shop", ".aicoded", "services")
@@ -257,10 +257,10 @@ func TestValuesReadBeforeGenerate(t *testing.T) {
 
 func TestRenamedAppFails(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, manifest.FileName), "app: shop\nsettings: [greeting]\n")
+	writeFile(t, filepath.Join(root, manifest.FileName), "app: shop\naudience: {internal: [everyone]}\nsettings: [greeting]\n")
 	writeFile(t, filepath.Join(root, "go.mod"), "module shop\n\ngo 1.26.0\n")
 	w := openWorkspace(t, root, nil, io.Discard)
-	writeFile(t, filepath.Join(root, manifest.FileName), "app: store\nsettings: [greeting]\n")
+	writeFile(t, filepath.Join(root, manifest.FileName), "app: store\naudience: {internal: [everyone]}\nsettings: [greeting]\n")
 
 	a, err := w.Restart(t.Context(), "shop")
 	require.NoError(t, err)
@@ -277,8 +277,8 @@ func TestRenamedAppFails(t *testing.T) {
 func TestOpenStartsCalleesFirst(t *testing.T) {
 	root := t.TempDir()
 	for dir, lines := range map[string]string{
-		"a": "app: shop\nsettings: [greeting]\nservices:\n  calls:\n    billing: [Ping]\n",
-		"b": "app: billing\nsettings: [greeting]\n",
+		"a": "app: shop\naudience: {internal: [everyone]}\nsettings: [greeting]\nservices:\n  calls:\n    billing: [Ping]\n",
+		"b": "app: billing\naudience: {internal: [everyone]}\nsettings: [greeting]\n",
 	} {
 		writeFile(t, filepath.Join(root, dir, manifest.FileName), lines)
 		writeFile(t, filepath.Join(root, dir, "go.mod"), "module "+dir+"\n\ngo 1.26.0\n")
@@ -544,7 +544,7 @@ func pageWhileStopping(t *testing.T, w *Workspace, ask func() error, text string
 
 func TestCloseEndsRequests(t *testing.T) {
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, manifest.FileName), "app: shop\n")
+	writeFile(t, filepath.Join(root, manifest.FileName), "app: shop\naudience: {internal: [everyone]}\n")
 	writeFile(t, filepath.Join(root, "go.mod"), "module shop\n\ngo 1.26.0\n")
 	w := openWorkspace(t, root, nil, io.Discard)
 	s, err := w.slot("shop")
@@ -572,7 +572,7 @@ func TestCloseEndsRequests(t *testing.T) {
 
 // unbuilt writes an app named name at dir that aicoded dev fails at once, without building it.
 func unbuilt(t *testing.T, dir, name string) {
-	writeFile(t, filepath.Join(dir, manifest.FileName), "app: "+name+"\n")
+	writeFile(t, filepath.Join(dir, manifest.FileName), "app: "+name+"\naudience: {internal: [everyone]}\n")
 }
 
 // uiGet gets path from the dev UI on port, with the cookie header cookie when it is not "",

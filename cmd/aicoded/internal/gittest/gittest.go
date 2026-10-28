@@ -22,7 +22,7 @@ func NewApp(t testing.TB, name string) string {
 	}
 	dir := t.TempDir()
 	Write(t, dir, map[string]string{
-		"aicoded.yaml": "app: " + name + "\n# access is written by aicoded generate from <ssr:access>; do not edit it\naccess: {}\n",
+		"aicoded.yaml": "app: " + name + "\naudience: {internal: [everyone]}\n# access is written by aicoded generate from <ssr:access>; do not edit it\naccess: {}\n",
 		"go.mod":       "module " + name + "\n\ngo 1.26.0\n",
 		"main.go":      "package main\n\nfunc main() {}\n",
 	})
@@ -36,7 +36,7 @@ func NewApp(t testing.TB, name string) string {
 func DatabaseApp(t testing.TB, name, draft string) string {
 	t.Helper()
 	dir := NewApp(t, name)
-	Write(t, dir, map[string]string{"aicoded.yaml": "app: " + name + "\ndata:\n  - source: sqldb\n    classes: [internal]\n" +
+	Write(t, dir, map[string]string{"aicoded.yaml": "app: " + name + "\naudience: {internal: [everyone]}\ndata:\n  - source: sqldb\n    classes: [internal]\n" +
 		"# access is written by aicoded generate from <ssr:access>; do not edit it\naccess: {}\n",
 		".gitignore": "/.aicoded/migration.sql\n/.aicoded/migrations.json\n"})
 	Commit(t, dir, "Keep data")

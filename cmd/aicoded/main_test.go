@@ -51,7 +51,7 @@ func TestRunDevWithoutManifest(t *testing.T) {
 func TestRunDevManual(t *testing.T) {
 	testhome.Set(t)
 	root := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(root, "aicoded.yaml"), []byte("app: hello\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "aicoded.yaml"), []byte("app: hello\naudience: {internal: [everyone]}\n"), 0o600))
 	var out, errOut bytes.Buffer
 	assert.Equal(t, 1, run([]string{"dev", "--manual", "hello", "--manual", "nope", root}, &out, &errOut))
 	assert.Contains(t, errOut.String(), `E-DEV-014: no app named "nope"`, "every --manual reaches aicoded dev")
@@ -67,7 +67,7 @@ func TestRunDevPointsAtTheRunningOne(t *testing.T) {
 	home := testhome.Set(t)
 	root := filepath.Join(home, "work")
 	require.NoError(t, os.MkdirAll(root, 0o700))
-	require.NoError(t, os.WriteFile(filepath.Join(root, "aicoded.yaml"), []byte("app: hello\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "aicoded.yaml"), []byte("app: hello\naudience: {internal: [everyone]}\n"), 0o600))
 	var lc net.ListenConfig
 	l, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -95,7 +95,7 @@ func TestRunRPCAdd(t *testing.T) {
 
 	shop := filepath.Join(t.TempDir(), "shop")
 	require.NoError(t, os.Mkdir(shop, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(shop, "aicoded.yaml"), []byte("app: shop\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(shop, "aicoded.yaml"), []byte("app: shop\naudience: {internal: [everyone]}\n"), 0o600))
 	t.Chdir(shop)
 	assert.Equal(t, 1, run([]string{"rpc", "add", "billing"}, &out, &errOut))
 	assert.Contains(t, errOut.String(), "E-RPC-007")
@@ -194,7 +194,7 @@ func TestRunGenerateWarnings(t *testing.T) {
 func testApp(t *testing.T, test string) string {
 	dir := t.TempDir()
 	for name, data := range map[string]string{
-		"aicoded.yaml": "app: calc\n# access is written by aicoded generate from <ssr:access>; do not edit it\naccess: {}\n",
+		"aicoded.yaml": "app: calc\naudience: {internal: [everyone]}\n# access is written by aicoded generate from <ssr:access>; do not edit it\naccess: {}\n",
 		"go.mod":       "module calc\n\ngo 1.26.0\n",
 		"main.go":      "package main\n\nfunc main() {}\n",
 		"main_test.go": "package main\n\nimport \"testing\"\n\nfunc TestCalc(t *testing.T) {\n\t" + test + "\n}\n",

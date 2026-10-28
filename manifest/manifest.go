@@ -29,35 +29,35 @@ const framework = "aicoded.dev/framework"
 
 // Manifest is the permission list, aicoded.yaml. A field left out or empty is not stated.
 type Manifest struct {
-	App       string            `yaml:"app"`
-	Class     string            `yaml:"class"`
-	Owner     string            `yaml:"owner"`
-	Audience  Audience          `yaml:"audience"`
-	Data      []Data            `yaml:"data"`
-	Access    map[string]Access `yaml:"access"`
-	Services  Services          `yaml:"services"`
-	Egress    []string          `yaml:"egress"`
-	Email     *Email            `yaml:"email"`
-	Schedule  []Job             `yaml:"schedule"`
-	Settings  []string          `yaml:"settings"`
-	Secrets   []string          `yaml:"secrets"`
-	Modules   []string          `yaml:"modules"`
-	Size      string            `yaml:"size"`
-	Resources string            `yaml:"resources"`
-	TTL       string            `yaml:"ttl"`
+	App       string            `yaml:"app" json:"app,omitzero"`
+	Class     string            `yaml:"class" json:"class,omitzero"`
+	Owner     string            `yaml:"owner" json:"owner,omitzero"`
+	Audience  Audience          `yaml:"audience" json:"audience,omitzero"`
+	Data      []Data            `yaml:"data" json:"data,omitzero"`
+	Access    map[string]Access `yaml:"access" json:"access,omitzero"`
+	Services  Services          `yaml:"services" json:"services,omitzero"`
+	Egress    []string          `yaml:"egress" json:"egress,omitzero"`
+	Email     *Email            `yaml:"email" json:"email,omitzero"`
+	Schedule  []Job             `yaml:"schedule" json:"schedule,omitzero"`
+	Settings  []string          `yaml:"settings" json:"settings,omitzero"`
+	Secrets   []string          `yaml:"secrets" json:"secrets,omitzero"`
+	Modules   []string          `yaml:"modules" json:"modules,omitzero"`
+	Size      string            `yaml:"size" json:"size,omitzero"`
+	Resources string            `yaml:"resources" json:"resources,omitzero"`
+	TTL       string            `yaml:"ttl" json:"ttl,omitzero"`
 }
 
 // Audience is who may use the app: people of the company, as group:<name> or everyone, and
 // outside people, as idp:<name> or magic-link.
 type Audience struct {
-	Internal []string `yaml:"internal"`
-	External []string `yaml:"external"`
+	Internal []string `yaml:"internal" json:"internal,omitzero"`
+	External []string `yaml:"external" json:"external,omitzero"`
 }
 
 // Job is one scheduled job: its name and the cron expression, in UTC, of when it runs.
 type Job struct {
-	Cron string `yaml:"cron"`
-	Name string `yaml:"job"`
+	Cron string `yaml:"cron" json:"cron,omitzero"`
+	Name string `yaml:"job" json:"job,omitzero"`
 }
 
 // Access is one entry of the access section aicoded generate writes: the role rules a viewer
@@ -65,39 +65,39 @@ type Job struct {
 // the rules admit may see every record, and the page calls. Guard and Shared are never both
 // set.
 type Access struct {
-	Require []string `yaml:"require"`
-	Guard   bool     `yaml:"guard"`
-	Shared  bool     `yaml:"shared"`
-	Calls   []string `yaml:"calls"`
+	Require []string `yaml:"require" json:"require,omitzero"`
+	Guard   bool     `yaml:"guard" json:"guard,omitzero"`
+	Shared  bool     `yaml:"shared" json:"shared,omitzero"`
+	Calls   []string `yaml:"calls" json:"calls,omitzero"`
 }
 
 // Services is the services section aicoded generate writes: the functions of other apps this
 // app calls, by app, and the functions it serves to other apps, by name.
 type Services struct {
-	Calls  map[string][]string `yaml:"calls"`
-	Serves map[string]Serve    `yaml:"serves"`
+	Calls  map[string][]string `yaml:"calls" json:"calls,omitzero"`
+	Serves map[string]Serve    `yaml:"serves" json:"serves,omitzero"`
 }
 
 // Serve says who may call one function the app serves: the calling apps, the role rules a
 // viewer must meet, written as in the access section, and whether a calling app may call it with
 // no viewer. A function without role rules takes no call on behalf of a viewer.
 type Serve struct {
-	Callers []string `yaml:"callers"`
-	Require []string `yaml:"require,omitempty"`
-	Apps    bool     `yaml:"apps,omitempty"`
+	Callers []string `yaml:"callers" json:"callers,omitzero"`
+	Require []string `yaml:"require,omitempty" json:"require,omitzero"`
+	Apps    bool     `yaml:"apps,omitempty" json:"apps,omitzero"`
 }
 
 // Data is one source of data the app reaches: sqldb, filestore:<name> or connector:<name>,
 // with the classes of data it holds.
 type Data struct {
-	Source  string   `yaml:"source"`
-	Classes []string `yaml:"classes"`
+	Source  string   `yaml:"source" json:"source,omitzero"`
+	Classes []string `yaml:"classes" json:"classes,omitzero"`
 }
 
 // Email is the address the app sends mail from and the domains it may send to.
 type Email struct {
-	From      string   `yaml:"from"`
-	ToDomains []string `yaml:"to_domains"`
+	From      string   `yaml:"from" json:"from,omitzero"`
+	ToDomains []string `yaml:"to_domains" json:"to_domains,omitzero"`
 }
 
 // SQLDB reports whether the app declares its SQL database.
@@ -151,8 +151,8 @@ func (m Manifest) Roles() []string {
 var (
 	appName   = regexp.MustCompile(`^[a-z][a-z0-9-]{0,61}[a-z0-9]$`)
 	valueName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
-	// lowerName is the shape of the names of data sources, data classes, app types, identity
-	// providers and jobs.
+	// lowerName is the shape of the names of data sources, app types, identity providers and
+	// jobs.
 	lowerName = regexp.MustCompile(`^[a-z][a-z0-9-]{0,62}$`)
 )
 
@@ -430,9 +430,12 @@ func (c *checker) checkData(ds []Data, n *yaml.Node) {
 				"list the classes of data it holds, such as classes: [internal]")
 		}
 		for _, class := range d.Classes {
-			if !lowerName.MatchString(class) {
-				c.add(at, "E-MAN-008", fmt.Sprintf("data class %q of %s is not valid", class, d.Source),
-					"use lower-case letters, digits and dashes, such as internal")
+			switch {
+			case slices.Contains(ReservedClasses, class):
+				c.add(at, "E-MAN-024", fmt.Sprintf("data class %q of %s is not allowed: apps may not hold health, HR or card data", class, d.Source),
+					fmt.Sprintf("remove %s from the classes of %s, and the data from the app", class, d.Source))
+			case !slices.Contains(Classes, class):
+				c.add(at, "E-MAN-008", fmt.Sprintf("data class %q of %s is not %s", class, d.Source, classList), "use "+classList)
 			}
 		}
 	}

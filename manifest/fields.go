@@ -48,6 +48,10 @@ func isGroup(ref string) bool {
 }
 
 func (c *checker) checkAudience(a Audience, n *yaml.Node) {
+	if len(a.Internal) == 0 && len(a.External) == 0 {
+		c.add(c.keyLine("audience"), "E-MAN-024", "the audience lists no one, and an app that no one signs in to is not allowed",
+			"list who uses the app under audience, such as audience: {internal: [everyone]} or {internal: [group:<name>]}")
+	}
 	c.checkRefs(a.Internal, "internal", "group:<name> or everyone", value(n, "internal"), func(ref string) bool {
 		return ref == "everyone" || isGroup(ref)
 	})
@@ -70,14 +74,25 @@ func (c *checker) checkRefs(refs []string, key, forms string, n *yaml.Node, vali
 	}
 }
 
+// ValidHost reports whether host is a host name an app may reach: lower-case, with no scheme,
+// port, path, wildcard or IP address, and not a local name, one whose last label is localhost,
+// local, internal or arpa.
+func ValidHost(host string) bool {
+	return !localHost(host) && len(host) <= 253 && hostName.MatchString(host)
+}
+
+func localHost(host string) bool {
+	return slices.Contains(localTLDs, host[strings.LastIndexByte(host, '.')+1:])
+}
+
 func (c *checker) checkEgress(hosts []string, n *yaml.Node) {
 	seen := map[string]bool{}
 	for i, h := range hosts {
 		at := line(item(n, i))
 		switch {
-		case slices.Contains(localTLDs, h[strings.LastIndexByte(h, '.')+1:]):
+		case localHost(h):
 			c.add(at, "E-MAN-018", fmt.Sprintf("egress entry %q is a local name, which an app may not reach", h), fixEgress)
-		case len(h) > 253 || !hostName.MatchString(h):
+		case !ValidHost(h):
 			c.add(at, "E-MAN-018", fmt.Sprintf("egress entry %q is not a host name", h), fixEgress)
 		case seen[h]:
 			c.add(at, "E-MAN-018", fmt.Sprintf("egress entry %q is listed twice", h), fixEgress)

@@ -43,6 +43,13 @@ Workspaces use these codes:
 - E-DEV-018 and E-DEV-019: the dev UI's token file, and a request to the dev UI from a browser
   that did not log in.
 
+The permission list uses these codes for what its fields may hold:
+
+- E-MAN-008: a data source with no data class, or a class other than `public`, `internal`,
+  `confidential` and `personal`.
+- E-MAN-024: a permission list that is *Not allowed* whatever the app type: an audience that
+  lists no one, or a data source with the class `health`, `hr` or `card`.
+
 Signing in to the platform uses these codes:
 
 - E-CLI-004: no sign-in to the platform, or one that has ended.

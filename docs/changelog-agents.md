@@ -4,6 +4,20 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- The permission list needs an `audience` that lists someone: one left out, or with neither
+  `internal` nor `external` entries, is *Not allowed* (E-MAN-024). `aicoded init` writes
+  `internal: [everyone]` under `audience`, and the examples state it. Give an app without one
+  `audience:` with `internal: [everyone]`, or the groups that use it.
+- Data classes are fixed: `public`, `internal`, `confidential` and `personal`, from the least
+  sensitive to the most. Any other class is E-MAN-008, whose message lists the four, and `health`,
+  `hr` and `card` are *Not allowed* (E-MAN-024). `manifest.Classes`, `manifest.ReservedClasses`
+  and `manifest.ClassRank` give them to runners and the platform.
+- `manifest.Canonical` and `manifest.Hash` give a permission list's canonical form, its JSON with
+  every list sorted and each item once and what is empty left out, and its hash,
+  `sha256:<64 hex digits>`: the order of keys and of list items, and comments, do not change it.
+  The manifest types carry JSON names equal to their YAML keys.
+- `manifest.ValidHost` is the host check of `egress` (E-MAN-018), and `Audience.Admits` reports
+  whether an audience's internal entries admit a member of the given groups.
 - `migrate.Normalize` returns the form of a statement in which two statements that MySQL reads
   alike are the same. The platform compares a draft with the app's published steps in that form,
   so a published statement sent again with other spacing or keyword case is refused with

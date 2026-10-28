@@ -20,6 +20,8 @@ app with no pages.
    <!-- code: examples/people/aicoded.yaml -->
    ```yaml
    app: people
+   audience:
+     internal: [everyone]
    data:
      - source: sqldb
        classes: [internal]
@@ -215,6 +217,8 @@ function it serves:
 <!-- code: examples/contacts/aicoded.yaml -->
 ```yaml
 app: contacts
+audience:
+  internal: [everyone]
 data:
   - source: sqldb
     classes: [internal]

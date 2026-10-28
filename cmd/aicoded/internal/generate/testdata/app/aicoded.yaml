@@ -1,1 +1,3 @@
 app: app
+audience:
+  internal: [everyone]

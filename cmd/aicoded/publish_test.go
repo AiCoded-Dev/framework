@@ -207,7 +207,7 @@ func TestRunPublishBaseChanged(t *testing.T) {
 
 func TestRunPublishRefusesTheRepository(t *testing.T) {
 	p, aicoded := signedIn(t)
-	app := map[string]string{"aicoded.yaml": "app: demo\n", "go.mod": "module demo\n\ngo 1.26.0\n", "main.go": "package main\n\nfunc main() {}\n"}
+	app := map[string]string{"aicoded.yaml": "app: demo\naudience: {internal: [everyone]}\n", "go.mod": "module demo\n\ngo 1.26.0\n", "main.go": "package main\n\nfunc main() {}\n"}
 
 	outside := t.TempDir()
 	gittest.Write(t, outside, app)

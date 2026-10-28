@@ -21,6 +21,15 @@ func write(t *testing.T, src string) string {
 	return path
 }
 
+// a1 returns the permission list of app a1 with src after its first line, and an audience of
+// everyone at its end when src states none.
+func a1(src string) string {
+	if strings.Contains(src, "audience:") {
+		return "app: a1\n" + src + "\n"
+	}
+	return "app: a1\n" + src + "\n" + everyone
+}
+
 func load(t *testing.T, src string) manifest.Manifest {
 	m, err := manifest.Load(write(t, src))
 	require.NoError(t, err)
@@ -28,9 +37,9 @@ func load(t *testing.T, src string) manifest.Manifest {
 }
 
 func TestLoad(t *testing.T) {
-	m, err := manifest.Load(write(t, "app: rooms\nowner: group:ops\nsettings: [greeting]\nsecrets: [api_key]\nmodules: [golang.org/x/text]\n"))
+	m, err := manifest.Load(write(t, "app: rooms\nowner: group:ops\n"+everyone+"settings: [greeting]\nsecrets: [api_key]\nmodules: [golang.org/x/text]\n"))
 	require.NoError(t, err)
-	assert.Equal(t, manifest.Manifest{App: "rooms", Owner: "group:ops", Settings: []string{"greeting"}, Secrets: []string{"api_key"},
+	assert.Equal(t, manifest.Manifest{App: "rooms", Owner: "group:ops", Audience: manifest.Audience{Internal: []string{"everyone"}}, Settings: []string{"greeting"}, Secrets: []string{"api_key"},
 		Modules: []string{"golang.org/x/text"}}, m)
 }
 
@@ -58,21 +67,21 @@ func TestLoadErrors(t *testing.T) {
 }
 
 func TestParse(t *testing.T) {
-	m, err := manifest.Parse("apps/rooms/aicoded.yaml", []byte("app: rooms\n"))
+	m, err := manifest.Parse("apps/rooms/aicoded.yaml", []byte("app: rooms\n"+everyone))
 	require.NoError(t, err)
 	assert.Equal(t, "rooms", m.App)
 
-	_, err = manifest.Parse("apps/rooms/aicoded.yaml", []byte("app: rooms\nsettings: [Bad]\n"))
+	_, err = manifest.Parse("apps/rooms/aicoded.yaml", []byte("app: rooms\nsettings: [Bad]\n"+everyone))
 	require.ErrorContains(t, err, "apps/rooms/aicoded.yaml:2: E-MAN-005")
 }
 
 func TestModuleBesideFramework(t *testing.T) {
-	assert.Equal(t, []string{"aicoded.dev/frameworkx"}, load(t, "app: rooms\nmodules: [aicoded.dev/frameworkx]\n").Modules,
+	assert.Equal(t, []string{"aicoded.dev/frameworkx"}, load(t, "app: rooms\nmodules: [aicoded.dev/frameworkx]\n"+everyone).Modules,
 		"a module whose path only starts with the framework's is a third-party module")
 }
 
 func TestLoadOneDocument(t *testing.T) {
-	assert.Equal(t, "rooms", load(t, "---\napp: rooms\n").App)
+	assert.Equal(t, "rooms", load(t, "---\napp: rooms\n"+everyone).App)
 
 	path := write(t, "app: rooms\n---\napp: other\n")
 	_, err := manifest.Load(path)
@@ -84,11 +93,12 @@ func TestLoadOneDocument(t *testing.T) {
 
 func TestDataAndEmail(t *testing.T) {
 	m := load(t, `app: blocks
+audience: {internal: [everyone]}
 data:
   - source: sqldb
     classes: [internal]
   - source: filestore:invoices
-    classes: [internal, finance]
+    classes: [internal, confidential]
   - source: connector:m365-sharepoint
     classes: [internal]
   - source: connector:crm
@@ -102,7 +112,7 @@ email:
 	assert.Equal(t, []string{"crm", "m365-sharepoint"}, m.Connectors())
 	assert.Equal(t, &manifest.Email{From: "ops@acme.example", ToDomains: []string{"acme.example", "partner.example"}}, m.Email)
 
-	m = load(t, "app: plain\n")
+	m = load(t, "app: plain\n"+everyone)
 	assert.False(t, m.SQLDB())
 	assert.Empty(t, m.Stores())
 	assert.Empty(t, m.Connectors())
@@ -128,7 +138,7 @@ func TestDataAndEmailErrors(t *testing.T) {
 		"app: a1\nemail:\n  from: Ops@acme.example\n  to_domains: [acme.example]\n":                         {2, "E-MAN-009"},
 		"app: a1\nemail:\n  from: ops@acme.example\n  to_domains: [Acme.example]\n":                         {2, "E-MAN-009"},
 	} {
-		path := write(t, yml)
+		path := write(t, yml+everyone)
 		_, err := manifest.Load(path)
 		var e *errs.Error
 		require.ErrorAs(t, err, &e, yml)
@@ -138,6 +148,7 @@ func TestDataAndEmailErrors(t *testing.T) {
 
 func TestRoles(t *testing.T) {
 	m := load(t, `app: notes
+audience: {internal: [everyone]}
 access:
   "/":
     require: ["*"]
@@ -157,14 +168,14 @@ services:
 }
 
 func TestAccess(t *testing.T) {
-	m := load(t, "app: notes\naccess:\n  \"/notes/{id}\":\n    require: [\"staff\"]\n    shared: true\n")
+	m := load(t, a1("access:\n  \"/notes/{id}\":\n    require: [\"staff\"]\n    shared: true"))
 	assert.Equal(t, map[string]manifest.Access{"/notes/{id}": {Require: []string{"staff"}, Shared: true}}, m.Access)
 
 	for src, line := range map[string]string{
 		"access:\n  \"/a\":\n    require: [\"*\"]\n  \"/a/{id}\":\n    require: [\"*\"]\n    guard: true\n    shared: true": "5",
 		`access: {"/a/{id}": {require: ["*"], shared: true, guard: true}}`:                                                  "2",
 	} {
-		_, err := manifest.Parse(manifest.FileName, []byte("app: a1\n"+src+"\n"))
+		_, err := manifest.Parse(manifest.FileName, []byte(a1(src)))
 		var e *errs.Error
 		require.ErrorAs(t, err, &e, src)
 		assert.Equal(t, []string{manifest.FileName + ":" + line, "E-MAN-023", `access "/a/{id}" is both guarded and shared`,
@@ -174,6 +185,7 @@ func TestAccess(t *testing.T) {
 
 func TestServices(t *testing.T) {
 	m := load(t, `app: shop
+audience: {internal: [everyone]}
 services:
   calls:
     "billing": ["GetInvoice", "Ping"]
@@ -187,7 +199,7 @@ services:
 		Calls:  map[string][]string{"billing": {"GetInvoice", "Ping"}},
 		Serves: map[string]manifest.Serve{"Order": {Callers: []string{"reports"}, Require: []string{"*"}, Apps: true}},
 	}, m.Services)
-	assert.Equal(t, manifest.Services{}, load(t, "app: shop\n").Services)
+	assert.Equal(t, manifest.Services{}, load(t, "app: shop\n"+everyone).Services)
 }
 
 func TestValidApp(t *testing.T) {
@@ -258,11 +270,12 @@ ttl: 1d
 	assert.Equal(t, manifest.Audience{Internal: []string{"everyone", "group:hr_leads"}, External: []string{"idp:partners", "magic-link"}}, m.Audience)
 	assert.Equal(t, []string{"api.partner.example", "hooks.slack.com"}, m.Egress)
 	assert.Equal(t, "1d", m.TTL)
-	assert.Equal(t, "group:hr_leads", load(t, "app: a1\nowner: group:hr_leads\n").Owner)
-	assert.Equal(t, "3650d", load(t, "app: a1\nttl: 3650d\n").TTL)
+	assert.Equal(t, "group:hr_leads", load(t, a1("owner: group:hr_leads")).Owner)
+	assert.Equal(t, "3650d", load(t, a1("ttl: 3650d")).TTL)
 
-	empty := "app: a1\nclass:\nowner: ''\naudience:\negress: []\nschedule:\nsize:\nresources: ''\nttl: ~\n"
-	assert.Equal(t, manifest.Manifest{App: "a1", Egress: []string{}}, load(t, empty), "an empty value is not stated")
+	empty := "app: a1\nclass:\nowner: ''\naudience:\n  internal: [everyone]\n  external:\negress: []\nschedule:\nsize:\nresources: ''\nttl: ~\n"
+	assert.Equal(t, manifest.Manifest{App: "a1", Audience: manifest.Audience{Internal: []string{"everyone"}}, Egress: []string{}}, load(t, empty),
+		"an empty value is not stated")
 }
 
 func TestFieldErrors(t *testing.T) {
@@ -317,7 +330,7 @@ func TestFieldErrors(t *testing.T) {
 		"schedule:\n  - job: daily\n    cron: '0 25 * * *'":                           "4 E-MAN-019",
 		"schedule:\n  - {cron: '0 6 * * *', job: a}\n  - {cron: '0 7 * * *', job: a}": "4 E-MAN-019",
 	} {
-		assert.Equal(t, []string{"aicoded.yaml:" + want}, problems(t, "app: a1\n"+src+"\n"), src)
+		assert.Equal(t, []string{"aicoded.yaml:" + want}, problems(t, a1(src)), src)
 	}
 }
 
@@ -339,12 +352,12 @@ func TestFieldMessages(t *testing.T) {
 		"size: XL":                                             "size \"XL\" is not S, M or L",
 		"resources: huge":                                      "resources \"huge\" is not small, medium or large",
 	} {
-		_, err := manifest.Parse(manifest.FileName, []byte("app: a1\n"+src+"\n"))
+		_, err := manifest.Parse(manifest.FileName, []byte(a1(src)))
 		var e *errs.Error
 		require.ErrorAs(t, err, &e, src)
 		assert.Equal(t, want, e.Msg, src)
 	}
-	_, err := manifest.Parse(manifest.FileName, []byte("app: a1\nsize: XL\n"))
+	_, err := manifest.Parse(manifest.FileName, []byte(a1("size: XL")))
 	assert.ErrorContains(t, err, "fix: use S, M or L")
 }
 
@@ -353,15 +366,15 @@ func TestUnknownKeys(t *testing.T) {
 	for src, want := range map[string]struct{ pos, msg, fix string }{
 		"owners: x": {":2", `unknown key "owners" in the top level`,
 			"remove it, or correct its name: the keys there are app, class, owner, audience, data, access, services, egress, email, schedule, settings, secrets, modules, size, resources, ttl"},
-		"audience:\n  inside: [everyone]":                                                            {":3", `unknown key "inside" in audience`, "remove it, or correct its name: the keys there are internal, external"},
-		"data:\n  - source: sqldb\n    classes: [internal]\n    class: x":                            {":5", `unknown key "class" in data`, "remove it, or correct its name: the keys there are source, classes"},
-		"access:\n  \"/\":\n    require: [\"*\"]\n    roles: [x]":                                    {":5", `unknown key "roles" in access "/"`, generated},
-		"services:\n  call: {}":                                                                      {":3", `unknown key "call" in services`, generated},
+		"audience:\n  internal: [everyone]\n  inside: [everyone]":         {":4", `unknown key "inside" in audience`, "remove it, or correct its name: the keys there are internal, external"},
+		"data:\n  - source: sqldb\n    classes: [internal]\n    class: x": {":5", `unknown key "class" in data`, "remove it, or correct its name: the keys there are source, classes"},
+		"access:\n  \"/\":\n    require: [\"*\"]\n    roles: [x]":         {":5", `unknown key "roles" in access "/"`, generated},
+		"services:\n  call: {}": {":3", `unknown key "call" in services`, generated},
 		"services:\n  serves:\n    Get:\n      callers: [shop]\n      apps: true\n      caller: [x]": {":7", `unknown key "caller" in services.serves "Get"`, generated},
 		"email:\n  from: a@acme.example\n  to_domains: [acme.example]\n  cc: x":                      {":5", `unknown key "cc" in email`, "remove it, or correct its name: the keys there are from, to_domains"},
 		"schedule:\n  - cron: '0 6 * * *'\n    job: daily\n    at: x":                                {":5", `unknown key "at" in schedule`, "remove it, or correct its name: the keys there are cron, job"},
 	} {
-		_, err := manifest.Parse(manifest.FileName, []byte("app: a1\n"+src+"\n"))
+		_, err := manifest.Parse(manifest.FileName, []byte(a1(src)))
 		var e *errs.Error
 		require.ErrorAs(t, err, &e, src)
 		assert.Equal(t, manifest.FileName+want.pos+" E-MAN-014", e.Pos+" "+e.Code, src)
@@ -371,17 +384,18 @@ func TestUnknownKeys(t *testing.T) {
 }
 
 func TestEveryProblemAtOnce(t *testing.T) {
-	src := "app: a1\ncolour: red\nsettings: [x]\negress:\n  - localhost\nsecrets: [k]\nsize: S\nresources: small\nttl: 6m\n"
+	src := "app: a1\ncolour: red\nsettings: [x]\negress:\n  - localhost\nsecrets: [k]\nsize: S\nresources: small\nttl: 6m\n" + everyone
 	assert.Equal(t, []string{"aicoded.yaml:2 E-MAN-014", "aicoded.yaml:5 E-MAN-018", "aicoded.yaml:9 E-MAN-022"}, problems(t, src))
 	_, err := manifest.Parse(manifest.FileName, []byte(src))
 	assert.Equal(t, "E-MAN-014", errs.Code(err))
 
-	assert.Equal(t, []string{"aicoded.yaml:1 E-MAN-014", "aicoded.yaml:1 E-MAN-004", "aicoded.yaml:1 E-MAN-014", "aicoded.yaml:1 E-MAN-020", "aicoded.yaml:1 E-MAN-022"},
+	assert.Equal(t, []string{"aicoded.yaml:1 E-MAN-014", "aicoded.yaml:1 E-MAN-004", "aicoded.yaml:1 E-MAN-014", "aicoded.yaml:1 E-MAN-024",
+		"aicoded.yaml:1 E-MAN-020", "aicoded.yaml:1 E-MAN-022"},
 		problems(t, "{ttl: 6m, audience: {others: []}, size: XL, colour: red, app: A}\n"), "on one line, in the order of the fields")
 	assert.Equal(t, []string{"aicoded.yaml:2 E-MAN-014", "aicoded.yaml:3 E-MAN-003"},
 		problems(t, "app: a1\ncolour: red\nsettings: x\nsize: XL\n"), "a shape that does not decode stops the checks")
 	assert.Equal(t, []string{"aicoded.yaml:2 E-MAN-005", "aicoded.yaml:3 E-MAN-005"},
-		problems(t, "app: a1\nsettings: [Bad]\nsecrets: [Bad]\n"))
+		problems(t, "app: a1\nsettings: [Bad]\nsecrets: [Bad]\n"+everyone))
 	assert.Equal(t, []string{"aicoded.yaml:2 E-MAN-003"}, problems(t, "app: a1\nsettings: [\n"))
 }
 

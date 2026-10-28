@@ -34,7 +34,8 @@ aicoded init hello
 `aicoded init` creates the folder `hello` with:
 
 - `go.mod`, which requires the framework;
-- `aicoded.yaml`, the permission list, with `app: hello`;
+- `aicoded.yaml`, the permission list, with `app: hello` and an audience of everyone in the
+  company, `internal: [everyone]`;
 - `main.go`;
 - `pages/index.html`, the app's one page;
 - `AGENTS.md`, the rules for AI assistants that build the app.

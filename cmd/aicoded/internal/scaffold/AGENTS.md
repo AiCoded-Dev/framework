@@ -39,8 +39,8 @@ not for changing the framework itself. Follow them in every change.
 - Store `auth.Viewer(ctx).Subject` as a record's owner, never the viewer's name.
 - Give every mail an `IdempotencyKey` that names what it is about, such as `invoice-42-reminder`:
   a retry within 24 hours sends nothing again. Send it after the data it reports is committed.
-- Declare in `aicoded.yaml` every data source, mail address, setting, secret and third-party
-  module the app uses.
+- Declare in `aicoded.yaml` who uses the app (`audience`) and every data source, mail address,
+  setting, secret and third-party module it uses.
 - Open the database and file stores once, in `OnStart`. Use the context of the request or call
   being served for everything else.
 - Schema changes go in `.aicoded/migration.sql`; never commit it; `aicoded publish` sends it.

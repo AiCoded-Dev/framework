@@ -157,11 +157,11 @@ func TestGenerateKeepsModules(t *testing.T) {
 	dir := copyApp(t, "app")
 	manifest := filepath.Join(dir, "aicoded.yaml")
 	modules := "# third-party modules, by hand\nmodules:\n  - golang.org/x/text # collation\n  - github.com/google/uuid\n"
-	require.NoError(t, os.WriteFile(manifest, []byte("app: app\n"+modules+"access: {}\n"), 0o600))
+	require.NoError(t, os.WriteFile(manifest, []byte("app: app\naudience: {internal: [everyone]}\n"+modules+"access: {}\n"), 0o600))
 	require.NoError(t, Generate(dir))
 	after, err := os.ReadFile(manifest)
 	require.NoError(t, err)
-	assert.Contains(t, string(after), "app: app\n"+modules+accessMarker+"\naccess:\n", "modules: stays byte for byte")
+	assert.Contains(t, string(after), "app: app\naudience: {internal: [everyone]}\n"+modules+accessMarker+"\naccess:\n", "modules: stays byte for byte")
 }
 
 func TestGenerateWithoutManifest(t *testing.T) {

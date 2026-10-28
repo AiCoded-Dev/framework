@@ -65,7 +65,7 @@ func TestSnapshotNeverReadThroughLinks(t *testing.T) {
 	err := Generate(dir)
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "E-RPC-005", "the snapshot out of the app is never read")
-	assert.Equal(t, "# billing app\napp: billing\n", read(t, dir, "aicoded.yaml"))
+	assert.Equal(t, "# billing app\napp: billing\naudience: {internal: [everyone]}\n", read(t, dir, "aicoded.yaml"))
 	assert.Equal(t, "{", read(t, outside, "rpc.json"))
 }
 

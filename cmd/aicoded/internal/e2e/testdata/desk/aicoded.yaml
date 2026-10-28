@@ -1,4 +1,6 @@
 app: desk
+audience:
+  internal: [everyone]
 email:
   from: app@desk.test
   to_domains: [desk.test]

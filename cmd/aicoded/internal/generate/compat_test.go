@@ -92,7 +92,7 @@ func TestCheckHeld(t *testing.T) {
 	apps := map[string]string{}
 	for _, app := range []string{"billing", "desk", "shop"} {
 		apps[app] = filepath.Join(root, app)
-		writeFile(t, filepath.Join(apps[app], "aicoded.yaml"), "app: "+app+"\n")
+		writeFile(t, filepath.Join(apps[app], "aicoded.yaml"), "app: "+app+"\naudience: {internal: [everyone]}\n")
 	}
 	writeFile(t, filepath.Join(apps["desk"], ".aicoded", "services", "billing.json"), invoiceSnapshot)
 	held := filepath.Join(apps["shop"], ".aicoded", "services", "billing.json")

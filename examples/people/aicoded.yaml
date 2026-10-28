@@ -1,4 +1,6 @@
 app: people
+audience:
+  internal: [everyone]
 data:
   - source: sqldb
     classes: [internal]

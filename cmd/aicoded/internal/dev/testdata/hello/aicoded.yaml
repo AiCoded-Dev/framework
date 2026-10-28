@@ -1,4 +1,6 @@
 app: hello
+audience:
+  internal: [everyone]
 settings: [greeting]
 secrets: [token]
 # access is written by aicoded generate from <ssr:access>; do not edit it

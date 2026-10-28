@@ -43,7 +43,7 @@ func TestDiffFullList(t *testing.T) {
 
 func TestDiff(t *testing.T) {
 	parse := func(src string) manifest.Manifest {
-		m, err := manifest.Parse(manifest.FileName, []byte("app: a1\n"+src+"\n"))
+		m, err := manifest.Parse(manifest.FileName, []byte(a1(src)))
 		require.NoError(t, err, src)
 		return m
 	}
@@ -53,7 +53,7 @@ func TestDiff(t *testing.T) {
 	}{
 		"a new order":         {"settings: [a, b]", "settings: [b, a]", nil},
 		"a repeated class":    {"data: [{source: sqldb, classes: [internal, internal]}]", "data: [{source: sqldb, classes: [internal]}]", nil},
-		"empty is not stated": {"", "audience: {internal: []}\negress: []\naccess: {}\nservices: {calls: {inventory: []}}", nil},
+		"empty is not stated": {"", "audience: {internal: [everyone], external: []}\negress: []\naccess: {}\nservices: {calls: {inventory: []}}", nil},
 		"a host":              {"", "egress: [api.partner.example]", []manifest.Change{{Field: "egress", After: "api.partner.example"}}},
 		"a guard": {`access: {"/rooms/{id}": {require: [staff]}}`, `access: {"/rooms/{id}": {require: [staff], guard: true}}`,
 			[]manifest.Change{{Field: "access", Key: "/rooms/{id}", Before: "require staff", After: "require staff; guard"}}},
@@ -62,8 +62,8 @@ func TestDiff(t *testing.T) {
 			[]manifest.Change{{Field: "access", Key: "/rooms/{id}", Before: "require staff; shared; calls Star", After: "require staff; guard; calls Star"}}},
 		"a cron": {"schedule: [{cron: '0 6 * * *', job: daily}]", "schedule: [{cron: '0 7 * * *', job: daily}]",
 			[]manifest.Change{{Field: "schedule", Key: "daily", Before: "0 6 * * *", After: "0 7 * * *"}}},
-		"a data class": {"data: [{source: sqldb, classes: [internal]}]", "data: [{source: sqldb, classes: [internal, finance]}]",
-			[]manifest.Change{{Field: "data", Key: "sqldb", Before: "internal", After: "finance, internal"}}},
+		"a data class": {"data: [{source: sqldb, classes: [internal]}]", "data: [{source: sqldb, classes: [internal, personal]}]",
+			[]manifest.Change{{Field: "data", Key: "sqldb", Before: "internal", After: "internal, personal"}}},
 		"no email": {"email: {from: ops@acme.example, to_domains: [partner.example, acme.example]}", "", []manifest.Change{
 			{Field: "email.from", Before: "ops@acme.example"},
 			{Field: "email.to_domains", Before: "acme.example"},
@@ -73,7 +73,7 @@ func TestDiff(t *testing.T) {
 			[]manifest.Change{{Field: "services.calls", Key: "inventory", After: "Count"}}},
 		"a size": {"size: S", "size: M", []manifest.Change{{Field: "size", Before: "S", After: "M"}}},
 		"entries removed": {"services: {calls: {billing: [Pay]}}\nschedule: [{cron: '0 6 * * *', job: daily}]",
-			"audience: {external: [magic-link]}\nmodules: [golang.org/x/text]", []manifest.Change{
+			"audience: {internal: [everyone], external: [magic-link]}\nmodules: [golang.org/x/text]", []manifest.Change{
 				{Field: "audience.external", After: "magic-link"},
 				{Field: "services.calls", Key: "billing", Before: "Pay"},
 				{Field: "schedule", Key: "daily", Before: "0 6 * * *"},

@@ -36,7 +36,7 @@ func rpcApp(t *testing.T, src string) string {
 	t.Helper()
 	dir := t.TempDir()
 	write(t, dir, "go.mod", "module example.com/billing\n\ngo 1.26.0\n")
-	write(t, dir, "aicoded.yaml", "# billing app\napp: billing\n")
+	write(t, dir, "aicoded.yaml", "# billing app\napp: billing\naudience: {internal: [everyone]}\n")
 	write(t, dir, "rpc/billing.go", src)
 	return dir
 }
@@ -104,7 +104,7 @@ func TestGenerateCallee(t *testing.T) {
 	dir := rpcApp(t, billingRPC)
 	require.NoError(t, Generate(dir))
 
-	assert.Equal(t, "# billing app\napp: billing\n"+accessMarker+"\naccess: {}\n"+servicesMarker+`
+	assert.Equal(t, "# billing app\napp: billing\naudience: {internal: [everyone]}\n"+accessMarker+"\naccess: {}\n"+servicesMarker+`
 services:
   serves:
     "Get":
@@ -166,7 +166,7 @@ func TestGenerateWithoutFunctions(t *testing.T) {
 	write(t, dir, "rpc/billing.go", "package rpc\n")
 	require.NoError(t, Generate(dir))
 	assert.NoFileExists(t, filepath.Join(dir, "rpc", "server_gen.go"))
-	assert.Equal(t, "# billing app\napp: billing\n"+accessMarker+"\naccess: {}\n"+servicesMarker+"\nservices: {}\n",
+	assert.Equal(t, "# billing app\napp: billing\naudience: {internal: [everyone]}\n"+accessMarker+"\naccess: {}\n"+servicesMarker+"\nservices: {}\n",
 		read(t, dir, "aicoded.yaml"), "the section stays, empty, once it was written")
 	assert.Empty(t, snapshot(t, dir).Methods)
 
@@ -180,19 +180,19 @@ func TestGenerateRefusesBrokenSnapshot(t *testing.T) {
 	write(t, dir, ".aicoded/rpc.json", "{")
 	assert.Equal(t, "E-RPC-005", errs.Code(Generate(dir)))
 	assert.NoFileExists(t, filepath.Join(dir, "rpc", "server_gen.go"), "nothing is written")
-	assert.Equal(t, "# billing app\napp: billing\n", read(t, dir, "aicoded.yaml"))
+	assert.Equal(t, "# billing app\napp: billing\naudience: {internal: [everyone]}\n", read(t, dir, "aicoded.yaml"))
 	assert.Equal(t, "{", read(t, dir, ".aicoded/rpc.json"))
 }
 
 func TestGenerateSplicesServices(t *testing.T) {
 	dir := rpcApp(t, billingRPC)
-	write(t, dir, "aicoded.yaml", "# billing app\napp: billing # the name\nservices:\n  serves: {}\n\n# secrets below\nsecrets: [api_key]\n")
+	write(t, dir, "aicoded.yaml", "# billing app\napp: billing # the name\naudience: {internal: [everyone]}\nservices:\n  serves: {}\n\n# secrets below\nsecrets: [api_key]\n")
 	require.NoError(t, Generate(dir))
 	section, err := servicesSection(manifest.Services{Serves: map[string]manifest.Serve{
 		"Get": {Callers: []string{"shop"}, Require: []string{"admin|editor"}, Apps: true},
 	}})
 	require.NoError(t, err)
-	assert.Equal(t, "# billing app\napp: billing # the name\n"+string(section)+"\n# secrets below\nsecrets: [api_key]\n"+
+	assert.Equal(t, "# billing app\napp: billing # the name\naudience: {internal: [everyone]}\n"+string(section)+"\n# secrets below\nsecrets: [api_key]\n"+
 		accessMarker+"\naccess: {}\n", read(t, dir, "aicoded.yaml"))
 }
 
@@ -225,7 +225,7 @@ func shopApp(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	write(t, dir, "go.mod", "module example.com/shop\n\ngo 1.26.0\n")
-	write(t, dir, "aicoded.yaml", "app: shop\n")
+	write(t, dir, "aicoded.yaml", "app: shop\naudience: {internal: [everyone]}\n")
 	write(t, dir, ".aicoded/services/billing.json", string(heldBilling.Marshal()))
 	write(t, dir, "main.go", `package main
 
@@ -246,7 +246,7 @@ func TestGenerateCaller(t *testing.T) {
 	dir := shopApp(t)
 	require.NoError(t, Generate(dir))
 	assert.Contains(t, read(t, dir, "services/billing/client_gen.go"), "func Get(ctx context.Context, in GetIn) (GetOut, error) {")
-	assert.Equal(t, "app: shop\n"+accessMarker+"\naccess: {}\n"+servicesMarker+`
+	assert.Equal(t, "app: shop\naudience: {internal: [everyone]}\n"+accessMarker+"\naccess: {}\n"+servicesMarker+`
 services:
   calls:
     "billing": ["Get"]
@@ -255,7 +255,7 @@ services:
 	require.NoError(t, os.Remove(filepath.Join(dir, ".aicoded", "services", "billing.json")))
 	require.NoError(t, Generate(dir))
 	assert.NoDirExists(t, filepath.Join(dir, "services"), "the client of an app no longer held is removed with its emptied folders")
-	assert.Equal(t, "app: shop\n"+accessMarker+"\naccess: {}\n"+servicesMarker+"\nservices: {}\n", read(t, dir, "aicoded.yaml"))
+	assert.Equal(t, "app: shop\naudience: {internal: [everyone]}\n"+accessMarker+"\naccess: {}\n"+servicesMarker+"\nservices: {}\n", read(t, dir, "aicoded.yaml"))
 }
 
 func TestGenerateKeepsFoldersWithOtherFiles(t *testing.T) {

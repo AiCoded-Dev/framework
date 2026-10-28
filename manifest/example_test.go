@@ -9,7 +9,7 @@ import (
 // Parse checks a permission list and returns its fields. A list with problems returns every
 // problem, each with a code and its position.
 func ExampleParse() {
-	m, err := manifest.Parse(manifest.FileName, []byte("app: rooms\negress: [api.partner.example]\n"))
+	m, err := manifest.Parse(manifest.FileName, []byte("app: rooms\naudience: {internal: [everyone]}\negress: [api.partner.example]\n"))
 	if err != nil {
 		fmt.Println(err)
 		return

@@ -72,7 +72,7 @@ func fill(ctx context.Context, dir, name string, fw Framework) error {
 		".gitignore":       gitignore,
 		"AGENTS.md":        agents,
 		"go.mod":           goMod(name, fw),
-		manifest.FileName:  "app: " + name + "\n",
+		manifest.FileName:  "app: " + name + "\naudience:\n  internal: [everyone]\n",
 		"main.go":          fmt.Sprintf(mainGo, name),
 		"pages/index.html": fmt.Sprintf(indexHTML, name, name),
 	}

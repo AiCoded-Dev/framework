@@ -32,9 +32,9 @@ import (
 )
 
 const (
-	helloYAML = "app: hello\nsettings: [greeting]\nsecrets: [token]\naccess: {}\n"
-	mailYAML  = "app: hello\nemail: {from: hello@acme.example, to_domains: [acme.example]}\naccess: {}\n"
-	sqlYAML   = "app: notes\ndata:\n  - {source: sqldb, classes: [internal]}\naccess: {}\n"
+	helloYAML = "app: hello\naudience: {internal: [everyone]}\nsettings: [greeting]\nsecrets: [token]\naccess: {}\n"
+	mailYAML  = "app: hello\naudience: {internal: [everyone]}\nemail: {from: hello@acme.example, to_domains: [acme.example]}\naccess: {}\n"
+	sqlYAML   = "app: notes\naudience: {internal: [everyone]}\ndata:\n  - {source: sqldb, classes: [internal]}\naccess: {}\n"
 )
 
 // binDir holds the app the tests build, once per test binary.

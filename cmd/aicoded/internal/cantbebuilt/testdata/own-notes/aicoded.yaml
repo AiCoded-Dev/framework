@@ -1,4 +1,6 @@
 app: notes
+audience:
+  internal: [everyone]
 data:
   - source: sqldb
     classes: [internal]

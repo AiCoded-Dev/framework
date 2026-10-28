@@ -87,7 +87,7 @@ func calc(t *testing.T, root, name string, fails bool) string {
 	if fails {
 		sum = "5"
 	}
-	write(t, filepath.Join(dir, "aicoded.yaml"), "app: "+name+"\n"+
+	write(t, filepath.Join(dir, "aicoded.yaml"), "app: "+name+"\naudience: {internal: [everyone]}\n"+
 		"# access is written by aicoded generate from <ssr:access>; do not edit it\naccess: {}\n")
 	write(t, filepath.Join(dir, "go.mod"), "module "+name+"\n\ngo 1.26.0\n")
 	write(t, filepath.Join(dir, "main.go"), "package main\n\nfunc main() {}\n")
@@ -321,7 +321,7 @@ func TestCheckFrozenDrift(t *testing.T) {
 	requireGo(t)
 	root := tempRoot(t)
 	dir := filepath.Join(root, "shop")
-	write(t, filepath.Join(dir, "aicoded.yaml"), "app: shop\n")
+	write(t, filepath.Join(dir, "aicoded.yaml"), "app: shop\naudience: {internal: [everyone]}\n")
 	write(t, filepath.Join(dir, "go.mod"), "module shop\n\ngo 1.26.0\n")
 	write(t, filepath.Join(dir, "pages", "index.html"), `<!doctype html><html><head><ssr:access role="*"/><title>Shop</title></head><body></body></html>`)
 	require.NoError(t, generate.Generate(dir))
