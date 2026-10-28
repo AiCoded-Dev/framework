@@ -100,7 +100,11 @@ func writeRelease(b *strings.Builder, r platform.Release) {
 		if appType, _, _ := strings.Cut(r.AppType, "@"); appType != "" {
 			by = " by app type " + appType
 		}
-		fmt.Fprintf(b, "  Pre-approved%s: %s.\n", by, progress(r))
+		if r.State == "replaced" {
+			fmt.Fprintf(b, "  Pre-approved%s.\n  Released: %s.\n", by, progress(r))
+		} else {
+			fmt.Fprintf(b, "  Pre-approved%s: %s.\n", by, progress(r))
+		}
 	case "R2":
 		b.WriteString("  Needs approval:\n")
 		for _, q := range r.Reasons {
@@ -110,7 +114,7 @@ func writeRelease(b *strings.Builder, r platform.Release) {
 			}
 			fmt.Fprintf(b, "    %s\n", line)
 		}
-		if r.Live || r.State == "released" {
+		if r.Live || r.State == "released" || r.State == "replaced" {
 			fmt.Fprintf(b, "  Released: %s.\n", progress(r))
 		} else {
 			b.WriteString("  An approver must approve it before it goes live.\n")
@@ -127,6 +131,8 @@ func progress(r platform.Release) string {
 		return "live"
 	case r.State == "released":
 		return "being released"
+	case r.State == "replaced":
+		return "replaced by a newer release"
 	case r.State == "due":
 		return "going live"
 	case r.State != "":

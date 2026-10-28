@@ -8,10 +8,11 @@ Changes to the API that AI assistants build apps with. Newest first.
   `internal-tool`). `aicoded publish` and `aicoded status` print the decision before the status
   line: `Pre-approved by app type <type>: going live.` (then `live`), `Needs approval:` with a
   line for each reason and `An approver must approve it before it goes live.` (then
-  `Released: live.`), `Not allowed: <reason>.`, `Release failed: <reason>.` or
-  `Not released: <reason>.`. `aicoded status --json` and `release_status` carry it as `release`,
-  with `tier` (`R1`, `R2` or `R3`), `app_type` (`<name>@<version>`), `reasons`, `state` (`due`,
-  `waiting`, `released`, `failed`, `refused` or `superseded`), `reason` and `live`; a platform
+  `Released: live.`), `Released: replaced by a newer release.`, `Not allowed: <reason>.`,
+  `Release failed: <reason>.` or `Not released: <reason>.`. `aicoded status --json` and
+  `release_status` carry it as `release`, with `tier` (`R1`, `R2` or `R3`), `app_type`
+  (`<name>@<version>`), `reasons`, `state` (`due`, `waiting`, `released`, `failed`, `replaced`,
+  `refused` or `superseded`), `reason` and `live`; a platform
   that decides nothing leaves it out. The new guide `guides/app-types` explains app types, the decision, the
   group map and the source registry.
 - E-GATE-039 to E-GATE-046 are notes of the new step `decision` that say why a release *Needs
@@ -19,7 +20,7 @@ Changes to the API that AI assistants build apps with. Newest first.
   service (042) beyond the app type, people outside the company (043), a destructive schema
   change (044), data that reaches mail in a new way (045), and a page open to more people than in
   the live version (046). Each page's fix says what an approver sees and how to stay
-  *Pre-approved*.
+  *Pre-approved*. E-GATE-044 names the step as `<publish>#<index>` and never quotes its statement.
 - E-REL-019 (an app type the organisation does not have), E-REL-020 (a group or a role its group
   map does not have) and E-REL-021 (a source its source registry classes `health`, `hr` or
   `card`) fail a publish when it is decided, and refuse a release the same way. Only the audience

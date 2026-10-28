@@ -28,23 +28,28 @@ func TestWriteTextChecks(t *testing.T) {
 func TestWriteTextDecision(t *testing.T) {
 	reasons := []problem.Problem{
 		{Code: "E-GATE-041", Pos: "aicoded.yaml:9", Message: "mail to partner.example, which the app type internal-tool does not allow"},
-		{Code: "E-GATE-044", Pos: ".aicoded/migration.sql:1", Message: "a destructive schema change"},
+		{Code: "E-GATE-044", Pos: ".aicoded/migration.sql", Message: "a destructive schema change: step pub_x#1, which production has not run"},
 	}
 	for name, tc := range map[string]struct {
 		release *platform.Release
 		want    string
 	}{
-		"none":    {nil, ""},
-		"R1 due":  {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "due"}, "  Pre-approved by app type internal-tool: going live.\n"},
-		"R1 live": {&platform.Release{Tier: "R1", AppType: "finance@3", State: "released", Live: true}, "  Pre-approved by app type finance: live.\n"},
-		"R1 sent": {&platform.Release{Tier: "R1", AppType: "finance@3", State: "released"}, "  Pre-approved by app type finance: being released.\n"},
+		"none":       {nil, ""},
+		"R1 due":     {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "due"}, "  Pre-approved by app type internal-tool: going live.\n"},
+		"R1 live":    {&platform.Release{Tier: "R1", AppType: "finance@3", State: "released", Live: true}, "  Pre-approved by app type finance: live.\n"},
+		"R1 pending": {&platform.Release{Tier: "R1", AppType: "finance@3", State: "released"}, "  Pre-approved by app type finance: being released.\n"},
+		"R1 replaced": {&platform.Release{Tier: "R1", AppType: "finance@3", State: "replaced"}, "  Pre-approved by app type finance.\n" +
+			"  Released: replaced by a newer release.\n"},
 		"R2 waits": {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons, State: "waiting"}, "  Needs approval:\n" +
 			"    E-GATE-041: mail to partner.example, which the app type internal-tool does not allow\n" +
-			"    E-GATE-044: a destructive schema change\n" +
+			"    E-GATE-044: a destructive schema change: step pub_x#1, which production has not run\n" +
 			"  An approver must approve it before it goes live.\n"},
 		"R2 live": {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons[:1], State: "released", Live: true}, "  Needs approval:\n" +
 			"    E-GATE-041: mail to partner.example, which the app type internal-tool does not allow\n" +
 			"  Released: live.\n"},
+		"R2 replaced": {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons[:1], State: "replaced"}, "  Needs approval:\n" +
+			"    E-GATE-041: mail to partner.example, which the app type internal-tool does not allow\n" +
+			"  Released: replaced by a newer release.\n"},
 		"refused":      {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "refused", Reason: "E-REL-017: outside services are not run yet."}, "  Not released: E-REL-017: outside services are not run yet.\n"},
 		"refused bare": {&platform.Release{Tier: "R1", State: "refused"}, "  Not released.\n"},
 		"no type":      {&platform.Release{Tier: "R1", State: "due"}, "  Pre-approved: going live.\n"},
