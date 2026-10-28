@@ -79,7 +79,14 @@ func writeProblem(b *strings.Builder, prefix, app string, q problem.Problem) {
 // writeRelease writes the decision r on releasing a publish, in the words people see: the tier
 // with its app type or its reasons, and what became of the release.
 func writeRelease(b *strings.Builder, r platform.Release) {
+	if r.Tier == "R3" {
+		b.WriteString("  Not allowed" + reason(r.Reason) + ".\n")
+		return
+	}
 	switch r.State {
+	case "failed":
+		b.WriteString("  Release failed" + reason(r.Reason) + ".\n")
+		return
 	case "refused":
 		b.WriteString("  Not released" + reason(r.Reason) + ".\n")
 		return
@@ -87,10 +94,13 @@ func writeRelease(b *strings.Builder, r platform.Release) {
 		b.WriteString("  Not released: a newer publish of the app came after it.\n")
 		return
 	}
-	appType, _, _ := strings.Cut(r.AppType, "@")
 	switch r.Tier {
 	case "R1":
-		fmt.Fprintf(b, "  Pre-approved by app type %s: %s.\n", appType, progress(r))
+		by := ""
+		if appType, _, _ := strings.Cut(r.AppType, "@"); appType != "" {
+			by = " by app type " + appType
+		}
+		fmt.Fprintf(b, "  Pre-approved%s: %s.\n", by, progress(r))
 	case "R2":
 		b.WriteString("  Needs approval:\n")
 		for _, q := range r.Reasons {
@@ -101,12 +111,10 @@ func writeRelease(b *strings.Builder, r platform.Release) {
 			fmt.Fprintf(b, "    %s\n", line)
 		}
 		if r.Live || r.State == "released" {
-			fmt.Fprintf(b, "  Approved: %s.\n", progress(r))
+			fmt.Fprintf(b, "  Released: %s.\n", progress(r))
 		} else {
 			b.WriteString("  An approver must approve it before it goes live.\n")
 		}
-	case "R3":
-		b.WriteString("  Not allowed" + reason(r.Reason) + ".\n")
 	default:
 		fmt.Fprintf(b, "  release: %s, %s\n", r.Tier, r.State)
 	}

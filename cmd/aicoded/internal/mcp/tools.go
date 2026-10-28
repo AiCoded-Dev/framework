@@ -310,7 +310,7 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 		s.publish)
 	tool(srv, &mcpsdk.Tool{Name: "release_status", Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &yes},
 		InputSchema: releaseStatusSchema,
-		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, the problems with their code, file:line and fix, and the notes, in the same shape, which do not stop the publish; release, the decision on releasing a publish that passed: its tier (R1 Pre-approved, R2 Needs approval, R3 Not allowed), the app type, the reasons it needs approval, its state (due, waiting, released, refused or superseded) and whether it is live; and draft, what became of the app's schema-change draft, .aicoded/migration.sql: sent with a publish that has not ended, settled (deleted once that publish passed, or kept, as draft_note says), or none."},
+		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, the problems with their code, file:line and fix, and the notes, in the same shape, which do not stop the publish; release, the decision on releasing a publish that passed: its tier (R1 Pre-approved, R2 Needs approval, R3 Not allowed), the app type, the reasons it needs approval, its state (due, waiting, released, failed, refused or superseded) and whether it is live; and draft, what became of the app's schema-change draft, .aicoded/migration.sql: sent with a publish that has not ended, settled (deleted once that publish passed, or kept, as draft_note says), or none."},
 		s.releaseStatus)
 }
 

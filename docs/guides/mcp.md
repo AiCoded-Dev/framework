@@ -70,8 +70,9 @@ The server tells the assistant to start with `howto guides/overview`, and to wor
 4. When something fails, `what_broke` lists the failed apps, error log lines and failed spans.
 5. Only when you ask it to publish an app, it commits everything, calls `publish` with the app
    and a summary of the change, then calls `release_status` with the id until the publish ends,
-   tells you the outcome, with whether it goes live, and fixes its problems as it fixes those of `check`. When it is not
-   signed in (E-CLI-004), it asks you to run `aicoded login`: there is no tool for signing in.
+   tells you the outcome, with whether it goes live, and fixes its problems as it fixes those of
+   `check`. When it is not signed in (E-CLI-004), it asks you to run `aicoded login`: there is no
+   tool for signing in.
 
 It writes `app`, `owner`, `data`, `email`, `settings` and `secrets` in the permission list by
 hand, and never edits what `aicoded generate` writes: the `access` and `services` sections, every

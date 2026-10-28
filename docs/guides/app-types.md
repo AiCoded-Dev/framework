@@ -61,7 +61,7 @@ line:
 
 A publish that passes but is not released says `Not released:` and why, such as a newer publish
 of the app that came after it, or what the platform does not run yet, such as outside services
-(E-REL-017).
+(E-REL-017). One whose release did not go live where the app runs says `Release failed:` and why.
 
 ### What always needs approval
 

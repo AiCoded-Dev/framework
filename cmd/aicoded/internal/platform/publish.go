@@ -176,9 +176,10 @@ type Release struct {
 	AppType string `json:"app_type"`
 	// Reasons say why the publish needs approval, empty for R1.
 	Reasons []problem.Problem `json:"reasons"`
-	// State is due, waiting, released, refused or superseded.
+	// State is due, waiting, released, failed (its release failed where the app runs), refused
+	// or superseded.
 	State string `json:"state"`
-	// Reason says why the release was refused.
+	// Reason says why the release was refused or failed.
 	Reason string `json:"reason,omitempty"`
 	// Live is whether the release went live.
 	Live bool `json:"live"`

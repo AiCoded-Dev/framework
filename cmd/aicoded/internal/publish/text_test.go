@@ -44,10 +44,13 @@ func TestWriteTextDecision(t *testing.T) {
 			"  An approver must approve it before it goes live.\n"},
 		"R2 live": {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons[:1], State: "released", Live: true}, "  Needs approval:\n" +
 			"    E-GATE-041: mail to partner.example, which the app type internal-tool does not allow\n" +
-			"  Approved: live.\n"},
+			"  Released: live.\n"},
 		"refused":      {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "refused", Reason: "E-REL-017: outside services are not run yet."}, "  Not released: E-REL-017: outside services are not run yet.\n"},
 		"refused bare": {&platform.Release{Tier: "R1", State: "refused"}, "  Not released.\n"},
-		"R3":           {&platform.Release{Tier: "R3", AppType: "internal-tool@builtin", Reason: "E-REL-021: the source sqldb holds hr data"}, "  Not allowed: E-REL-021: the source sqldb holds hr data.\n"},
+		"no type":      {&platform.Release{Tier: "R1", State: "due"}, "  Pre-approved: going live.\n"},
+		"failed":       {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "failed", Reason: "the app did not start"}, "  Release failed: the app did not start.\n"},
+		"failed bare":  {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons, State: "failed"}, "  Release failed.\n"},
+		"R3":           {&platform.Release{Tier: "R3", AppType: "internal-tool@builtin", State: "refused", Reason: "E-REL-021: the source sqldb holds hr data"}, "  Not allowed: E-REL-021: the source sqldb holds hr data.\n"},
 		"superseded":   {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons, State: "superseded"}, "  Not released: a newer publish of the app came after it.\n"},
 	} {
 		var b strings.Builder

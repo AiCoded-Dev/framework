@@ -7,11 +7,12 @@ Changes to the API that AI assistants build apps with. Newest first.
 - A publish that passes is decided on at once, against its app type (`class`; left out, it is
   `internal-tool`). `aicoded publish` and `aicoded status` print the decision before the status
   line: `Pre-approved by app type <type>: going live.` (then `live`), `Needs approval:` with a
-  line for each reason and `An approver must approve it before it goes live.`, or
+  line for each reason and `An approver must approve it before it goes live.` (then
+  `Released: live.`), `Not allowed: <reason>.`, `Release failed: <reason>.` or
   `Not released: <reason>.`. `aicoded status --json` and `release_status` carry it as `release`,
   with `tier` (`R1`, `R2` or `R3`), `app_type` (`<name>@<version>`), `reasons`, `state` (`due`,
-  `waiting`, `released`, `refused` or `superseded`), `reason` and `live`; a platform that decides
-  nothing leaves it out. The new guide `guides/app-types` explains app types, the decision, the
+  `waiting`, `released`, `failed`, `refused` or `superseded`), `reason` and `live`; a platform
+  that decides nothing leaves it out. The new guide `guides/app-types` explains app types, the decision, the
   group map and the source registry.
 - E-GATE-039 to E-GATE-046 are notes of the new step `decision` that say why a release *Needs
   approval*: an audience group (039), a data class (040), a mail domain (041) or an outside
