@@ -130,7 +130,8 @@ Notes on where data goes, which never stop a check or a publish, use these codes
 Releasing uses these codes, each a release that the platform refuses before anything runs:
 
 - E-REL-001: a publish that did not pass the delivery pipeline, has no built app, or has a
-  permission list that the platform cannot read.
+  permission list that the platform cannot read; and a rollback to a release that never went live
+  or is live already.
 - E-REL-002: an organisation that the platform's operator has not placed on a server.
 - E-REL-003: an app built with a framework older than v0.6.0.
 - E-REL-004, E-REL-007 and E-REL-017: what the platform does not run yet: people outside the

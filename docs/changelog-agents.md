@@ -22,7 +22,11 @@ Changes to the API that AI assistants build apps with. Newest first.
   *Pre-approved*.
 - E-REL-019 (an app type the organisation does not have), E-REL-020 (a group or a role its group
   map does not have) and E-REL-021 (a source its source registry classes `health`, `hr` or
-  `card`) fail a publish when it is decided, and refuse a release the same way.
+  `card`) fail a publish when it is decided, and refuse a release the same way. Only the audience
+  entry `everyone` needs no mapping; a role `everyone` or `group:everyone` must be mapped.
+- E-REL-001 also refuses a rollback to a release that never went live, or that is live already.
+- The delivery pipeline's step `migrations` (L9) lists each destructive statement of the draft as
+  an E-MIG-003 note at its line, and passes; the publish then *Needs approval* (E-GATE-044).
 - E-REL-004 now refuses only `audience.external`: groups in `audience.internal` are released.
   E-RUN-006 is now the page of a signed-in person whom the app's audience does not name. On the
   platform, `auth.Viewer` gives the group-map names the person is in, of those the app uses, as
