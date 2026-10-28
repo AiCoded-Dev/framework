@@ -59,9 +59,10 @@ On the platform, `Subject` is `<iss>|<sub>`: the issuer of the company login and
 id there, such as `https://login.microsoftonline.com/<tenant>/v2.0|AAAAAAAAAAAAAAAAAAAAAIkzqFVr`.
 It stays the same on every visit, and no two people, or two company logins, share one. Keep it
 as it is, as text: never parse it or build it from parts. `Name` is the name the company login
-shows. The platform gives no groups or roles yet, so `Groups` and `Roles` are empty there, and a
-page opens there only when every access rule on its path is `role="*"`. On your computer,
-`Subject` is the persona's name.
+shows. `Roles` and `Groups` both hold the names of the organisation's group map that the person
+is in, of those the app's audience and access rules use: a role `hr` is membership of the group
+map's `hr`, which the permission list writes as `group:hr`. They are checked again every 15
+minutes; see [app types](app-types.md). On your computer, `Subject` is the persona's name.
 
 ## Guards
 

@@ -1,14 +1,15 @@
-# E-REL-004: audience not allowed yet
+# E-REL-004: people outside the company not served yet
 
-For now the platform releases only apps that every person of the organisation may use: the
-permission list must say `audience.internal: [everyone]`, with no other entry and no `external`
-audience. For an organisation that signs in with its own company login, everyone is every
-account that login signs in; for an organisation of invited people, its invited people. Apps for
-a group or for people outside the company come later. Nothing was released.
+For now the platform releases only apps used by people of the organisation: those that
+`audience.internal` names, as `everyone` or `group:<name>`. People outside the company, whom
+`audience.external` names, such as `magic-link` or `idp:<name>`, cannot sign in to an app yet, so
+the platform refuses a release whose permission list has an `external` entry. Nothing was
+released.
 
 ```yaml
 audience:
-  internal: [everyone]
+  internal: [group:hotel-staff]
+  external: []
 ```
 
-**Fix:** set `audience: {internal: [everyone]}` in aicoded.yaml, with no group and no external entry, commit, and publish again
+**Fix:** remove the entries of audience.external from aicoded.yaml, commit, and publish again

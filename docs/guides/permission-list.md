@@ -52,7 +52,8 @@ or left empty, is not stated.
   and not ending with a dash (E-MAN-004). It gives the app its address in `aicoded dev`, and other
   apps, `dev.yaml` and the `aicoded mcp` tools name the app by it.
 - `class` names the app type the app belongs to, which security defines: lower-case letters,
-  digits and dashes, starting with a letter, such as `internal-tool` (E-MAN-015).
+  digits and dashes, starting with a letter, such as `internal-tool` (E-MAN-015). Left out, the
+  app is an Internal tool, `internal-tool`; see [app types](app-types.md).
 - `owner` is the group of the company that owns the app, `group:<name>`, such as
   `group:hr-leads`. A group's name is lower-case letters, digits, dots, dashes and underscores,
   starting and ending with a letter or digit (E-MAN-016).
@@ -63,7 +64,8 @@ or left empty, is not stated.
     a link sent to their email.
 
   An audience that lists no one is *Not allowed* (E-MAN-024): every app is used by people who
-  sign in. `aicoded init` starts with `internal: [everyone]`.
+  sign in. `aicoded init` starts with `internal: [everyone]`. On the platform, each group is a
+  name of the organisation's group map (E-REL-020).
 - `data` lists the sources of data the app reaches, each with the `classes` of data it holds:
   at least one of `public`, `internal`, `confidential` and `personal`, from the least sensitive
   to the most (E-MAN-008). The app type sets the highest class its apps may hold. Health, HR and
@@ -179,17 +181,21 @@ without reading its code.
 
 - `data`, `email`, `settings`, `secrets`, `modules`, `access` and `services` are enforced as
   above, by the runner, `aicoded check` and the delivery pipeline.
-- In this version the platform records the other fields, `class`, `owner`, `audience`, `egress`,
-  `schedule`, `size`, `resources` and `ttl`, and shows each change to the permission list in the
-  app's change record.
-- Holding the app to them comes later, with app types, limits and production. Until the platform
-  runs outside services and schedules, a release to production refuses a permission list with
-  `egress` hosts or `schedule` jobs (E-REL-017).
+- `class`, `audience`, `data`, `email.to_domains` and `egress` are compared with the app type
+  when a publish passes, and decide whether its release is *Pre-approved* or *Needs approval*;
+  see [app types](app-types.md). The runner lets in only the people `audience` names, through
+  the organisation's group map.
+- The platform records the other fields, `owner`, `schedule`, `size`, `resources` and `ttl`,
+  and shows each change to the permission list in the app's change record. Holding the app to
+  them comes later, with limits. Until the platform runs outside services and schedules, a
+  release to production refuses a permission list with `egress` hosts or `schedule` jobs
+  (E-REL-017), and until outside people can sign in, one with `audience.external` (E-REL-004).
 
 ## See also
 
 - [Access](access.md): the rules the `access` section records.
 - [Calls between apps](calls-between-apps.md): the `services` section.
+- [App types](app-types.md): what the app type allows, and what needs approval.
 - [Publishing](publishing.md): the change record of each publish.
 - [people/aicoded.yaml](../../examples/people/aicoded.yaml),
   [contacts/aicoded.yaml](../../examples/contacts/aicoded.yaml) and

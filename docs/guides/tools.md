@@ -257,7 +257,8 @@ record. [Publishing](publishing.md) tells the whole story.
   `aicoded status` does after `--no-wait`. See [Schema changes](schema-changes.md).
 - It prints `Published <app> at <commit> as <id>.`, then waits for the outcome, asking every 3
   seconds for up to 35 minutes, and prints the steps, the problems as `aicoded check` prints
-  them, the notes, which do not stop a publish, and the status. It exits with 0 when the publish
+  them, the notes, which do not stop a publish, the decision on releasing a publish that passed,
+  and the status. It exits with 0 when the publish
   passed and 1 otherwise. Ctrl-C stops the waiting, not the publish. `--no-wait` returns at once.
 - When the platform refuses the sign-in for want of an app's scopes, or does not accept its
   token, as when this computer's clock is off, it refreshes the sign-in once and asks again. That
@@ -267,7 +268,7 @@ record. [Publishing](publishing.md) tells the whole story.
 ## aicoded status
 
 `aicoded status [--json] <id>` prints a publish as the end of `aicoded publish` does, at once:
-its steps, its problems, its notes and its status, `queued`, `running`, `passed`, `failed`,
+its steps, its problems, its notes, the decision on releasing it and its status, `queued`, `running`, `passed`, `failed`,
 `refused` or `error`. `--json` prints the publish as JSON. It exits with 1 when the publish
 failed, was refused or ended in error. An id is `pub_` and 26 lowercase letters and digits; another shape
 exits with 2. An id the platform does not know in your organisation is E-PUB-013, a publish of

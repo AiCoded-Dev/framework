@@ -34,7 +34,7 @@ The MCP setup page of the dev UI shows the commands for Claude Code and Codex, a
 | `mail_get` | one message from `mail_list` |
 | `mail_receive` | delivers a test message to an app's inbox, as if it had arrived by mail |
 | `publish` | does what `aicoded publish --no-wait` does for an app, with a summary of the change, and returns the publish's id, app and commit, whether it created the app, and what to do next |
-| `release_status` | shows a publish by its id, as `aicoded status --json` does: its status, steps, problems and notes |
+| `release_status` | shows a publish by its id, as `aicoded status --json` does: its status, steps, problems and notes, and the decision on releasing it |
 
 All but `app_create`, `check`, `preview`, `mail_receive` and `publish` only read. `publish`,
 `release_status`, and `logs`, `traces` and `trace` with `env` set to `preview` or `production`,
@@ -70,7 +70,7 @@ The server tells the assistant to start with `howto guides/overview`, and to wor
 4. When something fails, `what_broke` lists the failed apps, error log lines and failed spans.
 5. Only when you ask it to publish an app, it commits everything, calls `publish` with the app
    and a summary of the change, then calls `release_status` with the id until the publish ends,
-   tells you the outcome, and fixes its problems as it fixes those of `check`. When it is not
+   tells you the outcome, with whether it goes live, and fixes its problems as it fixes those of `check`. When it is not
    signed in (E-CLI-004), it asks you to run `aicoded login`: there is no tool for signing in.
 
 It writes `app`, `owner`, `data`, `email`, `settings` and `secrets` in the permission list by

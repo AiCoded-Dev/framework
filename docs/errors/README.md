@@ -97,6 +97,10 @@ Publishing uses these codes:
   the checks read.
 - E-GATE-038 is a note, which does not stop a publish: a page the simulated attacks did not
   reach.
+- E-GATE-039 to E-GATE-046 are notes, which do not stop a publish, that say why its release
+  *Needs approval*: an audience group, a data class, a mail domain or an outside service that the
+  app type does not allow, people outside the company, a destructive schema change, data that
+  reaches mail in a new way, and a page open to more people than before.
 
 Schema changes use these codes:
 
@@ -129,8 +133,8 @@ Releasing uses these codes, each a release that the platform refuses before anyt
   permission list that the platform cannot read.
 - E-REL-002: an organisation that the platform's operator has not placed on a server.
 - E-REL-003: an app built with a framework older than v0.6.0.
-- E-REL-004, E-REL-007 and E-REL-017: what the platform does not run yet: an audience other than
-  everyone in the organisation, calls between apps, and outside services and schedules.
+- E-REL-004, E-REL-007 and E-REL-017: what the platform does not run yet: people outside the
+  company, calls between apps, and outside services and schedules.
 - E-REL-005: settings, which the platform does not keep yet, and secrets where the target of the
   organisation's server does not keep them.
 - E-REL-006, E-REL-008 and E-REL-013: an `email.from` address in a domain that the organisation
@@ -143,6 +147,9 @@ Releasing uses these codes, each a release that the platform refuses before anyt
   server.
 - E-REL-012: an app whose name, or whose organisation's slug, cannot be a label of its host.
 - E-REL-015: an app that the platform's operator archived.
+- E-REL-019 to E-REL-021: an app type that the organisation does not have, a group or a role
+  that its group map does not have, and a data source that its source registry marks *Not
+  allowed*. Each also fails a publish when the platform decides on its release.
 
 E-REL-009 refuses the operator's purge of a publish that a live or pending release runs.
 
@@ -159,7 +166,7 @@ messages are being sent.
 E-RUN-005 refuses an app's call to a building block the runner does not provide; none on the
 platform today.
 
-E-RUN-006 is the page a runner shows, to everyone, for an app whose audience it cannot check.
+E-RUN-006 is the page a runner shows to a signed-in person whom the app's audience does not name.
 
 E-RUN-009 is the reason a runner reports for a release whose grants it cannot tell the resources
 of: a grant of a kind it does not know, or two of one kind.

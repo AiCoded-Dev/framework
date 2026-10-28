@@ -48,8 +48,19 @@ type Publish struct {
 	Steps            []Step    `json:"steps"`
 	Problems         []Problem `json:"problems"`
 	// Notes are left out when empty, as an older platform does.
-	Notes  []Problem `json:"notes,omitempty"`
-	Record int       `json:"record,omitempty"`
+	Notes   []Problem `json:"notes,omitempty"`
+	Record  int       `json:"record,omitempty"`
+	Release *Release  `json:"release,omitempty"`
+}
+
+// Release is the decision on releasing a publish and what became of it.
+type Release struct {
+	Tier    string    `json:"tier"`
+	AppType string    `json:"app_type"`
+	Reasons []Problem `json:"reasons"`
+	State   string    `json:"state"`
+	Reason  string    `json:"reason,omitempty"`
+	Live    bool      `json:"live"`
 }
 
 // Parent is the publish before another.

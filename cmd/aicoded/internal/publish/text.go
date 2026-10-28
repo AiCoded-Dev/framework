@@ -12,8 +12,8 @@ import (
 
 // WriteText writes the publish as aicoded publish and aicoded status print it: what was
 // published, each step with its outcome, the problems as aicoded check prints them, each note
-// after "note: ", which checks ran, the change record, and a last line with the status, which
-// counts the problems of a failed publish.
+// after "note: ", which checks ran, the change record, the decision on releasing it, and a last
+// line with the status, which counts the problems of a failed publish.
 func WriteText(w io.Writer, p platform.Publish) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "publish %s of %s at %s", p.ID, p.App, short(p.SHA))
@@ -51,6 +51,9 @@ func WriteText(w io.Writer, p platform.Publish) error {
 	if p.Record > 0 {
 		fmt.Fprintf(&b, "  change record %d\n", p.Record)
 	}
+	if p.Release != nil {
+		writeRelease(&b, *p.Release)
+	}
 	b.WriteString(p.Status)
 	switch {
 	case p.Status == "failed":
@@ -71,4 +74,64 @@ func WriteText(w io.Writer, p platform.Publish) error {
 func writeProblem(b *strings.Builder, prefix, app string, q problem.Problem) {
 	q.App = app
 	fmt.Fprintf(b, "  %s%s\n", prefix, strings.ReplaceAll(q.String(), "\n", "\n  "))
+}
+
+// writeRelease writes the decision r on releasing a publish, in the words people see: the tier
+// with its app type or its reasons, and what became of the release.
+func writeRelease(b *strings.Builder, r platform.Release) {
+	switch r.State {
+	case "refused":
+		b.WriteString("  Not released" + reason(r.Reason) + ".\n")
+		return
+	case "superseded":
+		b.WriteString("  Not released: a newer publish of the app came after it.\n")
+		return
+	}
+	appType, _, _ := strings.Cut(r.AppType, "@")
+	switch r.Tier {
+	case "R1":
+		fmt.Fprintf(b, "  Pre-approved by app type %s: %s.\n", appType, progress(r))
+	case "R2":
+		b.WriteString("  Needs approval:\n")
+		for _, q := range r.Reasons {
+			line := strings.ReplaceAll(q.Message, "\n", " ")
+			if q.Code != "" {
+				line = q.Code + ": " + line
+			}
+			fmt.Fprintf(b, "    %s\n", line)
+		}
+		if r.Live || r.State == "released" {
+			fmt.Fprintf(b, "  Approved: %s.\n", progress(r))
+		} else {
+			b.WriteString("  An approver must approve it before it goes live.\n")
+		}
+	case "R3":
+		b.WriteString("  Not allowed" + reason(r.Reason) + ".\n")
+	default:
+		fmt.Fprintf(b, "  release: %s, %s\n", r.Tier, r.State)
+	}
+}
+
+// progress says how far the release of r got.
+func progress(r platform.Release) string {
+	switch {
+	case r.Live:
+		return "live"
+	case r.State == "released":
+		return "being released"
+	case r.State == "due":
+		return "going live"
+	case r.State != "":
+		return r.State
+	default:
+		return "not released yet"
+	}
+}
+
+// reason returns ": " and the text of a reason without its last full stop, or "" for none.
+func reason(text string) string {
+	if text == "" {
+		return ""
+	}
+	return ": " + strings.TrimSuffix(text, ".")
 }

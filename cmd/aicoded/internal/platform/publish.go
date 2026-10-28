@@ -164,6 +164,24 @@ type Publish struct {
 	Notes []problem.Problem `json:"notes"`
 	// Record is the number of the publish's change record, once it is written.
 	Record int64 `json:"record,omitempty"`
+	// Release is the platform's decision on releasing a publish that passed, once it is made.
+	Release *Release `json:"release,omitempty"`
+}
+
+// Release is the decision on releasing a publish to production and what became of it.
+type Release struct {
+	// Tier is R1 (Pre-approved), R2 (Needs approval) or R3 (Not allowed).
+	Tier string `json:"tier"`
+	// AppType is the app type that decided, as <name>@<version>, such as internal-tool@builtin.
+	AppType string `json:"app_type"`
+	// Reasons say why the publish needs approval, empty for R1.
+	Reasons []problem.Problem `json:"reasons"`
+	// State is due, waiting, released, refused or superseded.
+	State string `json:"state"`
+	// Reason says why the release was refused.
+	Reason string `json:"reason,omitempty"`
+	// Live is whether the release went live.
+	Live bool `json:"live"`
 }
 
 // Parent is the publish before another.
@@ -352,6 +370,10 @@ func (p *Publish) clean() {
 	p.Steps = steps
 	p.Problems, p.Notes = cleanProblems(p.Problems), cleanProblems(p.Notes)
 	p.Record = max(p.Record, 0)
+	if r := p.Release; r != nil {
+		r.Tier, r.AppType, r.State, r.Reason = clean(r.Tier, 8), clean(r.AppType, 128), clean(r.State, 32), clean(r.Reason, 500)
+		r.Reasons = cleanProblems(r.Reasons)
+	}
 }
 
 // cleanProblems returns the problems with every text fit to print and the docs link of each code.

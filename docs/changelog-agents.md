@@ -4,6 +4,29 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- A publish that passes is decided on at once, against its app type (`class`; left out, it is
+  `internal-tool`). `aicoded publish` and `aicoded status` print the decision before the status
+  line: `Pre-approved by app type <type>: going live.` (then `live`), `Needs approval:` with a
+  line for each reason and `An approver must approve it before it goes live.`, or
+  `Not released: <reason>.`. `aicoded status --json` and `release_status` carry it as `release`,
+  with `tier` (`R1`, `R2` or `R3`), `app_type` (`<name>@<version>`), `reasons`, `state` (`due`,
+  `waiting`, `released`, `refused` or `superseded`), `reason` and `live`; a platform that decides
+  nothing leaves it out. The new guide `guides/app-types` explains app types, the decision, the
+  group map and the source registry.
+- E-GATE-039 to E-GATE-046 are notes of the new step `decision` that say why a release *Needs
+  approval*: an audience group (039), a data class (040), a mail domain (041) or an outside
+  service (042) beyond the app type, people outside the company (043), a destructive schema
+  change (044), data that reaches mail in a new way (045), and a page open to more people than in
+  the live version (046). Each page's fix says what an approver sees and how to stay
+  *Pre-approved*.
+- E-REL-019 (an app type the organisation does not have), E-REL-020 (a group or a role its group
+  map does not have) and E-REL-021 (a source its source registry classes `health`, `hr` or
+  `card`) fail a publish when it is decided, and refuse a release the same way.
+- E-REL-004 now refuses only `audience.external`: groups in `audience.internal` are released.
+  E-RUN-006 is now the page of a signed-in person whom the app's audience does not name. On the
+  platform, `auth.Viewer` gives the group-map names the person is in, of those the app uses, as
+  both `Roles` and `Groups`, checked again every 15 minutes.
+
 - A draft may hold destructive schema changes in a fixed set of forms: `DROP TABLE [IF EXISTS]`,
   `DROP INDEX … ON`, `RENAME TABLE`, `TRUNCATE [TABLE]`, and `ALTER TABLE` with `DROP [COLUMN]`,
   `DROP INDEX`/`KEY`/`FOREIGN KEY`/`PRIMARY KEY`/`CHECK`/`CONSTRAINT`, `MODIFY`, `CHANGE`,

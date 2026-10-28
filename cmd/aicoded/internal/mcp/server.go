@@ -36,7 +36,8 @@ Work in this loop:
 5. Only when the person asks to publish an app: commit everything in its git repository, then
    call publish with the app and a summary of the change. It sends the commit to the platform's
    delivery pipeline and returns a publish id at once. Call release_status with that id until
-   the status is passed, failed, refused or error, tell the person the outcome, and fix its
+   the status is passed, failed, refused or error, tell the person the outcome, with the release
+   of a publish that passed (Pre-approved, Needs approval and why, or Not released), and fix its
    problems as you fix check's. On E-CLI-004, ask the person to run aicoded login.
 aicoded.yaml is the app's permission list: write app, owner, data, email, settings, secrets
 and modules by hand.

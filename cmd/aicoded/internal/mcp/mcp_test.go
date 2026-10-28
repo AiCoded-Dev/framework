@@ -559,6 +559,12 @@ func TestPublishTools(t *testing.T) {
 	assert.Equal(t, "all-but-l7", got.Checks)
 	assert.Equal(t, []problem.Problem{{Code: "E-GATE-025", Pos: "main.go:3", Message: "//nolint silences a check", Fix: "remove it",
 		Docs: "https://aicoded.dev/docs/errors/E-GATE-025"}}, got.Notes, "in the shape of problems")
+	p.Answers(platformtest.Publish{Status: "passed", Release: &platformtest.Release{Tier: "R2", AppType: "internal-tool@builtin", State: "waiting",
+		Reasons: []platformtest.Problem{{Code: "E-GATE-043", Pos: "aicoded.yaml:4", Message: "people outside the company may use it"}}}})
+	got = result[platform.Publish](t, callTool("release_status", map[string]any{"id": out.ID}))
+	assert.Equal(t, &platform.Release{Tier: "R2", AppType: "internal-tool@builtin", State: "waiting",
+		Reasons: []problem.Problem{{Code: "E-GATE-043", Pos: "aicoded.yaml:4", Message: "people outside the company may use it",
+			Docs: "https://aicoded.dev/docs/errors/E-GATE-043"}}}, got.Release, "the decision on releasing it")
 	p.Answers(platformtest.Passed())
 
 	res := callTool("publish", map[string]any{"app": "demo", "summary": "Again"})

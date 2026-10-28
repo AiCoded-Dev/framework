@@ -168,12 +168,13 @@ security checks, which the change record names too.
 | `licences` | L3 Known weaknesses | reads the licence of each module with go-licenses | nothing |
 | `sbom` | L3 Known weaknesses | lists the app's modules with Syft, as an SBOM | nothing |
 | `capabilities` | L2 Stays in its limits | follows the app's calls to the network, files and other capabilities with capslock | nothing |
-| `migrations` | L9 Safe data changes | checks the draft of schema changes that the publish carried, `.aicoded/migration.sql`, with the rules of `aicoded check`, and refuses a commit that holds the draft | E-MIG-001 to E-MIG-003 and E-MIG-006 |
+| `migrations` | L9 Safe data changes | checks the draft of schema changes that the publish carried, `.aicoded/migration.sql`, with the rules of `aicoded check`, and refuses a commit that holds the draft; a destructive change is the note E-MIG-003 | E-MIG-001, E-MIG-002 and E-MIG-006 |
 | `data` | L8 Stays in its limits | notes the data that may reach the app's mail, as `aicoded check` finds it, and each data class that the permission list adds | nothing |
 | `build` | L1 Approved parts only | builds the app's program | a build that fails |
 | `tests` | L1 Approved parts only | runs the tests with `-race` | a failing test (E-CHK-004) |
 | `attacks` | L7 Simulated attacks | starts the app it built and attacks it: requests without a session or a role, another viewer on each guarded page, and markup in every field | E-GATE-029 to E-GATE-034 and E-GATE-036 |
 | `personal-data` | L7 Simulated attacks | searches what the app wrote during the attacks, its output and its spans, for what was entered in its forms | E-GATE-035 and E-GATE-037 |
+| `decision` | L10 Approval if needed | decides on the release against the app type: *Pre-approved* or *Needs approval*, with each reason a note (E-GATE-039 to E-GATE-046); see [app types](app-types.md) | an app type, a group or a role that the organisation does not have, or data its source registry does not allow (E-REL-019 to E-REL-021), and a permission list that the platform's rules refuse whatever the app's framework version, such as a data class outside the four (E-MAN-008) or E-MAN-024 |
 
 `checkout` and `modules` come first, and a problem in either skips the rest. The steps from
 `check` to `data` run no code of the app, and they run whatever one of them finds, so one
@@ -186,7 +187,7 @@ and `migrations` still run; and `data`, which takes its notes from `check`, is `
 `.aicoded/migration.sql:<line>`. `build` and `tests` run only when all of them passed.
 `attacks` and `personal-data` run only when `tests` passed, on one run of the app, and
 `personal-data` is skipped when `attacks` ended in `error` or the app did not start
-(E-GATE-036).
+(E-GATE-036). `decision` comes last, only when every other step passed.
 [Simulated attacks](simulated-attacks.md) says what each attack does and how to let the attacks
 reach every page. A step that runs out of time, memory or disk is E-GATE-012, and tests that stop
 the checks, or the go command that runs them (E-CHK-008), are E-GATE-028. A finding of a check
@@ -211,6 +212,10 @@ change record counts the notes, and security sees them, so fix them when you can
   block;
 - E-GATE-025: a directive silences a check;
 - E-GATE-038: a page the simulated attacks did not reach, which the change record lists too;
+- E-GATE-039 to E-GATE-046: why the release *Needs approval*, as [app types](app-types.md)
+  explains;
+- E-MIG-003: a destructive schema change, which makes the release *Needs approval* and stops the
+  app briefly while it is applied;
 - E-DATA-001: data from the app's database, its files, its inbox or a secret that the app's mail
   may send;
 - E-DATA-002: a data class that the permission list adds, which the app did not have before.
@@ -240,8 +245,32 @@ tests failed or one to a platform that does not run the attacks yet, says
 Any other publish says `partial checks: not every security check ran; the steps above say which`,
 such as one that has not ended, one that a step before `lint` stopped, or one whose `check` found
 Go that does not compile; an older platform that runs only `aicoded check` and the tests says it
-of every publish. Approvals come later, so a publish that passes is checked and recorded, and
-runs in production only once the platform releases it.
+of every publish.
+
+## Going live
+
+A publish that passes is decided on at once, against its app type, and the end of
+`aicoded publish` and `aicoded status` says what happens next, before the status line:
+
+```text
+  change record 8
+  Pre-approved by app type internal-tool: going live.
+passed
+```
+
+- `Pre-approved by app type <type>: going live.`: the platform releases it on its own, and the
+  line says `live` once the new version serves.
+- `Needs approval:`, then a line for each reason, then
+  `An approver must approve it before it goes live.`: the permission list asks for more than the
+  app type allows, or the release holds a change that always needs an approver, such as a
+  destructive schema change.
+- `Not released:` and why: a newer publish of the app came after it, or the platform refused the
+  release, such as one with outside services (E-REL-017).
+
+`aicoded status --json` and the `release_status` tool give the same in `release`: its `tier`
+(`R1` for *Pre-approved*, `R2` for *Needs approval*), its `app_type`, its `reasons`, its `state`
+(`due`, `waiting`, `released`, `refused` or `superseded`), the `reason` of a refusal and whether
+it is `live`. [App types](app-types.md) tells how the platform decides.
 
 ## When a release stops at a schema change
 
@@ -298,9 +327,10 @@ says which sections are enforced today, and which the platform only records for 
 - E-GATE-000 and E-GATE-013 to E-GATE-020: what the security checks find in the code, its
   history and its modules.
 - E-GATE-029 to E-GATE-037: what the simulated attacks find in the running app.
-- E-MIG-001 to E-MIG-006: the draft of schema changes, and the migrations a release applies.
-- E-GATE-021 to E-GATE-025, E-GATE-038, E-DATA-001 and E-DATA-002: notes, which do not stop a
-  publish.
+- E-MIG-001 to E-MIG-007: the draft of schema changes, and the migrations a release applies.
+- E-REL-019 to E-REL-021: a publish that fails when the platform decides on its release.
+- E-GATE-021 to E-GATE-025, E-GATE-038 to E-GATE-046, E-MIG-003, E-DATA-001 and E-DATA-002:
+  notes, which do not stop a publish.
 
 `aicoded explain <code>` prints the page of each, as does the `howto` tool of `aicoded mcp`.
 
@@ -322,6 +352,7 @@ running an app in production without the platform, `aicoded run`, comes later.
 - [Tools](tools.md): `aicoded publish`, `aicoded status`, `aicoded check` and `aicoded login`.
 - [MCP](mcp.md): the `publish` and `release_status` tools.
 - [Simulated attacks](simulated-attacks.md): what the `attacks` and `personal-data` steps do.
+- [App types](app-types.md): what goes live on its own and what needs approval.
 - [Schema changes](schema-changes.md): the draft that a publish carries.
 - [Project structure](project-structure.md): which files are yours and which are generated.
 - [The error catalogue](../errors/README.md): every code with its page.
