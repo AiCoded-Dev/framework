@@ -69,11 +69,13 @@ const (
 //
 // It refuses, before running anything, a list whose steps are not numbered from 1 or whose
 // hash does not match its statement (E-MIG-004), a list the journal does not agree with
-// (E-MIG-004, see Extends) and a step to run that Classify refuses. A step that fails stops
-// Apply with E-MIG-005; the journal keeps the steps that ran. So does a step that ran but whose row
-// could not be added to the journal, even on a new connection; its message says it ran but was not
-// recorded.
-func Apply(ctx context.Context, db *sql.DB, steps []Step) (applied []Step, err error) {
+// (E-MIG-004, see Extends), a step to run that Classify refuses, and, unless destructive is
+// true, a step to run that Classify finds Destructive (E-MIG-003). A caller passes true only for
+// an approved release while the app is stopped, or for a database of test data. A step that fails
+// stops Apply with E-MIG-005; the journal keeps the steps that ran. So does a step that ran but
+// whose row could not be added to the journal, even on a new connection; its message says it ran
+// but was not recorded.
+func Apply(ctx context.Context, db *sql.DB, steps []Step, destructive bool) (applied []Step, err error) {
 	if err := valid(steps); err != nil {
 		return nil, err
 	}
@@ -98,10 +100,14 @@ func Apply(ctx context.Context, db *sql.DB, steps []Step) (applied []Step, err e
 	}
 	todo := steps[len(ran):]
 	for _, st := range todo {
-		if _, err := Classify(st.Statement); err != nil {
+		kind, what, err := classify(st.Statement)
+		if err != nil {
 			var coded *errs.Error
 			errors.As(err, &coded)
 			return nil, errs.New(coded.Code, "step "+st.name()+": "+coded.Msg, coded.Fix)
+		}
+		if kind == Destructive && !destructive {
+			return nil, errs.New("E-MIG-003", "step "+st.name()+": "+what+", and this release may not apply a destructive change", destructiveFix)
 		}
 	}
 	for _, st := range todo {

@@ -15,7 +15,11 @@ func ExampleCheck() {
 }
 
 func ExampleClassify() {
-	_, err := migrate.Classify("ALTER TABLE notes DROP COLUMN author")
+	kind, err := migrate.Classify("ALTER TABLE notes DROP COLUMN author")
+	fmt.Println(kind == migrate.Destructive, err)
+	_, err = migrate.Classify("DROP DATABASE notes")
 	fmt.Println(errs.Code(err))
-	// Output: E-MIG-003
+	// Output:
+	// true <nil>
+	// E-MIG-002
 }

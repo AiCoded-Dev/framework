@@ -104,14 +104,15 @@ Schema changes use these codes:
   committed to git, or sent with a publish that has not ended.
 - E-MIG-002: a statement that a schema change may not hold, such as one that changes data, an
   executable comment, `DELIMITER` or a name with a database in front.
-- E-MIG-003: a destructive statement: `DROP`, `RENAME`, `TRUNCATE`, or `ALTER TABLE` with a
-  `DROP`, `MODIFY`, `CHANGE`, `RENAME` or `ALTER` clause.
+- E-MIG-003: a note on a destructive statement, such as `DROP TABLE` or `ALTER TABLE … DROP
+  COLUMN`: the release needs an approval, and the app stops briefly while it is applied.
 - E-MIG-004: migrations that differ from those the database ran, and on the platform a release
   of a publish whose schema changes were rejected after a step failed on production data.
 - E-MIG-005: a step that failed while it was applied; on the platform, the schema changes after
   a step that MySQL refused on production data are rejected, and a step that could not finish is
   tried again with the next release.
 - E-MIG-006: a draft while the permission list declares no `sqldb`.
+- E-MIG-007: a rollback to a release before a destructive schema change that ran in production.
 
 E-LINT-013 refuses a schema change in app code, which goes in the draft, and SQL in app code that
 names `aicoded_migrations`, the platform's journal of migrations.

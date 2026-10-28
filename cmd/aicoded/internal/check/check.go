@@ -213,7 +213,8 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 	}
 	steps := []func() ([]*errs.Error, error){
 		func() ([]*errs.Error, error) {
-			_, err := draft.Check(a.Dir, m)
+			_, notes, err := draft.Check(a.Dir, m)
+			out.Notes = append(out.Notes, problem.FromErrs(a.Name, notes)...)
 			return codedErrs(err)
 		},
 		func() ([]*errs.Error, error) { return goBuild(ctx, a.Dir) },
@@ -227,9 +228,7 @@ func checkApp(ctx context.Context, a workspace.App, names map[string]string, opt
 			if err == nil {
 				s := surface.Of(m, r.Writes)
 				out.Surface = &s
-				if len(r.Notes) > 0 {
-					out.Notes = problem.FromErrs(a.Name, r.Notes)
-				}
+				out.Notes = append(out.Notes, problem.FromErrs(a.Name, r.Notes)...)
 			}
 			return r.Problems, err
 		},

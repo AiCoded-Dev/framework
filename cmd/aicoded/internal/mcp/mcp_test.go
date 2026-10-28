@@ -629,10 +629,10 @@ func TestPublishToolShowsTheDraftsRefusal(t *testing.T) {
 	p.SignIn(t)
 	dir := gittest.DatabaseApp(t, "demo", "CREATE TABLE notes (v TEXT);\n")
 	cs := connect(t, dir, io.Discard)
-	p.RefuseUpload(http.StatusBadRequest, "invalid_request", "E-MIG-003")
+	p.RefuseUpload(http.StatusBadRequest, "invalid_request", "E-MIG-002")
 	res := call(t, cs, "publish", map[string]any{"app": "demo", "summary": "First"})
 	assert.True(t, res.IsError)
-	assert.Contains(t, text(res), "E-MIG-003: refused as the test asked\n  fix: make the change expand-only")
+	assert.Contains(t, text(res), "E-MIG-002: refused as the test asked\n  fix: write only CREATE TABLE")
 }
 
 func TestTelemetryToolsReadThePlatform(t *testing.T) {

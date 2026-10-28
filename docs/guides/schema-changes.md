@@ -41,7 +41,7 @@ published. An app of yours never commits its draft. The rules:
   larger change over two publishes (E-MIG-001).
 - It is a plain file inside the app's folder, not a folder or a link out of it (E-MIG-001).
 - The app's permission list declares `sqldb` (E-MIG-006).
-- It holds only the statements below (E-MIG-002, E-MIG-003).
+- It holds only the statements below (E-MIG-002). A destructive one is a note (E-MIG-003).
 
 `aicoded check`, `aicoded dev` and the delivery pipeline check the draft with the same rules, so
 a draft that passes `aicoded check` passes the security check *Safe data changes*. Each problem
@@ -52,7 +52,7 @@ table is empty, as `fill` in room-maintenance does.
 
 ## The statements a draft may hold
 
-A draft only adds to the schema of the app's own database:
+A draft changes only the schema of the app's own tables. Most changes only add to it:
 
 - `CREATE TABLE <name> (…)`, with the table options `ENGINE=InnoDB`, `[DEFAULT] CHARACTER SET`
   or `CHARSET`, `COLLATE`, `COMMENT`, `AUTO_INCREMENT` and `ROW_FORMAT` only. Each step runs
@@ -77,24 +77,47 @@ Everything else is refused with E-MIG-002, and the fix says what to write instea
 - the table `aicoded_migrations`, in any letter case;
 - a column named like a keyword, such as `modify`, unless it is in backquotes.
 
-A statement that removes, renames or changes what is there is E-MIG-003: `DROP`, `RENAME`,
-`TRUNCATE`, and `ALTER TABLE` with a `DROP`, `MODIFY`, `CHANGE`, `RENAME`, `TRUNCATE` or `ALTER`
-clause.
+A destructive statement removes, renames or changes what is there. It is allowed in these forms
+only, and each is the note E-MIG-003 at its line:
+
+- `DROP TABLE [IF EXISTS] <table>[, <table>…]` and `DROP INDEX <name> ON <table>`;
+- `RENAME TABLE <a> TO <b>[, <c> TO <d>…]` and `TRUNCATE [TABLE] <table>`;
+- `ALTER TABLE <table>` with any of these clauses, alone or among `ADD` clauses:
+  - `DROP [COLUMN] <column>`, `DROP INDEX <name>`, `DROP KEY <name>`, `DROP FOREIGN KEY <name>`,
+    `DROP PRIMARY KEY`, `DROP CHECK <name>` and `DROP CONSTRAINT <name>`;
+  - `MODIFY [COLUMN] <column> <type> …` and `CHANGE [COLUMN] <column> <new name> <type> …`;
+  - `RENAME TO <table>`, `RENAME AS <table>`, `RENAME COLUMN <a> TO <b>`, `RENAME INDEX <a> TO <b>`
+    and `RENAME KEY <a> TO <b>`;
+  - `ALTER [COLUMN] <column>` with `SET DEFAULT …`, `DROP DEFAULT`, `SET VISIBLE` or
+    `SET INVISIBLE`.
+
+Every other `DROP`, `RENAME`, `TRUNCATE` or `ALTER`, such as `DROP DATABASE`, `DROP VIEW`,
+`DROP USER`, `DROP TEMPORARY TABLE`, `ALTER TABLE … ENGINE`, `ALTER TABLE … ALGORITHM` or a
+partition clause, is E-MIG-002, and so is any statement on another database's table or on the
+table `aicoded_migrations`.
 
 ```sql
 ALTER TABLE tickets ADD COLUMN priority TINYINT UNSIGNED NOT NULL DEFAULT 2; -- right
 ALTER TABLE tickets ADD COLUMN priority TINYINT UNSIGNED NOT NULL; -- wrong: E-MIG-002, no DEFAULT
-ALTER TABLE tickets DROP COLUMN details; -- wrong: E-MIG-003
+ALTER TABLE tickets DROP COLUMN details; -- destructive: the note E-MIG-003, and it needs an approval
+DROP VIEW open_tickets; -- wrong: E-MIG-002
 ```
 
-## Why destructive changes wait
+## Destructive changes need an approval
 
 A release starts the new version while the old one still serves, and switches over once the new
 one is ready; a rollback starts an older version again. Both versions run on the same database,
-so its schema must suit both: a dropped or renamed column breaks the version that still uses it,
-and no rollback brings dropped data back. So a draft only adds. To replace a column, add a new
-one, move the code to it, and stop using the old one. Destructive changes need an approval,
-which comes later.
+so for a release to go live without anyone noticing, its schema must suit both. A change that
+only adds does. A dropped or renamed column breaks the version that still uses it, and no
+rollback brings dropped data back. So a publish whose draft holds a destructive statement *Needs
+approval*: an approver decides whether it goes live, and `aicoded publish` says so. When it goes
+live, the platform stops the app, applies the steps and starts the new version, so the app is
+unavailable for a short while, usually seconds. When a step fails, the version that ran starts
+again. Once a destructive step ran, no rollback goes back past it (E-MIG-007).
+
+Where you can, make the change expand-only instead: to replace a column, add a new one, move the
+code to it, and stop using the old one. Such a release goes live without an approval while the
+app keeps serving. Drop the old column in a later publish, once no version that runs uses it.
 
 ## On your computer
 
@@ -169,7 +192,11 @@ journal, the table `aicoded_migrations`, which app code may not read or write (E
   row could not be added to the journal even on a new connection, nothing is rejected either: the
   publish shows E-MIG-005 as a note, and the platform's operator records the step before the next
   release. Nothing in the app needs to change.
-- A rollback to an older release, whose steps the database ran already, applies nothing.
+- A release whose steps hold a destructive one stops the app first (see above). The steps before
+  a step that fails stay applied, and the version that ran starts again.
+- A rollback to an older release, whose steps the database ran already, applies nothing. When the
+  steps it would leave behind hold a destructive one, it is refused (E-MIG-007): release a newer
+  publish instead.
 - A release whose migrations do not start with what the database ran, such as one from another
   line of publishes, is refused (E-MIG-004), and so is a release of a publish whose schema changes
   were rejected.

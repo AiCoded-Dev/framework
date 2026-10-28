@@ -13,19 +13,28 @@ import (
 // Kind is the kind of a statement that Classify allows.
 type Kind int
 
-// Expand is a statement that adds to the schema and changes or removes nothing in it.
-const Expand Kind = 1
+const (
+	// Expand is a statement that adds to the schema and changes or removes nothing in it.
+	Expand Kind = 1
+	// Destructive is a statement that removes, renames or changes what the schema of the app's own
+	// tables has. A release applies it only with an approval, while the app is stopped.
+	Destructive Kind = 2
+)
+
+// CodeRollback is the code that refuses a rollback whose release would leave behind steps that
+// ran in production and hold a destructive one.
+const CodeRollback = "E-MIG-007"
 
 const (
 	allowedFix = "write only CREATE TABLE, CREATE INDEX and ALTER TABLE … ADD statements on the app's own tables, " +
-		"and change data from the app's code"
-	destructiveFix = "make the change expand-only: add a new column or table and stop using the old one; " +
-		"destructive changes need an approval, which comes later"
-	journal = "aicoded_migrations"
+		"or the destructive forms of E-MIG-003, and change data from the app's code"
+	destructiveFix = "this release needs an approval, and the app stops briefly while the change is applied"
+	journal        = "aicoded_migrations"
 )
 
 // Check splits a draft into its statements and classifies each. It returns the statements and
-// one error that joins every problem, each at the line of the draft its statement starts on.
+// one error that joins every problem, each at the line of the draft its statement starts on. A
+// destructive statement is not a problem; Notes names it.
 func Check(draft []byte) ([]string, error) {
 	stmts, err := split(draft)
 	if err != nil {
@@ -44,40 +53,151 @@ func Check(draft []byte) ([]string, error) {
 	return out, errors.Join(problems...)
 }
 
+// Notes returns E-MIG-003, at the line of the draft it starts on, for each destructive statement
+// of a draft, in order. It returns nil for a draft that Split refuses, and leaves out the
+// statements that Check refuses.
+func Notes(draft []byte) []error {
+	stmts, err := split(draft)
+	if err != nil {
+		return nil
+	}
+	var out []error
+	for _, s := range stmts {
+		if kind, what, err := classify(s.text); err == nil && kind == Destructive {
+			out = append(out, at(s.line, destructive(what)))
+		}
+	}
+	return out
+}
+
+// Destructives returns the indexes in stmts of the destructive statements, or the first error of
+// Classify.
+func Destructives(stmts []string) ([]int, error) {
+	var out []int
+	for i, s := range stmts {
+		kind, err := Classify(s)
+		if err != nil {
+			return nil, err
+		}
+		if kind == Destructive {
+			out = append(out, i)
+		}
+	}
+	return out, nil
+}
+
 // Classify returns Expand for a statement that only adds to the schema of the app's own
-// database: CREATE TABLE, CREATE INDEX, and ALTER TABLE with only ADD clauses. It refuses a
-// destructive statement with E-MIG-003, and every other statement, and any it cannot read,
-// with E-MIG-002.
+// database: CREATE TABLE, CREATE INDEX, and ALTER TABLE with only ADD clauses. It returns
+// Destructive for one that removes, renames or changes what is there, on the app's own tables
+// only: DROP TABLE [IF EXISTS], DROP INDEX … ON, RENAME TABLE, TRUNCATE [TABLE], and ALTER TABLE
+// whose clauses add or are DROP [COLUMN], DROP INDEX or KEY, DROP FOREIGN KEY, DROP PRIMARY KEY,
+// DROP CHECK or CONSTRAINT, MODIFY, CHANGE, RENAME TO, AS, COLUMN, INDEX or KEY, or ALTER
+// [COLUMN] … SET DEFAULT, DROP DEFAULT, SET VISIBLE or SET INVISIBLE. It refuses every other
+// statement, and any it cannot read, with E-MIG-002.
 func Classify(stmt string) (Kind, error) {
+	kind, _, err := classify(stmt)
+	return kind, err
+}
+
+// classify returns the kind of stmt and, for a destructive one, what it does in words.
+func classify(stmt string) (Kind, string, error) {
 	toks, _, lexErr := lex(stmt)
 	if lexErr != nil {
-		return 0, lexErr
+		return 0, "", lexErr
 	}
 	toks = slices.DeleteFunc(toks, func(t token) bool { return t.kind == comment })
 	if n := len(toks); n > 0 && toks[n-1].is(";") {
 		toks = toks[:n-1]
 	}
 	if len(toks) == 0 {
-		return 0, notAllowed("an empty statement is not a schema change", allowedFix)
+		return 0, "", notAllowed("an empty statement is not a schema change", allowedFix)
 	}
 	if err := readable(toks); err != nil {
-		return 0, err
+		return 0, "", err
 	}
-	var err error
-	switch first := toks[0].up(); first {
+	switch toks[0].up() {
 	case "CREATE":
-		err = create(toks[1:])
+		if err := create(toks[1:]); err != nil {
+			return 0, "", err
+		}
+		return Expand, "", nil
 	case "ALTER":
-		err = alter(toks[1:])
-	case "DROP", "RENAME", "TRUNCATE":
-		err = destructive(first + " removes or renames what is there")
-	default:
-		err = notAllowed(fmt.Sprintf("%s statements are not allowed in a schema change", toks[0].text), allowedFix)
+		return alter(toks[1:])
+	case "DROP":
+		return drop(toks[1:])
+	case "RENAME":
+		return renameTable(toks[1:])
+	case "TRUNCATE":
+		return truncate(toks[1:])
 	}
-	if err != nil {
-		return 0, err
+	return 0, "", notAllowed(fmt.Sprintf("%s statements are not allowed in a schema change", toks[0].text), allowedFix)
+}
+
+// drop classifies the tokens after DROP: TABLE [IF EXISTS] and the tables, or INDEX, a name, ON
+// and a table.
+func drop(toks []token) (Kind, string, error) {
+	switch {
+	case len(toks) > 0 && toks[0].up() == "TABLE":
+		names := toks[1:]
+		if len(names) > 1 && names[0].up() == "IF" && names[1].up() == "EXISTS" {
+			names = names[2:]
+		}
+		if !nameList(names) {
+			return 0, "", notAllowed("DROP TABLE must name the app's tables, separated by commas, with nothing after them",
+				"write DROP TABLE <table>[, <table>…], without TEMPORARY, RESTRICT or CASCADE")
+		}
+		return Destructive, "DROP TABLE removes tables and every row in them", nil
+	case len(toks) > 0 && toks[0].up() == "INDEX":
+		if len(toks) != 4 || !toks[1].isName() || toks[2].up() != "ON" || !toks[3].isName() {
+			return 0, "", notAllowed("DROP INDEX must be DROP INDEX <name> ON <table>, with nothing after the table",
+				"write DROP INDEX <name> ON <table> and leave out IF EXISTS, ALGORITHM and LOCK")
+		}
+		return Destructive, "DROP INDEX removes an index", nil
+	case len(toks) > 0:
+		return 0, "", notAllowed(fmt.Sprintf("DROP %s is not allowed in a schema change", toks[0].text),
+			"drop only the app's own tables, with DROP TABLE, and indexes, with DROP INDEX … ON …")
 	}
-	return Expand, nil
+	return 0, "", notAllowed("DROP without what it drops", allowedFix)
+}
+
+// renameTable classifies the tokens after RENAME: TABLE, then <table> TO <table> pairs separated
+// by commas.
+func renameTable(toks []token) (Kind, string, error) {
+	shape := notAllowed("RENAME TABLE must be RENAME TABLE <table> TO <table>[, <table> TO <table>…]",
+		"write RENAME TABLE <old> TO <new>, with the app's own tables")
+	if len(toks) < 4 || toks[0].up() != "TABLE" || (len(toks)-4)%4 != 0 {
+		return 0, "", shape
+	}
+	for i := 1; i < len(toks); i += 4 {
+		if !toks[i].isName() || toks[i+1].up() != "TO" || !toks[i+2].isName() || i+3 < len(toks) && !toks[i+3].is(",") {
+			return 0, "", shape
+		}
+	}
+	return Destructive, "RENAME TABLE renames tables that the version of the app that runs now uses", nil
+}
+
+// truncate classifies the tokens after TRUNCATE: [TABLE] and one table.
+func truncate(toks []token) (Kind, string, error) {
+	if len(toks) > 0 && toks[0].up() == "TABLE" {
+		toks = toks[1:]
+	}
+	if len(toks) != 1 || !toks[0].isName() {
+		return 0, "", notAllowed("TRUNCATE must name one table", "write TRUNCATE TABLE <table>")
+	}
+	return Destructive, "TRUNCATE removes every row of a table", nil
+}
+
+// nameList reports whether toks are one name or more, separated by commas.
+func nameList(toks []token) bool {
+	if len(toks)%2 == 0 {
+		return false
+	}
+	for i, t := range toks {
+		if i%2 == 0 && !t.isName() || i%2 == 1 && !t.is(",") {
+			return false
+		}
+	}
+	return true
 }
 
 // readable refuses what hides SQL from the checks or reaches past the app's own tables.
@@ -194,31 +314,104 @@ func createIndex(toks []token) error {
 	return nil
 }
 
-// alter classifies the tokens after ALTER: TABLE, a name and clauses. A destructive clause
-// decides; otherwise every clause must add.
-func alter(toks []token) error {
+// alter classifies the tokens after ALTER: TABLE, a name and clauses. Every clause must add or
+// be one of the destructive clauses; the statement is destructive when one is.
+func alter(toks []token) (Kind, string, error) {
 	if len(toks) < 3 || toks[0].up() != "TABLE" || !toks[1].isName() {
-		return notAllowed("only ALTER TABLE <table> ADD … is allowed", allowedFix)
+		return 0, "", notAllowed("only ALTER TABLE <table> with ADD clauses, or the destructive clauses, is allowed", allowedFix)
 	}
 	clauses, err := clauses(toks[2:])
 	if err != nil {
-		return err
+		return 0, "", err
 	}
+	kind, what := Expand, ""
 	for _, c := range clauses {
-		if w := c[0].up(); slices.Contains(destroying, w) || w == "ALTER" {
-			return destructive("ALTER TABLE … " + w + " changes or removes what is there")
-		}
-	}
-	for _, c := range clauses {
-		for _, t := range outside(c[1:]) {
-			if slices.Contains(destroying, t.up()) {
-				return notAllowed(fmt.Sprintf("%s inside an ADD clause reads as a keyword that changes or removes what is there, not as a name", t.text),
-					fmt.Sprintf("write a column or index named %s in backquotes, as `%s`, or put a comma before the next clause", t.text, t.text))
+		for _, t := range outside(c) {
+			if slices.Contains([]string{"PARTITION", "PARTITIONS", "PARTITIONING"}, t.up()) {
+				return 0, "", notAllowed("partitions are not allowed in a schema change", "leave out PARTITION clauses")
 			}
 		}
-		if err := add(c); err != nil {
-			return err
+		if c[0].up() == "ADD" {
+			for _, t := range outside(c[1:]) {
+				if slices.Contains(destroying, t.up()) {
+					return 0, "", notAllowed(fmt.Sprintf("%s inside an ADD clause reads as a keyword that changes or removes what is there, not as a name", t.text),
+						fmt.Sprintf("write a column or index named %s in backquotes, as `%s`, or put a comma before the next clause", t.text, t.text))
+				}
+			}
+			if err := add(c); err != nil {
+				return 0, "", err
+			}
+			continue
 		}
+		if err := change(c); err != nil {
+			return 0, "", err
+		}
+		if kind == Expand {
+			kind, what = Destructive, "ALTER TABLE … "+c[0].up()+" changes or removes what the table has"
+		}
+	}
+	return kind, what, nil
+}
+
+// change allows a destructive clause of ALTER TABLE: DROP [COLUMN] <c>, DROP {INDEX|KEY} <i>,
+// DROP FOREIGN KEY <f>, DROP PRIMARY KEY, DROP {CHECK|CONSTRAINT} <x>, MODIFY [COLUMN] <c>
+// <type> …, CHANGE [COLUMN] <c> <new> <type> …, RENAME {TO|AS} <table>, RENAME {COLUMN|INDEX|KEY}
+// <a> TO <b>, and ALTER [COLUMN] <c> {SET DEFAULT …|DROP DEFAULT|SET VISIBLE|SET INVISIBLE}.
+func change(clause []token) error {
+	rest := clause[1:]
+	next := func(i int) string {
+		if i < len(rest) {
+			return rest[i].up()
+		}
+		return ""
+	}
+	name := func(i int) bool { return i < len(rest) && rest[i].isName() }
+	column := 0
+	if next(0) == "COLUMN" {
+		column = 1
+	}
+	ok := false
+	switch clause[0].up() {
+	case "DROP":
+		switch next(0) {
+		case "INDEX", "KEY", "CHECK", "CONSTRAINT", "COLUMN":
+			ok = len(rest) == 2 && name(1)
+		case "FOREIGN":
+			ok = len(rest) == 3 && next(1) == "KEY" && name(2)
+		case "PRIMARY":
+			ok = len(rest) == 2 && next(1) == "KEY"
+		default:
+			ok = len(rest) == 1 && name(0)
+		}
+	case "MODIFY":
+		ok = name(column) && column+1 < len(rest) && rest[column+1].kind == word
+	case "CHANGE":
+		ok = name(column) && name(column+1) && column+2 < len(rest) && rest[column+2].kind == word
+	case "RENAME":
+		switch next(0) {
+		case "TO", "AS":
+			ok = len(rest) == 2 && name(1)
+		case "COLUMN", "INDEX", "KEY":
+			ok = len(rest) == 4 && name(1) && next(2) == "TO" && name(3)
+		}
+	case "ALTER":
+		if slices.Contains([]string{"INDEX", "KEY", "CHECK", "CONSTRAINT"}, next(0)) || !name(column) {
+			break
+		}
+		switch at := column + 1; {
+		case next(at) == "SET" && next(at+1) == "DEFAULT":
+			ok = len(rest) > at+2
+		case next(at) == "DROP" && next(at+1) == "DEFAULT", next(at) == "SET" && (next(at+1) == "VISIBLE" || next(at+1) == "INVISIBLE"):
+			ok = len(rest) == at+2
+		}
+	default:
+		return notAllowed(fmt.Sprintf("ALTER TABLE … %s is not allowed: only ADD clauses and the destructive clauses are", clause[0].text), allowedFix)
+	}
+	if !ok {
+		return notAllowed(fmt.Sprintf("ALTER TABLE … %s is not allowed in this form", clause[0].text),
+			"keep to ADD clauses and the destructive clauses of E-MIG-003: DROP [COLUMN] <column>, DROP INDEX <name>, "+
+				"DROP FOREIGN KEY <name>, DROP PRIMARY KEY, DROP CHECK <name>, MODIFY, CHANGE, RENAME TO <table>, "+
+				"RENAME COLUMN <a> TO <b>, RENAME INDEX <a> TO <b> and ALTER [COLUMN] <column> SET DEFAULT, DROP DEFAULT, SET VISIBLE or SET INVISIBLE")
 	}
 	return nil
 }
@@ -253,8 +446,8 @@ func clauses(toks []token) ([][]token, error) {
 	return out, nil
 }
 
-// destroying are the words that start a clause of ALTER TABLE that changes or removes what is
-// there, with ALTER.
+// destroying are words that start a clause of ALTER TABLE that changes or removes what is there,
+// which an ADD clause may not hold as names.
 var destroying = []string{"DROP", "MODIFY", "CHANGE", "RENAME", "TRUNCATE"}
 
 // IsJournal reports whether name, a table name without quotes, names the journal of migrations,
@@ -291,14 +484,6 @@ func foldsTo(r, c rune) bool {
 // add allows a clause of ALTER TABLE that adds a column, an index, or a primary key, unique
 // or foreign key constraint.
 func add(clause []token) error {
-	if clause[0].up() != "ADD" {
-		return notAllowed(fmt.Sprintf("ALTER TABLE … %s is not allowed: only ADD clauses are", clause[0].text), allowedFix)
-	}
-	for _, t := range outside(clause) {
-		if slices.Contains([]string{"PARTITION", "PARTITIONS", "PARTITIONING"}, t.up()) {
-			return notAllowed("partitions are not allowed in a schema change", "leave out PARTITION clauses")
-		}
-	}
 	rest := clause[1:]
 	next := func(i int) string {
 		if i < len(rest) {
@@ -413,6 +598,6 @@ func notAllowed(msg, fix string) error {
 	return errs.New("E-MIG-002", msg, fix)
 }
 
-func destructive(msg string) error {
+func destructive(msg string) *errs.Error {
 	return errs.New("E-MIG-003", msg, destructiveFix)
 }

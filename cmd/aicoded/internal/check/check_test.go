@@ -530,7 +530,7 @@ func TestCheckDraft(t *testing.T) {
 		text string
 		want brief
 	}{
-		"destructive":        {"CREATE TABLE a (x INT);\nDROP TABLE b;\n", brief{"calc", "E-MIG-003", ".aicoded/migration.sql:2"}},
+		"not destructive":    {"CREATE TABLE a (x INT);\nDROP DATABASE b;\n", brief{"calc", "E-MIG-002", ".aicoded/migration.sql:2"}},
 		"executable comment": {"/*!50000 CREATE TABLE a (x INT) */;", brief{"calc", "E-MIG-002", ".aicoded/migration.sql:1"}},
 		"over 64 KiB":        {"-- " + strings.Repeat("x", 64<<10), brief{"calc", "E-MIG-001", ".aicoded/migration.sql"}},
 	} {
@@ -542,6 +542,16 @@ func TestCheckDraft(t *testing.T) {
 		assert.Equal(t, []brief{c.want}, briefs(r.Apps[0].Problems), name)
 		assert.Equal(t, []string{"precheck calc", "race calc"}, *ran, "nothing is built after the draft fails: %s", name)
 	}
+}
+
+func TestCheckDestructiveDraft(t *testing.T) {
+	requireGo(t)
+	root := tempRoot(t)
+	withDraft(t, calc(t, root, "calc", false), "CREATE TABLE a (x INT, y INT);\n\nALTER TABLE a DROP COLUMN y;\n")
+	r, err := Run(t.Context(), root, Options{})
+	require.NoError(t, err)
+	assert.True(t, r.OK(), "a destructive statement is a note")
+	assert.Equal(t, []brief{{"calc", "E-MIG-003", ".aicoded/migration.sql:3"}}, briefs(r.Apps[0].Notes))
 }
 
 func TestCheckDraftWithoutDatabase(t *testing.T) {

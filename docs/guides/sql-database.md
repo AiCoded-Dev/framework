@@ -79,8 +79,9 @@ CREATE TABLE users (
 );
 ```
 
-A draft only adds tables, indexes and columns. [Schema changes](schema-changes.md) lists what it
-may hold and what happens at publish and at release. The app's database user may only read and
+A draft adds tables, indexes and columns; a destructive change, such as a dropped column, needs
+an approval. [Schema changes](schema-changes.md) lists what it may hold and what happens at
+publish and at release. The app's database user may only read and
 write rows, and `aicoded check` refuses `CREATE`, `ALTER`, `DROP`, `RENAME` and `TRUNCATE` in app
 code (E-LINT-013). `fill` fills the table, in one transaction, with sample rows when it is empty.
 

@@ -109,8 +109,12 @@ func TestStepsWithoutASignIn(t *testing.T) {
 }
 
 func TestStepsRefusesTheDraft(t *testing.T) {
-	_, _, err := Steps(t.Context(), app(t, "DROP TABLE a;\n"), notes, fake{})
-	require.ErrorContains(t, err, ".aicoded/migration.sql:1: E-MIG-003: ")
+	_, _, err := Steps(t.Context(), app(t, "DROP VIEW a;\n"), notes, fake{})
+	require.ErrorContains(t, err, ".aicoded/migration.sql:1: E-MIG-002: ")
+
+	steps, _, err := Steps(t.Context(), app(t, "DROP TABLE a;\n"), notes, fake{})
+	require.NoError(t, err)
+	assert.Equal(t, Append(nil, Draft, []string{"DROP TABLE a"}), steps, "a destructive statement is a step")
 }
 
 func TestCacheStaysInTheApp(t *testing.T) {

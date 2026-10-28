@@ -4,6 +4,19 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- A draft may hold destructive schema changes in a fixed set of forms: `DROP TABLE [IF EXISTS]`,
+  `DROP INDEX … ON`, `RENAME TABLE`, `TRUNCATE [TABLE]`, and `ALTER TABLE` with `DROP [COLUMN]`,
+  `DROP INDEX`/`KEY`/`FOREIGN KEY`/`PRIMARY KEY`/`CHECK`/`CONSTRAINT`, `MODIFY`, `CHANGE`,
+  `RENAME TO`/`AS`/`COLUMN`/`INDEX`/`KEY`, or `ALTER [COLUMN] … SET DEFAULT`, `DROP DEFAULT`,
+  `SET VISIBLE` or `SET INVISIBLE` clauses. E-MIG-003 is now a note at the statement's line, which
+  `aicoded check` shows without failing the app, and `aicoded dev` applies the statement to the dev
+  database. Its fix: the release needs an approval, and the app stops briefly while the change is
+  applied. Every other `DROP`, `RENAME`, `TRUNCATE` or `ALTER`, such as `DROP DATABASE`,
+  `DROP VIEW` or `ALTER TABLE … ENGINE`, and any statement on `aicoded_migrations`, is E-MIG-002.
+  E-MIG-007 refuses a rollback to a release before a destructive change that ran in production:
+  release a newer publish. `migrate.Classify` returns `migrate.Destructive` for the destructive
+  forms, `migrate.Destructives` and `migrate.Notes` find them, and `migrate.Apply` takes a fourth
+  argument, `destructive`, without which it refuses a destructive step with E-MIG-003.
 - The permission list needs an `audience` that lists someone: one left out, or with neither
   `internal` nor `external` entries, is *Not allowed* (E-MAN-024). `aicoded init` writes
   `internal: [everyone]` under `audience`, and the examples state it. Give an app without one

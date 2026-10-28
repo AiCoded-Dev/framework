@@ -34,13 +34,24 @@ func found(err error) []string {
 }
 
 func TestCheck(t *testing.T) {
-	stmts, err := Check(app(t, "CREATE TABLE a (x INT);\n\nCREATE INDEX i ON a (x);\n"), withDB)
+	stmts, notes, err := Check(app(t, "CREATE TABLE a (x INT);\n\nCREATE INDEX i ON a (x);\n"), withDB)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"CREATE TABLE a (x INT)", "CREATE INDEX i ON a (x)"}, stmts)
+	assert.Empty(t, notes)
 
-	stmts, err = Check(t.TempDir(), withDB)
+	stmts, notes, err = Check(t.TempDir(), withDB)
 	require.NoError(t, err, "no draft")
 	assert.Nil(t, stmts)
+	assert.Empty(t, notes)
+}
+
+func TestCheckNotesADestructiveStatement(t *testing.T) {
+	stmts, notes, err := Check(app(t, "CREATE TABLE a (x INT, y INT);\n\nALTER TABLE a DROP COLUMN y;\n"), withDB)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"CREATE TABLE a (x INT, y INT)", "ALTER TABLE a DROP COLUMN y"}, stmts)
+	require.Len(t, notes, 1)
+	assert.Equal(t, "E-MIG-003", notes[0].Code)
+	assert.Equal(t, ".aicoded/migration.sql:3", notes[0].Pos)
 }
 
 func TestCheckRefuses(t *testing.T) {
@@ -48,12 +59,12 @@ func TestCheckRefuses(t *testing.T) {
 		text string
 		want []string
 	}{
-		"destructive":        {"CREATE TABLE a (x INT);\nDROP TABLE b;\n", []string{"E-MIG-003 .aicoded/migration.sql:2"}},
+		"not destructive":    {"DROP TABLE a;\nDROP DATABASE b;\n", []string{"E-MIG-002 .aicoded/migration.sql:2"}},
 		"executable comment": {"CREATE TABLE a (x INT);\n/*!50000 CREATE TABLE b (y INT) */;", []string{"E-MIG-002 .aicoded/migration.sql:2"}},
 		"over 64 KiB":        {"-- " + strings.Repeat("x", 64<<10), []string{"E-MIG-001 .aicoded/migration.sql"}},
 		"no statement":       {"-- only a comment\n", []string{"E-MIG-001 .aicoded/migration.sql"}},
 	} {
-		stmts, err := Check(app(t, c.text), withDB)
+		stmts, _, err := Check(app(t, c.text), withDB)
 		assert.Nil(t, stmts, name)
 		assert.Equal(t, c.want, found(err), name)
 	}
@@ -62,7 +73,7 @@ func TestCheckRefuses(t *testing.T) {
 }
 
 func TestCheckWithoutDatabase(t *testing.T) {
-	_, err := Check(app(t, "CREATE TABLE a (x INT);"), manifest.Manifest{App: "shop"})
+	_, _, err := Check(app(t, "CREATE TABLE a (x INT);"), manifest.Manifest{App: "shop"})
 	assert.Equal(t, []string{"E-MIG-006 .aicoded/migration.sql"}, found(err))
 }
 

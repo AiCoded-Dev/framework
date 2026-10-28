@@ -234,7 +234,7 @@ func (i *Instance) migrate(ctx context.Context, svc Services) (*mysqlproxy.Upstr
 	m := i.Manifest
 	i.draft = draftOf(i.dir)
 	if !m.SQLDB() {
-		_, err := draft.Check(i.dir, m)
+		_, _, err := draft.Check(i.dir, m)
 		return nil, err
 	}
 	steps, warning, err := migrations.Steps(ctx, i.dir, m, svc.Platform)

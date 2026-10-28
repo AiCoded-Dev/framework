@@ -117,10 +117,10 @@ applied on top. When the draft changes otherwise, or the journal holds steps tha
 migrations and the draft do not start with, as after a publish, `aicoded dev` drops the app's dev
 database, makes it again and applies everything: its data is test data. A list of steps that
 `aicoded dev` cannot apply at all, such as one over 2000 steps or 1 MiB, stops the app with
-E-MIG-004 and leaves the database as it is. It never touches another
-app's database. A draft that `aicoded check` refuses (E-MIG-001 to E-MIG-003, E-MIG-006) or a step
-that fails (E-MIG-005) stops the app, and its problems show at its address, on the dev UI and in
-`what_broke`.
+E-MIG-004 and leaves the database as it is. It never touches another app's database. A
+destructive statement of the draft (E-MIG-003) is applied like any other. A draft that
+`aicoded check` refuses (E-MIG-001, E-MIG-002, E-MIG-006) or a step that fails (E-MIG-005) stops
+the app, and its problems show at its address, on the dev UI and in `what_broke`.
 
 The draft and `.aicoded/migrations.json` stay out of git: a new app's `.gitignore` lists both, and
 `aicoded publish` refuses a commit that holds the draft (E-MIG-001). `aicoded publish` sends the

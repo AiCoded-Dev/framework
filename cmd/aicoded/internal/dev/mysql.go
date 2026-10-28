@@ -109,9 +109,9 @@ func (a *MySQLAdmin) Prepare(ctx context.Context, app, env string) (Users, error
 }
 
 // Migrate prepares the database and the users of app in env as Prepare does, and applies steps
-// there as the owner with migrate.Apply. When the database's journal does not start steps, or
-// holds more steps than steps, Migrate first drops the database and makes it again, since it holds
-// test data; it drops no other database. Every refusal of Apply, such as a list over its limits,
+// there as the owner with migrate.Apply, destructive steps too. When the database's journal does
+// not start steps, or holds more steps than steps, Migrate first drops the database and makes it
+// again, since it holds test data; it drops no other database. Every refusal of Apply, such as a list over its limits,
 // is returned as it is. It returns the users.
 func (a *MySQLAdmin) Migrate(ctx context.Context, app, env string, steps []migrate.Step) (Users, error) {
 	users, err := a.Prepare(ctx, app, env)
@@ -186,7 +186,7 @@ func apply(ctx context.Context, up mysqlproxy.Upstream, steps []migrate.Step) er
 		return err
 	}
 	defer db.Close()
-	_, err = migrate.Apply(ctx, db, steps)
+	_, err = migrate.Apply(ctx, db, steps, true)
 	return err
 }
 

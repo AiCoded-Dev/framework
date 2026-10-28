@@ -126,10 +126,10 @@ func (r *run) migrationsFile(t *testing.T, steps []migrate.Step) []string {
 func TestMigrations(t *testing.T) {
 	a := l7Account(t)
 	r := folders(t, sqlYAML)
-	steps := migrations.Append(nil, "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa", []string{"CREATE TABLE notes (v TEXT)"})
+	steps := migrations.Append(nil, "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa", []string{"CREATE TABLE notes (v TEXT, w TEXT)", "ALTER TABLE notes DROP COLUMN w"})
 	r.start(t, r.args(append(r.dsn(t, a.dsn, 0o600, a.database), r.migrationsFile(t, steps)...)...))
 	_, err := viaSocket(t, filepath.Join(r.runnerDir, runnerproto.MySQLSocket)).ExecContext(t.Context(), "INSERT INTO notes VALUES ('a')")
-	assert.NoError(t, err, "the steps were applied before the runner served")
+	assert.NoError(t, err, "the steps, a destructive one too, were applied before the runner served")
 }
 
 func TestMigrationsFail(t *testing.T) {
@@ -149,8 +149,8 @@ func TestMigrationsFail(t *testing.T) {
 	a, r = l7Account(t), folders(t, sqlYAML)
 	stderr = syncBuffer{}
 	assert.Equal(t, exitFail, Main(t.Context(), r.args(append(r.dsn(t, a.dsn, 0o600, a.database),
-		r.migrationsFile(t, migrations.Append(nil, "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa", []string{"DROP TABLE notes"}))...)...), &stderr))
-	assert.Contains(t, stderr.String(), "E-MIG-003", "the steps are classified")
+		r.migrationsFile(t, migrations.Append(nil, "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa", []string{"DROP VIEW notes"}))...)...), &stderr))
+	assert.Contains(t, stderr.String(), "E-MIG-002", "the steps are classified")
 }
 
 // A step the account may not run fails with MySQL's text, which names the account; the line on

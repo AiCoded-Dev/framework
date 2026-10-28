@@ -387,15 +387,15 @@ func checkLogin(ctx context.Context, up mysqlproxy.Upstream) error {
 	return nil
 }
 
-// applySteps applies steps to up's database with migrate.Apply, as up's account. Its error never
-// names the account or its password.
+// applySteps applies steps to up's database with migrate.Apply, as up's account, destructive steps
+// too, since the database holds test data. Its error never names the account or its password.
 func applySteps(ctx context.Context, up mysqlproxy.Upstream, steps []migrate.Step) error {
 	db, err := open(up)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	if _, err := migrate.Apply(ctx, db, steps); err != nil {
+	if _, err := migrate.Apply(ctx, db, steps, true); err != nil {
 		msg := err.Error()
 		for _, secret := range []string{up.Password, up.User} {
 			if secret != "" {

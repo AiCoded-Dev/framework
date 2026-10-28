@@ -50,9 +50,10 @@ func TestCreatePublishRefused(t *testing.T) {
 		{http.StatusConflict, "conflict", "E-PUB-999", "E-PUB-999: refused as the test asked\n  fix: read the docs page below"},
 		{http.StatusConflict, "conflict", "E-NOPE-001", "the platform answered 409: conflict: refused as the test asked"},
 		{http.StatusConflict, "conflict", "E-MIG-001", "E-MIG-001: refused as the test asked\n  fix: keep the draft to 64 KiB of UTF-8"},
-		{http.StatusBadRequest, "invalid_request", "E-MIG-003", "E-MIG-003: refused as the test asked\n" +
-			"  fix: make the change expand-only: add a new column or table and stop using the old one; destructive changes need an approval, which comes later\n" +
-			"  docs: https://aicoded.dev/docs/errors/E-MIG-003"},
+		{http.StatusBadRequest, "invalid_request", "E-MIG-002", "E-MIG-002: refused as the test asked\n" +
+			"  fix: write only CREATE TABLE, CREATE INDEX and ALTER TABLE … ADD statements on the app's own tables, or the destructive forms of E-MIG-003, " +
+			"give a new NOT NULL column a DEFAULT, and change data from the app's code\n" +
+			"  docs: https://aicoded.dev/docs/errors/E-MIG-002"},
 		{http.StatusBadRequest, "invalid_request", "E-MIG-999", "the platform answered 400: invalid_request: refused as the test asked"},
 	} {
 		p, c := signedIn(t)

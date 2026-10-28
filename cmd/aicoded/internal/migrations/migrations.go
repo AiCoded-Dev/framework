@@ -68,7 +68,7 @@ type sent struct {
 // publish's steps are among the published ones, before Settle clears it. Its error is that of
 // draft.Check.
 func Steps(ctx context.Context, dir string, m manifest.Manifest, p Platform) (steps []migrate.Step, warning string, err error) {
-	stmts, err := draft.Check(dir, m)
+	stmts, _, err := draft.Check(dir, m)
 	if err != nil {
 		return nil, "", err
 	}

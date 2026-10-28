@@ -73,11 +73,11 @@ func TestApplyRunsWhatTheJournalLacks(t *testing.T) {
 	db, admin, name := database(t)
 	list := append(steps(1, "p1", "CREATE TABLE a (x INT)", "ALTER TABLE a ADD COLUMN y INT"), steps(3, "p2", "CREATE INDEX i ON a (y)")...)
 
-	applied, err := migrate.Apply(t.Context(), db, list[:2])
+	applied, err := migrate.Apply(t.Context(), db, list[:2], false)
 	require.NoError(t, err)
 	assert.Equal(t, list[:2], applied)
 
-	applied, err = migrate.Apply(t.Context(), db, list)
+	applied, err = migrate.Apply(t.Context(), db, list, false)
 	require.NoError(t, err)
 	assert.Equal(t, list[2:], applied)
 	assert.Equal(t, ran(list), journal(t, db))
@@ -93,14 +93,14 @@ func TestApplyRunsWhatTheJournalLacks(t *testing.T) {
 func TestApplyRefusesALongList(t *testing.T) {
 	db, _, _ := database(t)
 	list := steps(1, "p1", make([]string, 2001)...)
-	_, err := migrate.Apply(t.Context(), db, list)
+	_, err := migrate.Apply(t.Context(), db, list, false)
 	assert.Equal(t, "E-MIG-004", errs.Code(err))
 	require.ErrorContains(t, err, "the list holds 2001 steps")
 }
 
 func TestApplyEmpty(t *testing.T) {
 	db, _, _ := database(t)
-	applied, err := migrate.Apply(t.Context(), db, nil)
+	applied, err := migrate.Apply(t.Context(), db, nil, false)
 	require.NoError(t, err)
 	assert.Empty(t, applied)
 	assert.Empty(t, journal(t, db), "the journal exists")
@@ -112,7 +112,7 @@ func TestApplyContinuesAfterAFailure(t *testing.T) {
 	db, admin, name := database(t)
 	list := steps(1, "p1", "CREATE TABLE a (x INT)", "CREATE TABLE b (x INT)", "ALTER TABLE c ADD COLUMN y INT", "CREATE TABLE d (x INT)")
 
-	applied, err := migrate.Apply(t.Context(), db, list)
+	applied, err := migrate.Apply(t.Context(), db, list, false)
 	assert.Equal(t, "E-MIG-005", errs.Code(err))
 	require.ErrorContains(t, err, "step p1#3 failed: MySQL error 1146: ")
 	assert.Equal(t, list[:2], applied)
@@ -120,7 +120,7 @@ func TestApplyContinuesAfterAFailure(t *testing.T) {
 
 	_, err = admin.ExecContext(t.Context(), "CREATE TABLE `"+name+"`.c (x INT)")
 	require.NoError(t, err)
-	applied, err = migrate.Apply(t.Context(), db, list)
+	applied, err = migrate.Apply(t.Context(), db, list, false)
 	require.NoError(t, err)
 	assert.Equal(t, list[2:], applied)
 	assert.Equal(t, ran(list), journal(t, db))
@@ -140,7 +140,7 @@ func TestApplyReportsAStepNotRecorded(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	applied, err := migrate.Apply(t.Context(), db, steps(1, "p1", "CREATE TABLE a (x INT)", "CREATE TABLE b (x INT)"))
+	applied, err := migrate.Apply(t.Context(), db, steps(1, "p1", "CREATE TABLE a (x INT)", "CREATE TABLE b (x INT)"), false)
 	assert.Equal(t, "E-MIG-005", errs.Code(err))
 	require.ErrorContains(t, err, "step p1#1 ran but was not recorded in the journal aicoded_migrations: MySQL error 1644: refused")
 	require.ErrorContains(t, err, "an operator must add the step's row")
@@ -163,7 +163,7 @@ func TestApplyConcurrently(t *testing.T) {
 	results := make([][]migrate.Step, 2)
 	failures := make([]error, 2)
 	for i := range 2 {
-		wg.Go(func() { results[i], failures[i] = migrate.Apply(t.Context(), db, list) })
+		wg.Go(func() { results[i], failures[i] = migrate.Apply(t.Context(), db, list, false) })
 	}
 	wg.Wait()
 	require.NoError(t, failures[0])
@@ -177,15 +177,15 @@ func TestApplyConcurrently(t *testing.T) {
 func TestApplyRollback(t *testing.T) {
 	db, _, _ := database(t)
 	list := steps(1, "p1", "CREATE TABLE a (x INT)", "CREATE TABLE b (x INT)", "CREATE TABLE c (x INT)")
-	_, err := migrate.Apply(t.Context(), db, list)
+	_, err := migrate.Apply(t.Context(), db, list, false)
 	require.NoError(t, err)
 
-	applied, err := migrate.Apply(t.Context(), db, list[:2])
+	applied, err := migrate.Apply(t.Context(), db, list[:2], false)
 	require.NoError(t, err)
 	assert.Empty(t, applied)
 
 	other := append(steps(1, "p1", "CREATE TABLE a (x INT)", "CREATE TABLE b (y INT)", "CREATE TABLE c (x INT)"), steps(4, "p2", "CREATE TABLE d (x INT)")...)
-	applied, err = migrate.Apply(t.Context(), db, other)
+	applied, err = migrate.Apply(t.Context(), db, other, false)
 	assert.Equal(t, "E-MIG-004", errs.Code(err))
 	require.ErrorContains(t, err, "step 2 (p1#2)")
 	assert.Empty(t, applied)
@@ -213,7 +213,7 @@ func TestApplyRefusesABadList(t *testing.T) {
 		"a destructive step":  {append(good, steps(3, "p2", "DROP TABLE a")...), "E-MIG-003"},
 		"a step not allowed":  {append(good, steps(3, "p2", "INSERT INTO a VALUES (1)")...), "E-MIG-002"},
 	} {
-		applied, err := migrate.Apply(t.Context(), db, tc.list)
+		applied, err := migrate.Apply(t.Context(), db, tc.list, false)
 		assert.Equal(t, tc.code, errs.Code(err), reason)
 		assert.Empty(t, applied, reason)
 	}
@@ -222,11 +222,36 @@ func TestApplyRefusesABadList(t *testing.T) {
 	assert.Equal(t, 1, tables, "only the journal: no step ran")
 }
 
+func TestApplyDestructive(t *testing.T) {
+	db, admin, name := database(t)
+	list := append(steps(1, "p1", "CREATE TABLE a (x INT, y INT)"), steps(2, "p2", "ALTER TABLE a DROP COLUMN y")...)
+
+	applied, err := migrate.Apply(t.Context(), db, list, false)
+	assert.Equal(t, "E-MIG-003", errs.Code(err))
+	require.ErrorContains(t, err, "step p2#1")
+	assert.Empty(t, applied)
+	var tables int
+	require.NoError(t, admin.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?", name).Scan(&tables))
+	assert.Equal(t, 1, tables, "only the journal: not even the expand step ran")
+
+	applied, err = migrate.Apply(t.Context(), db, list, true)
+	require.NoError(t, err)
+	assert.Equal(t, list, applied)
+	assert.Equal(t, ran(list), journal(t, db))
+	var columns int
+	require.NoError(t, admin.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'a'", name).Scan(&columns))
+	assert.Equal(t, 1, columns)
+
+	applied, err = migrate.Apply(t.Context(), db, append(list, steps(3, "p3", "DROP USER u")...), true)
+	assert.Equal(t, "E-MIG-002", errs.Code(err), "only the destructive set is allowed")
+	assert.Empty(t, applied)
+}
+
 // A step that waits on a table another session locks is bounded by lock_wait_timeout and by
 // its context, and a step cut off by its context is stopped in the server too.
 func TestApplyTimesOut(t *testing.T) {
 	db, admin, name := database(t)
-	_, err := migrate.Apply(t.Context(), db, steps(1, "p1", "CREATE TABLE t (x INT)"))
+	_, err := migrate.Apply(t.Context(), db, steps(1, "p1", "CREATE TABLE t (x INT)"), false)
 	require.NoError(t, err)
 
 	holder, err := admin.Conn(t.Context())
@@ -239,7 +264,7 @@ func TestApplyTimesOut(t *testing.T) {
 	go func() {
 		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 		defer cancel()
-		_, err := migrate.Apply(ctx, db, steps(1, "p1", "CREATE TABLE t (x INT)", "ALTER TABLE t ADD COLUMN y INT"))
+		_, err := migrate.Apply(ctx, db, steps(1, "p1", "CREATE TABLE t (x INT)", "ALTER TABLE t ADD COLUMN y INT"), false)
 		waiting <- err
 	}()
 	var timeout string
@@ -293,12 +318,12 @@ func TestApplyLocksPerDatabase(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	_, err := migrate.Apply(ctx, other, steps(1, "p1", "CREATE TABLE a (x INT)"))
+	_, err := migrate.Apply(ctx, other, steps(1, "p1", "CREATE TABLE a (x INT)"), false)
 	require.NoError(t, err, "neither the lock of another database nor a lock of another name blocks Apply")
 
 	ctx, cancel = context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
-	_, err = migrate.Apply(ctx, one, steps(1, "p1", "CREATE TABLE a (x INT)"))
+	_, err = migrate.Apply(ctx, one, steps(1, "p1", "CREATE TABLE a (x INT)"), false)
 	assert.Equal(t, "E-MIG-005", errs.Code(err), "Apply waits on its database's lock")
 }
 
@@ -309,7 +334,7 @@ func TestApplyNeedsADatabase(t *testing.T) {
 	require.NoError(t, err)
 	db := sql.OpenDB(c)
 	defer db.Close()
-	_, err = migrate.Apply(t.Context(), db, nil)
+	_, err = migrate.Apply(t.Context(), db, nil, false)
 	assert.Equal(t, "E-MIG-005", errs.Code(err))
 	require.ErrorContains(t, err, "the connection has no database selected")
 }
@@ -318,7 +343,7 @@ func TestApplyNeedsADatabase(t *testing.T) {
 func TestApplyOnTwoDatabases(t *testing.T) {
 	one, admin, name := database(t)
 	other, _, _ := database(t)
-	_, err := migrate.Apply(t.Context(), one, steps(1, "p1", "CREATE TABLE t (x INT)"))
+	_, err := migrate.Apply(t.Context(), one, steps(1, "p1", "CREATE TABLE t (x INT)"), false)
 	require.NoError(t, err)
 	holder, err := admin.Conn(t.Context())
 	require.NoError(t, err)
@@ -328,7 +353,7 @@ func TestApplyOnTwoDatabases(t *testing.T) {
 
 	waiting := make(chan error, 1)
 	go func() {
-		_, err := migrate.Apply(t.Context(), one, steps(1, "p1", "CREATE TABLE t (x INT)", "ALTER TABLE t ADD COLUMN y INT"))
+		_, err := migrate.Apply(t.Context(), one, steps(1, "p1", "CREATE TABLE t (x INT)", "ALTER TABLE t ADD COLUMN y INT"), false)
 		waiting <- err
 	}()
 	require.Eventually(t, func() bool {
@@ -338,7 +363,7 @@ func TestApplyOnTwoDatabases(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	_, err = migrate.Apply(ctx, other, steps(1, "p1", "CREATE TABLE a (x INT)"))
+	_, err = migrate.Apply(ctx, other, steps(1, "p1", "CREATE TABLE a (x INT)"), false)
 	require.NoError(t, err)
 
 	_, err = holder.ExecContext(t.Context(), "UNLOCK TABLES")

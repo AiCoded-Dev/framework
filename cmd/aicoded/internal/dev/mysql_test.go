@@ -203,8 +203,18 @@ func TestMigrateFails(t *testing.T) {
 	assert.Equal(t, "E-MIG-005", errs.Code(err))
 	require.ErrorContains(t, err, "step draft#1 failed: MySQL error 1064")
 
-	_, err = a.Migrate(t.Context(), app, "dev", steps("DROP TABLE notes"))
-	assert.Equal(t, "E-MIG-003", errs.Code(err), "the steps are classified before they run")
+	_, err = a.Migrate(t.Context(), app, "dev", steps("DROP VIEW notes"))
+	assert.Equal(t, "E-MIG-002", errs.Code(err), "the steps are classified before they run")
+}
+
+func TestMigrateAppliesADestructiveStep(t *testing.T) {
+	a, app, _ := prepared(t)
+	users, err := a.Migrate(t.Context(), app, "dev", steps("CREATE TABLE notes (v TEXT, w TEXT)", "ALTER TABLE notes DROP COLUMN w"))
+	require.NoError(t, err)
+	var columns int
+	require.NoError(t, direct(t, users.Owner).QueryRowContext(t.Context(),
+		"SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'notes'").Scan(&columns))
+	assert.Equal(t, 1, columns)
 }
 
 func TestPrepareGivesUp(t *testing.T) {
@@ -323,7 +333,7 @@ func TestStartRefusesTheDraft(t *testing.T) {
 	drop(t, testmysql.Admin(t), m.App)
 	dir := copyHello(t, t.TempDir(), m.App)
 	for text, code := range map[string]string{
-		"CREATE TABLE notes (v TEXT);\nDROP TABLE notes;\n":            "E-MIG-003",
+		"CREATE TABLE notes (v TEXT);\nDROP VIEW notes;\n":             "E-MIG-002",
 		"INSERT INTO notes VALUES ('a');\n":                            "E-MIG-002",
 		"CREATE TABLE notes (v TEXT);\nCREATE TABLE notes (w TEXT);\n": "E-MIG-005",
 	} {
@@ -420,7 +430,7 @@ func TestWorkspaceWarnsWithoutThePlatform(t *testing.T) {
 
 func TestWorkspaceFailsOnTheDraft(t *testing.T) {
 	requireGo(t)
-	root, app, _ := sqlWorkspace(t, "CREATE TABLE tags (v TEXT);\nDROP TABLE tags;\n")
+	root, app, _ := sqlWorkspace(t, "CREATE TABLE tags (v TEXT);\nDROP USER tags;\n")
 	w, err := Open(t.Context(), Config{Root: root, State: t.TempDir(), Out: io.Discard,
 		Dev: devconfig.Workspace{MySQL: testmysql.DSN(t), Apps: map[string]devconfig.AppValues{app: helloValues}}})
 	require.NoError(t, err)
@@ -428,8 +438,22 @@ func TestWorkspaceFailsOnTheDraft(t *testing.T) {
 	st := appState(t, w, app)
 	assert.Equal(t, devapi.Failed, st.State)
 	require.Len(t, st.Problems, 1)
-	assert.Equal(t, "E-MIG-003", st.Problems[0].Code)
+	assert.Equal(t, "E-MIG-002", st.Problems[0].Code)
 	assert.Equal(t, ".aicoded/migration.sql:2", st.Problems[0].Pos)
+}
+
+func TestWorkspaceAppliesADestructiveDraft(t *testing.T) {
+	requireGo(t)
+	root, app, _ := sqlWorkspace(t, "CREATE TABLE tags (v TEXT, w TEXT);\nALTER TABLE tags DROP COLUMN w;\n")
+	w, err := Open(t.Context(), Config{Root: root, State: t.TempDir(), Out: io.Discard,
+		Dev: devconfig.Workspace{MySQL: testmysql.DSN(t), Apps: map[string]devconfig.AppValues{app: helloValues}}})
+	require.NoError(t, err)
+	t.Cleanup(w.Close)
+	require.Equal(t, devapi.Running, appState(t, w, app).State)
+	var columns int
+	require.NoError(t, testmysql.Admin(t).QueryRowContext(t.Context(),
+		"SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = ? AND table_name = 'tags'", dbName(app, "dev")).Scan(&columns))
+	assert.Equal(t, 1, columns, "the dev database lost the dropped column")
 }
 
 // A list that Apply refuses for itself, here one whose hash does not match, stops the app with
