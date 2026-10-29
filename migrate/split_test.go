@@ -63,18 +63,35 @@ func TestSplitNamesTheLine(t *testing.T) {
 
 func TestNormalize(t *testing.T) {
 	for stmt, want := range map[string]string{
-		"CREATE TABLE a (x INT)":                          "CREATE TABLE a ( X INT )",
-		"create  table a(\n\tx int\n);":                   "CREATE TABLE a ( X INT )",
-		"CREATE /* new */ TABLE a (x INT) -- notes":       "CREATE TABLE a ( X INT )",
-		"CREATE TABLE Notes (x INT)":                      "CREATE TABLE Notes ( X INT )",
-		"create index i on Notes (x)":                     "CREATE INDEX I ON Notes ( X )",
-		"alter table Notes add column y int default 0x1f": "ALTER TABLE Notes ADD COLUMN Y INT DEFAULT 0x1f",
-		"ALTER TABLE n ADD FOREIGN KEY (x) REFERENCES Owners (id) on delete cascade": "ALTER TABLE n ADD FOREIGN KEY ( X ) " +
-			"REFERENCES Owners ( ID ) ON DELETE CASCADE",
-		"CREATE TABLE a (x INT) COMMENT 'Two  spaces'": "CREATE TABLE a ( X INT ) COMMENT 'Two  spaces'",
+		"CREATE TABLE a (x INT)":                          "CREATE TABLE a ( x INT )",
+		"create  table a(\n\tx int\n);":                   "CREATE TABLE a ( x INT )",
+		"CREATE /* new */ TABLE a (x INT) -- notes":       "CREATE TABLE a ( x INT )",
+		"CREATE TABLE Notes (x INT)":                      "CREATE TABLE Notes ( x INT )",
+		"create index i on Notes (x)":                     "CREATE INDEX i ON Notes ( x )",
+		"alter table Notes add column y int default 0x1f": "ALTER TABLE Notes ADD COLUMN y INT DEFAULT 0x1f",
+		"ALTER TABLE n ADD FOREIGN KEY (x) REFERENCES Owners (id) on delete cascade": "ALTER TABLE n ADD FOREIGN KEY ( x ) " +
+			"REFERENCES Owners ( id ) ON DELETE CASCADE",
+		"CREATE TABLE a (x INT) COMMENT 'Two  spaces'": "CREATE TABLE a ( x INT ) COMMENT 'Two  spaces'",
 		"CREATE TABLE `My  Notes` (`Body` TEXT)":       "CREATE TABLE `My  Notes` ( `Body` TEXT )",
-		"  CREATE TABLE a (x INT) COMMENT 'it''s'  ":   "CREATE TABLE a ( X INT ) COMMENT 'it''s'",
+		"  CREATE TABLE a (x INT) COMMENT 'it''s'  ":   "CREATE TABLE a ( x INT ) COMMENT 'it''s'",
 		"CREATE TABLE a (x INT) COMMENT 'goes on":      "CREATE TABLE a (x INT) COMMENT 'goes on",
+	} {
+		assert.Equal(t, want, migrate.Normalize(stmt), stmt)
+	}
+}
+
+func TestNormalizeKeepsNames(t *testing.T) {
+	assert.NotEqual(t, migrate.Normalize("insert into Visitors values (1)"), migrate.Normalize("INSERT INTO visitors VALUES (1)"))
+	assert.Equal(t, migrate.Normalize("Create Table Visitors (Id Int Not Null)"), migrate.Normalize("CREATE TABLE Visitors (Id INT NOT NULL)"))
+	for stmt, want := range map[string]string{
+		"drop table if exists Notes":            "DROP TABLE IF EXISTS Notes",
+		"create table if not exists T (id int)": "CREATE TABLE IF NOT EXISTS T ( id INT )",
+		"alter table a rename to B":             "ALTER TABLE a RENAME TO B",
+		"select 1":                              "SELECT 1",
+		"alter table a modify column Total decimal(10, 2) unsigned not null default 0": "ALTER TABLE a MODIFY COLUMN Total " +
+			"DECIMAL ( 10 , 2 ) UNSIGNED NOT NULL DEFAULT 0",
+		"create table a (At datetime default current_timestamp) engine=innodb default charset=utf8mb4": "CREATE TABLE a ( At DATETIME " +
+			"DEFAULT CURRENT_TIMESTAMP ) ENGINE = INNODB DEFAULT CHARSET = utf8mb4",
 	} {
 		assert.Equal(t, want, migrate.Normalize(stmt), stmt)
 	}

@@ -36,11 +36,10 @@ func Split(draft []byte) ([]string, error) {
 
 // Normalize returns the form of stmt, a statement as Split returns it, in which two statements that
 // MySQL reads alike are the same: its tokens with one space between each two, without comments or
-// a final ;, and each word outside quotes in upper case, but for a table's name, after TABLE, ON or
-// REFERENCES, and a word that starts with a digit, such as 0x1f. MySQL reads keywords and the
-// names of columns and indexes in any case, while a table's name keeps its case. Strings and names
-// in backquotes are kept as they are. Text the checks cannot read is returned without surrounding
-// space.
+// a final ;, and each SQL keyword, type and function of a fixed list in upper case. Every other
+// word, a name, keeps its case, since MySQL tells tables apart by the case of their names.
+// Strings and names in backquotes are kept as they are. Text the checks cannot read is returned
+// without surrounding space.
 func Normalize(stmt string) string {
 	toks, _, err := lex(stmt)
 	if err != nil {
@@ -53,26 +52,11 @@ func Normalize(stmt string) string {
 	words := make([]string, len(toks))
 	for i, t := range toks {
 		words[i] = t.text
-		if t.kind == word && !isDigit(t.text[0]) && !tableName(toks, i) {
-			words[i] = strings.ToUpper(t.text)
+		if up := t.up(); keywords[up] {
+			words[i] = up
 		}
 	}
 	return strings.Join(words, " ")
-}
-
-// tableName reports whether toks[i] stands where a statement names a table: after TABLE, after
-// REFERENCES, or after ON but for ON DELETE and ON UPDATE.
-func tableName(toks []token, i int) bool {
-	if i == 0 {
-		return false
-	}
-	switch toks[i-1].up() {
-	case "TABLE", "REFERENCES":
-		return true
-	case "ON":
-		return toks[i].up() != "DELETE" && toks[i].up() != "UPDATE"
-	}
-	return false
 }
 
 // statement is a statement of a draft and the line it starts on.

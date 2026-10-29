@@ -4,6 +4,9 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `migrate.Normalize` upper-cases only SQL keywords, types and functions, from a fixed list;
+  every other word keeps its case, so `INSERT INTO Visitors` and `INSERT INTO visitors` no
+  longer compare alike, while `create table` and `CREATE TABLE` still do.
 - A publish that passes is decided on at once, against its app type (`class`; left out, it is
   `internal-tool`). `aicoded publish` and `aicoded status` print the decision before the status
   line: `Pre-approved by app type <type>: going live.` (then `live`), `Needs approval:` with a
