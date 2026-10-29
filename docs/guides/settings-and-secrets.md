@@ -75,8 +75,9 @@ On the platform, the values are set in the console, for each app, by the app's o
 security admin; neither the app, its builder nor an AI assistant can set them, and the console
 never shows a secret's value once it is set. A release whose permission list declares a setting
 or a secret with no value is refused with E-REL-022, which lists the names: ask the app's owner or
-a security admin to set them, then publish again. Each change of a value is in a change record: a
-setting's with its value, a secret's without it.
+a security admin to set them, and a *Pre-approved* publish goes live by itself about a minute
+later. Each change of a value is in a change record: a setting's with its value, a secret's
+without it.
 
 - The runner gives the app its settings when it starts, as `aicoded dev` does: a changed setting
   takes effect at the app's next start.
