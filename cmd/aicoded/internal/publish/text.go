@@ -55,7 +55,8 @@ func WriteText(w io.Writer, p platform.Publish) error {
 		writeRelease(&b, *p.Release, p.Declined != nil)
 	}
 	if d := p.Declined; d != nil {
-		fmt.Fprintf(&b, "  Declined by %s%s.\n  Publish again to ask for a new approval.\n", d.By, reason(strings.ReplaceAll(d.Reason, "\n", " ")))
+		fmt.Fprintf(&b, "  Declined by %s%s.\n  Publish again to ask for a new approval.\n"+
+			"  If it changed the schema, put the changes you still want back in .aicoded/migration.sql: they left the app's migrations.\n", d.By, reason(strings.ReplaceAll(d.Reason, "\n", " ")))
 	}
 	b.WriteString(p.Status)
 	switch {

@@ -410,7 +410,8 @@ func TestStatusDeclined(t *testing.T) {
 	declined.Declined = &platformtest.Declined{By: "ann@acme.example", Reason: "the export goes to\na personal address.", At: "2026-10-29T10:00:00Z"}
 	p.Answers(declined)
 	const want = "  Needs approval:\n    E-GATE-041: mail to partner.example\n" +
-		"  Declined by ann@acme.example: the export goes to a personal address.\n  Publish again to ask for a new approval.\npassed\n"
+		"  Declined by ann@acme.example: the export goes to a personal address.\n  Publish again to ask for a new approval.\n" +
+		"  If it changed the schema, put the changes you still want back in .aicoded/migration.sql: they left the app's migrations.\npassed\n"
 
 	code, out, errOut := aicoded("publish", dir)
 	assert.Equal(t, 1, code, errOut)

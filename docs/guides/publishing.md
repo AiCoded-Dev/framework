@@ -174,7 +174,7 @@ security checks, which the change record names too.
 | `tests` | L1 Approved parts only | runs the tests with `-race` | a failing test (E-CHK-004) |
 | `attacks` | L7 Simulated attacks | starts the app it built and attacks it: requests without a session or a role, another viewer on each guarded page, and markup in every field | E-GATE-029 to E-GATE-034 and E-GATE-036 |
 | `personal-data` | L7 Simulated attacks | searches what the app wrote during the attacks, its output and its spans, for what was entered in its forms | E-GATE-035 and E-GATE-037 |
-| `decision` | L10 Approval if needed | decides on the release against the app type: *Pre-approved* or *Needs approval*, with each reason a note (E-GATE-039 to E-GATE-046); see [app types](app-types.md) | an app type, a group or a role that the organisation does not have, or data its source registry does not allow (E-REL-019 to E-REL-021), and a permission list that the platform's rules refuse whatever the app's framework version, such as a data class outside the four (E-MAN-008) or E-MAN-024 |
+| `decision` | L10 Approval if needed | decides on the release against the app type: *Pre-approved* or *Needs approval*, with each reason a note (E-GATE-039 to E-GATE-047); see [app types](app-types.md) | an app type, a group or a role that the organisation does not have, or data its source registry does not allow (E-REL-019 to E-REL-021), and a permission list that the platform's rules refuse whatever the app's framework version, such as a data class outside the four (E-MAN-008) or E-MAN-024 |
 
 `checkout` and `modules` come first, and a problem in either skips the rest. The steps from
 `check` to `data` run no code of the app, and they run whatever one of them finds, so one
@@ -212,7 +212,7 @@ change record counts the notes, and security sees them, so fix them when you can
   block;
 - E-GATE-025: a directive silences a check;
 - E-GATE-038: a page the simulated attacks did not reach, which the change record lists too;
-- E-GATE-039 to E-GATE-046: why the release *Needs approval*, as [app types](app-types.md)
+- E-GATE-039 to E-GATE-047: why the release *Needs approval*, as [app types](app-types.md)
   explains;
 - E-MIG-003: a destructive schema change, which makes the release *Needs approval* and stops the
   app briefly while it is applied;
@@ -264,9 +264,12 @@ passed
   `An approver must approve it before it goes live.`: the permission list asks for more than the
   app type allows, or the release holds a change that always needs an approver, such as a
   destructive schema change.
-- `Declined by <email>: <reason>.`, then `Publish again to ask for a new approval.`: an
-  approver declined the approval card, which is final, and the command exits 1. Change what the
-  reason asks for, commit, and publish again: a new publish makes a new approval card.
+- `Declined by <email>: <reason>.`, then `Publish again to ask for a new approval.` and a line
+  about schema changes: an approver declined the approval card, which is final, and the command
+  exits 1. Change what the reason asks for, commit, and publish again: a new publish makes a new
+  approval card. The declined publish's schema changes left the app's migrations, and the draft
+  was cleared when it passed, so put the ones you still want back in `.aicoded/migration.sql`; a
+  publish made on top of them meanwhile fails with E-MIG-004.
 - `Released: replaced by a newer release.`: the release went live, and a newer release of the
   app has since taken its place.
 - `Release failed:` and why: the release did not go live where the app runs.
@@ -337,7 +340,7 @@ says which sections are enforced today, and which the platform only records for 
 - E-GATE-029 to E-GATE-037: what the simulated attacks find in the running app.
 - E-MIG-001 to E-MIG-007: the draft of schema changes, and the migrations a release applies.
 - E-REL-019 to E-REL-021: a publish that fails when the platform decides on its release.
-- E-GATE-021 to E-GATE-025, E-GATE-038 to E-GATE-046, E-MIG-003, E-DATA-001 and E-DATA-002:
+- E-GATE-021 to E-GATE-025, E-GATE-038 to E-GATE-047, E-MIG-003, E-DATA-001 and E-DATA-002:
   notes, which do not stop a publish.
 
 `aicoded explain <code>` prints the page of each, as does the `howto` tool of `aicoded mcp`.

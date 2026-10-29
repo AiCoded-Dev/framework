@@ -112,7 +112,8 @@ Schema changes use these codes:
 - E-MIG-003: a note on a destructive statement, such as `DROP TABLE` or `ALTER TABLE … DROP
   COLUMN`: the release needs an approval, and the app stops briefly while it is applied.
 - E-MIG-004: migrations that differ from those the database ran, and on the platform a release
-  of a publish whose schema changes were rejected after a step failed on production data.
+  of a publish whose schema changes were rejected after a step failed on production data, or a
+  publish made on top of the schema changes of a publish whose approval card was declined.
 - E-MIG-005: a step that failed while it was applied; on the platform, the schema changes after
   a step that MySQL refused on production data are rejected, and a step that could not finish is
   tried again with the next release.

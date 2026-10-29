@@ -7,9 +7,8 @@ compares the app's permission list with its app type and decides whether the rel
 *Pre-approved*, *Needs approval* or *Not allowed*. This guide covers app types, that decision,
 the group map, the source registry, and what `aicoded publish` shows.
 
-Your organisation's security admin defines its app types, its group map and its source
-registry. Until the console exists, the platform's operator sets them for your organisation, and
-every change has a change record.
+Your organisation's security admin defines its app types and its source registry, and its admin
+its group map, in the console; every change has a change record.
 
 ## App types
 
@@ -51,9 +50,11 @@ line:
     An approver must approve it before it goes live.
   ```
 
-  An approver sees an approval card that lists only what is new compared with the app type.
-  Until the console exists, the platform's operator releases such a publish when your
-  organisation asks. The reasons are notes of the step `decision` too, each with its fix.
+  An approver sees an approval card in the console that lists only what is new compared with the
+  app type, and approves or declines it: the app type's `approvers` group, or the security admins
+  when the type names none, and never the publish's builder. An approved release goes live; a
+  declined one never does, and `aicoded status` shows who declined it and why. The reasons are
+  notes of the step `decision` too, each with its fix.
 
 - **Not allowed.** Some things no app may do, whatever its type: an audience that lists no one,
   and health, HR or payment card data. `aicoded check` refuses them in the permission list
@@ -73,7 +74,10 @@ Whatever the app type allows, a release needs approval when:
 - data from the app's database, files, inbox or secrets reaches mail in a way the live version
   did not have (E-GATE-045, E-DATA-001);
 - a page is open to more people than in the live version (E-GATE-046): its roles are not among
-  those it had, it loses its `Guard`, or it becomes `shared`. A new page is not.
+  those it had, it loses its `Guard`, or it becomes `shared`. A new page is not;
+- a function of `rpc/` is open to more callers than in the live version (E-GATE-047): a new app
+  in `caller=`, a first `role=` or `apps=true`, or a `role=` that admits more viewers. A new
+  function is not. For now no app that serves calls is released (E-REL-007).
 
 ### What the app type decides
 
@@ -131,7 +135,7 @@ Declare the classes your data really has, so the decision matches what security 
 
 - E-REL-019, E-REL-020 and E-REL-021: a publish that fails when it is decided, and a release
   that is refused for the same reason.
-- E-GATE-039 to E-GATE-046: the reasons a release needs approval, as notes, which do not stop a
+- E-GATE-039 to E-GATE-047: the reasons a release needs approval, as notes, which do not stop a
   publish.
 - E-MAN-024: what is *Not allowed* in any permission list.
 - E-RUN-006: the page of a viewer outside the app's audience.

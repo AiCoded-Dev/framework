@@ -80,7 +80,9 @@ later. Each change of a value is in a change record: a setting's with its value,
 without it.
 
 - The runner gives the app its settings when it starts, as `aicoded dev` does: a changed setting
-  takes effect at the app's next start.
+  takes effect at the app's next start. A setting deleted while a release runs reaches the app as
+  an empty string at its next start; the next release, or a rollback, is refused with E-REL-022
+  until it has a value again.
 - A secret is read from the platform's secrets store at each `secrets.Get`, so a changed secret
   takes effect at the next read, with no new release. A secret whose value is gone fails with
   E-RUN-011, and a secret the platform cannot reach for a moment fails with an error to retry

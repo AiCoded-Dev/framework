@@ -4,6 +4,16 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- After `Declined by <email>: <reason>.` and `Publish again to ask for a new approval.`,
+  `aicoded publish` and `aicoded status` print `If it changed the schema, put the changes you still
+  want back in .aicoded/migration.sql: they left the app's migrations.`: a declined publish's
+  schema changes leave the app's migrations, and the draft was cleared when it passed. A publish
+  made on top of them before the decline fails at its step `migrations` with E-MIG-004.
+- E-GATE-047 also counts a function that gains `apps=true` or its first `role=` as open to more
+  callers.
+- E-REL-022 refuses a rollback, too, to a release whose permission list declares a value deleted
+  since. A setting deleted while a release runs reaches the app as an empty string at its next
+  start.
 - Settings and secrets get their production values in the console, from the app's owner or a
   security admin. E-REL-005 now refuses only secrets on a target that does not keep them:
   settings are released. E-REL-022 refuses a release whose permission list declares a setting or
