@@ -16,7 +16,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | CLI | `aicoded init`, `aicoded explain`, `aicoded login`, `logout` and `whoami`, the sign-in that `aicoded publish` and `status` use, and the `app_create` and `howto` tools of `aicoded mcp` |
 | PUB | `aicoded publish` and `aicoded status`, and the `publish` and `release_status` tools of `aicoded mcp` |
 | GATE | the security checks of the platform's delivery pipeline, in the problems and notes of a publish |
-| REL | the platform's release of a publish to production |
+| REL | the platform's release of a publish to production, and the approval of an approval card in the console |
 | DATA | notes on where the app's data goes, in `aicoded check` and the delivery pipeline: they never stop a check or a publish |
 | MIG | schema changes: the draft `.aicoded/migration.sql` in `aicoded check`, `aicoded dev` and the delivery pipeline, and the migrations applied to a database |
 | SQL | the app's database connection (mysql.sock) |
@@ -97,10 +97,11 @@ Publishing uses these codes:
   the checks read.
 - E-GATE-038 is a note, which does not stop a publish: a page the simulated attacks did not
   reach.
-- E-GATE-039 to E-GATE-046 are notes, which do not stop a publish, that say why its release
+- E-GATE-039 to E-GATE-047 are notes, which do not stop a publish, that say why its release
   *Needs approval*: an audience group, a data class, a mail domain or an outside service that the
   app type does not allow, people outside the company, a destructive schema change, data that
-  reaches mail in a new way, and a page open to more people than before.
+  reaches mail in a new way, a page open to more people than before, and a function of `rpc/`
+  open to more callers than before.
 
 Schema changes use these codes:
 
@@ -136,8 +137,7 @@ Releasing uses these codes, each a release that the platform refuses before anyt
 - E-REL-003: an app built with a framework older than v0.6.0.
 - E-REL-004, E-REL-007 and E-REL-017: what the platform does not run yet: people outside the
   company, calls between apps, and outside services and schedules.
-- E-REL-005: settings, which the platform does not keep yet, and secrets where the target of the
-  organisation's server does not keep them.
+- E-REL-005: secrets where the target of the organisation's server does not keep them.
 - E-REL-006, E-REL-008 and E-REL-013: an `email.from` address in a domain that the organisation
   has not verified, that another app of the organisation has, or of which the hosting makes no
   mailbox.
@@ -151,6 +151,18 @@ Releasing uses these codes, each a release that the platform refuses before anyt
 - E-REL-019 to E-REL-021: an app type that the organisation does not have, a group or a role
   that its group map does not have, and a data source that its source registry marks *Not
   allowed*. Each also fails a publish when the platform decides on its release.
+- E-REL-022: a setting or a secret that the permission list declares and that has no value set
+  in the console.
+- E-REL-023: a release or a rollback that *Needs approval*, asked for by the platform's operator.
+
+Approving an approval card in the console uses these codes, each an approval that the platform
+refuses, so that nothing is released and the card still waits:
+
+- E-REL-024: an approver who built the publish.
+- E-REL-025: an approver who signed in more than five minutes ago.
+- E-REL-026: a card that changed since the approver opened it: a newer publish, another
+  permission list, built app or decision, or a card already approved or declined.
+- E-REL-027: a person who is not in the app type's approver group.
 
 E-REL-009 refuses the operator's purge of a publish that a live or pending release runs.
 
@@ -177,6 +189,9 @@ app runs.
 
 E-RUN-012 refuses, on the platform, an app's read of a secret past the runner's bound of its reads:
 100 at once, then 20 a second, and 8 under way at once.
+
+E-RUN-013 is the page a runner shows, with status 503, for an app whose new version did not start
+after a destructive schema change, which the earlier version cannot run on.
 
 E-RUN-007, E-RUN-008 and E-RUN-010 are what the platform answers a server's runner that enrols or
 connects: a refused enrolment token or certificate request, a runner certificate that is missing,

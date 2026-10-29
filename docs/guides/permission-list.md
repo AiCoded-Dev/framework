@@ -91,7 +91,8 @@ or left empty, is not stated.
   `#` and `@daily` are not accepted. No building block runs a job yet.
 - `settings` and `secrets` name the values the app reads: lowercase letters, digits and `_`,
   starting with a letter, each once (E-MAN-005). Their values are not in the file: on your
-  computer they come from `dev.yaml`. See [settings and secrets](settings-and-secrets.md).
+  computer they come from `dev.yaml`, and on the platform they are set in the console. See
+  [settings and secrets](settings-and-secrets.md).
 - `modules` lists the third-party Go modules the app's code uses, by module path, such as
   `golang.org/x/text`: each once, without a version, which comes from `go.mod` (E-MAN-013).
   `aicoded check` refuses a third-party module that the app, or a module it lists, imports

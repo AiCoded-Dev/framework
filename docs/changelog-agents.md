@@ -4,6 +4,22 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- Settings and secrets get their production values in the console, from the app's owner or a
+  security admin. E-REL-005 now refuses only secrets on a target that does not keep them:
+  settings are released. E-REL-022 refuses a release whose permission list declares a setting or
+  a secret with no value set, and lists the names. E-RUN-011's fix now asks the app's owner or a
+  security admin. See the guide `guides/settings-and-secrets`.
+- E-REL-023 refuses the platform's operator a release or a rollback that *Needs approval*: such a
+  release goes live only through an approval card in the console. E-REL-024 to E-REL-027 refuse
+  an approval of a card: by the publish's builder (024), after a sign-in more than five minutes
+  old (025), of a card that changed since it was opened (026), and by a person outside the app
+  type's approver group (027).
+- E-GATE-047 is a note of the step `decision`, a reason a release *Needs approval*: a function of
+  `rpc/` that the live version has is open to more callers, through a new app in `caller=` or a
+  `role=` that admits more viewers.
+- E-RUN-013 is the page, with status 503, of an app whose new version did not start after a
+  destructive schema change: the runner never starts the earlier version on the changed schema,
+  and the app stays stopped until a fixed version goes live.
 - When an approver declines a publish's approval card, `aicoded publish` and `aicoded status`
   print `Declined by <email>: <reason>.` and `Publish again to ask for a new approval.` after the
   decision, and exit 1. `aicoded status --json` and `release_status` carry it as `declined`, with

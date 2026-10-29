@@ -71,14 +71,22 @@ See [aicoded dev](dev.md) for the rest of `dev.yaml`.
 
 ## On the platform
 
-The platform's operator sets the values of an app's secrets where the app runs; neither the app
-nor its builder can set or read them there. A declared secret with no value fails in
-`secrets.Get` with E-RUN-011, and works once the operator sets it, with no new release. A secret
-the platform cannot reach for a moment fails with an error to retry later. Each read goes to the
-platform's secrets store, so read a secret once, when the app starts or first needs it, and keep
-the value in memory: an app that reads its secrets more than 20 times a second, after 100 at once,
-or 8 at once, fails with E-RUN-012. The platform keeps no settings yet: an app that declares
-`settings` is not released (E-REL-005).
+On the platform, the values are set in the console, for each app, by the app's owner or a
+security admin; neither the app, its builder nor an AI assistant can set them, and the console
+never shows a secret's value once it is set. A release whose permission list declares a setting
+or a secret with no value is refused with E-REL-022, which lists the names: ask the app's owner or
+a security admin to set them, then publish again. Each change of a value is in a change record: a
+setting's with its value, a secret's without it.
+
+- The runner gives the app its settings when it starts, as `aicoded dev` does: a changed setting
+  takes effect at the app's next start.
+- A secret is read from the platform's secrets store at each `secrets.Get`, so a changed secret
+  takes effect at the next read, with no new release. A secret whose value is gone fails with
+  E-RUN-011, and a secret the platform cannot reach for a moment fails with an error to retry
+  later.
+- Read a secret once, when the app starts or first needs it, and keep the value in memory: an app
+  that reads its secrets more than 20 times a second, after 100 at once, or 8 at once, fails with
+  E-RUN-012.
 
 ## See also
 
