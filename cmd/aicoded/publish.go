@@ -101,7 +101,7 @@ func wait(ctx context.Context, c *platform.Client, id, dir string, stdout, stder
 }
 
 // report prints the publish p and returns the exit code: 1 when it failed, was refused or ended
-// in error, and 0 otherwise.
+// in error, or its approval card was declined, and 0 otherwise.
 func report(p platform.Publish, stdout, stderr io.Writer) int {
 	if err := publish.WriteText(stdout, p); err != nil {
 		return fail(stderr, err)
@@ -109,7 +109,7 @@ func report(p platform.Publish, stdout, stderr io.Writer) int {
 	if err := publish.Outcome(p); err != nil {
 		return fail(stderr, err)
 	}
-	if p.Status == "failed" {
+	if p.Status == "failed" || p.Declined != nil {
 		return exitFail
 	}
 	return exitOK
@@ -153,7 +153,7 @@ func runStatus(args []string, stdout, stderr io.Writer) int {
 	if err := enc.Encode(p); err != nil {
 		return fail(stderr, err)
 	}
-	if p.Done() && p.Status != "passed" {
+	if p.Done() && p.Status != "passed" || p.Declined != nil {
 		return exitFail
 	}
 	return exitOK

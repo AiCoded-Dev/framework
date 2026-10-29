@@ -165,7 +165,8 @@ func TestPublishIsCleaned(t *testing.T) {
 		Notes:  []platformtest.Problem{{Code: "E-GATE-025", Pos: "main.go:3\x1b", Message: "a directive\u202e", Fix: "remove it", Docs: "https://evil.example/"}},
 		Record: -1,
 		Release: &platformtest.Release{Tier: "R2\x1b", AppType: "internal-tool@builtin\u202e", State: "refused\r", Reason: "no\x07", Live: true,
-			Reasons: []platformtest.Problem{{Code: "E-GATE-043", Pos: "aicoded.yaml:4\x1b", Message: "outside\u202e people", Docs: "https://evil.example/"}}}})
+			Reasons: []platformtest.Problem{{Code: "E-GATE-043", Pos: "aicoded.yaml:4\x1b", Message: "outside\u202e people", Docs: "https://evil.example/"}}},
+		Declined: &platformtest.Declined{By: "ann@acme.example\x1b[2J", Reason: "not\u202e this\nway", At: "2026-10-29T10:00:00Z"}})
 
 	got, err := c.Publish(t.Context(), created.ID)
 	require.NoError(t, err)
@@ -184,6 +185,8 @@ func TestPublishIsCleaned(t *testing.T) {
 	assert.Equal(t, &platform.Release{Tier: "R2?", AppType: "internal-tool@builtin?", State: "refused?", Reason: "no?", Live: true,
 		Reasons: []problem.Problem{{Code: "E-GATE-043", Pos: "aicoded.yaml:4?", Message: "outside? people", Docs: "https://aicoded.dev/docs/errors/E-GATE-043"}}},
 		got.Release, "the decision is cleaned as the rest")
+	assert.Equal(t, &platform.Declined{By: "ann@acme.example?[2J", Reason: "not? this\nway", At: time.Date(2026, 10, 29, 10, 0, 0, 0, time.UTC)},
+		got.Declined, "the decline is cleaned as the rest")
 	assert.True(t, got.Done())
 }
 

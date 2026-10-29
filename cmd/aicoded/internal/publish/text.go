@@ -12,8 +12,8 @@ import (
 
 // WriteText writes the publish as aicoded publish and aicoded status print it: what was
 // published, each step with its outcome, the problems as aicoded check prints them, each note
-// after "note: ", which checks ran, the change record, the decision on releasing it, and a last
-// line with the status, which counts the problems of a failed publish.
+// after "note: ", which checks ran, the change record, the decision on releasing it, an approver's
+// decline, and a last line with the status, which counts the problems of a failed publish.
 func WriteText(w io.Writer, p platform.Publish) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "publish %s of %s at %s", p.ID, p.App, short(p.SHA))
@@ -52,7 +52,10 @@ func WriteText(w io.Writer, p platform.Publish) error {
 		fmt.Fprintf(&b, "  change record %d\n", p.Record)
 	}
 	if p.Release != nil {
-		writeRelease(&b, *p.Release)
+		writeRelease(&b, *p.Release, p.Declined != nil)
+	}
+	if d := p.Declined; d != nil {
+		fmt.Fprintf(&b, "  Declined by %s%s.\n  Publish again to ask for a new approval.\n", d.By, reason(strings.ReplaceAll(d.Reason, "\n", " ")))
 	}
 	b.WriteString(p.Status)
 	switch {
@@ -77,8 +80,9 @@ func writeProblem(b *strings.Builder, prefix, app string, q problem.Problem) {
 }
 
 // writeRelease writes the decision r on releasing a publish, in the words people see: the tier
-// with its app type or its reasons, and what became of the release.
-func writeRelease(b *strings.Builder, r platform.Release) {
+// with its app type or its reasons, and what became of the release, which an approver must
+// approve unless it is declined.
+func writeRelease(b *strings.Builder, r platform.Release, declined bool) {
 	if r.Tier == "R3" {
 		b.WriteString("  Not allowed" + reason(r.Reason) + ".\n")
 		return
@@ -116,7 +120,7 @@ func writeRelease(b *strings.Builder, r platform.Release) {
 		}
 		if r.Live || r.State == "released" || r.State == "replaced" {
 			fmt.Fprintf(b, "  Released: %s.\n", progress(r))
-		} else {
+		} else if !declined {
 			b.WriteString("  An approver must approve it before it goes live.\n")
 		}
 	default:

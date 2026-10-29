@@ -166,6 +166,16 @@ type Publish struct {
 	Record int64 `json:"record,omitempty"`
 	// Release is the platform's decision on releasing a publish that passed, once it is made.
 	Release *Release `json:"release,omitempty"`
+	// Declined is the decline of the publish's approval card, which is final, or nil.
+	Declined *Declined `json:"declined,omitempty"`
+}
+
+// Declined is an approver's decline of a publish's approval card.
+type Declined struct {
+	// By is the approver's email.
+	By     string    `json:"by"`
+	Reason string    `json:"reason"`
+	At     time.Time `json:"at"`
 }
 
 // Release is the decision on releasing a publish to production and what became of it.
@@ -374,6 +384,12 @@ func (p *Publish) clean() {
 	if r := p.Release; r != nil {
 		r.Tier, r.AppType, r.State, r.Reason = clean(r.Tier, 8), clean(r.AppType, 128), clean(r.State, 32), clean(r.Reason, 500)
 		r.Reasons = cleanProblems(r.Reasons)
+	}
+	if d := p.Declined; d != nil {
+		d.By, d.Reason = clean(d.By, 254), cleanLines(d.Reason, 1000)
+		if d.By == "" {
+			d.By = "an approver"
+		}
 	}
 }
 

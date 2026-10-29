@@ -48,9 +48,17 @@ type Publish struct {
 	Steps            []Step    `json:"steps"`
 	Problems         []Problem `json:"problems"`
 	// Notes are left out when empty, as an older platform does.
-	Notes   []Problem `json:"notes,omitempty"`
-	Record  int       `json:"record,omitempty"`
-	Release *Release  `json:"release,omitempty"`
+	Notes    []Problem `json:"notes,omitempty"`
+	Record   int       `json:"record,omitempty"`
+	Release  *Release  `json:"release,omitempty"`
+	Declined *Declined `json:"declined,omitempty"`
+}
+
+// Declined is the approver's decline of a publish's approval card.
+type Declined struct {
+	By     string `json:"by"`
+	Reason string `json:"reason"`
+	At     string `json:"at"`
 }
 
 // Release is the decision on releasing a publish and what became of it.

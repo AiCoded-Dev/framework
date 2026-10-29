@@ -401,6 +401,40 @@ func TestRunStatusNotes(t *testing.T) {
 	assert.Less(t, strings.Index(out, `"problems"`), strings.Index(out, `"notes"`), "notes follow the problems")
 }
 
+func TestStatusDeclined(t *testing.T) {
+	p, aicoded := signedIn(t)
+	dir := gittest.NewApp(t, "demo")
+	declined := platformtest.Passed()
+	declined.Release = &platformtest.Release{Tier: "R2", AppType: "internal-tool@builtin", State: "declined",
+		Reasons: []platformtest.Problem{{Code: "E-GATE-041", Message: "mail to partner.example"}}}
+	declined.Declined = &platformtest.Declined{By: "ann@acme.example", Reason: "the export goes to\na personal address.", At: "2026-10-29T10:00:00Z"}
+	p.Answers(declined)
+	const want = "  Needs approval:\n    E-GATE-041: mail to partner.example\n" +
+		"  Declined by ann@acme.example: the export goes to a personal address.\n  Publish again to ask for a new approval.\npassed\n"
+
+	code, out, errOut := aicoded("publish", dir)
+	assert.Equal(t, 1, code, errOut)
+	assert.True(t, strings.HasSuffix(out, want), out)
+
+	id := publishID(t, out)
+	code, out, errOut = aicoded("status", id)
+	assert.Equal(t, 1, code, errOut)
+	assert.True(t, strings.HasSuffix(out, want), out)
+	assert.NotContains(t, out, "An approver must approve it")
+
+	code, out, _ = aicoded("status", "--json", id)
+	assert.Equal(t, 1, code)
+	var got platform.Publish
+	require.NoError(t, json.Unmarshal([]byte(out), &got))
+	require.NotNil(t, got.Declined)
+	assert.Equal(t, platform.Declined{By: "ann@acme.example", Reason: "the export goes to\na personal address.",
+		At: time.Date(2026, 10, 29, 10, 0, 0, 0, time.UTC)}, *got.Declined)
+
+	p.Answers(platformtest.Passed())
+	code, _, errOut = aicoded("status", id)
+	assert.Equal(t, 0, code, errOut, "a publish without declined is not declined")
+}
+
 func TestRunStatusUsage(t *testing.T) {
 	p, aicoded := signedIn(t)
 	for _, args := range [][]string{

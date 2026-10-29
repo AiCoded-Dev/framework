@@ -264,6 +264,9 @@ passed
   `An approver must approve it before it goes live.`: the permission list asks for more than the
   app type allows, or the release holds a change that always needs an approver, such as a
   destructive schema change.
+- `Declined by <email>: <reason>.`, then `Publish again to ask for a new approval.`: an
+  approver declined the approval card, which is final, and the command exits 1. Change what the
+  reason asks for, commit, and publish again: a new publish makes a new approval card.
 - `Released: replaced by a newer release.`: the release went live, and a newer release of the
   app has since taken its place.
 - `Release failed:` and why: the release did not go live where the app runs.
@@ -273,7 +276,9 @@ passed
 `aicoded status --json` and the `release_status` tool give the same in `release`: its `tier`
 (`R1` for *Pre-approved*, `R2` for *Needs approval*), its `app_type`, its `reasons`, its `state`
 (`due`, `waiting`, `released`, `failed`, `replaced`, `refused` or `superseded`), the `reason` of
-a refusal or a failure, and whether it is `live`. [App types](app-types.md) tells how the platform decides.
+a refusal or a failure, and whether it is `live`; a declined approval card is in `declined`, with
+the approver's email as `by`, the `reason` and the time `at`. [App types](app-types.md) tells how
+the platform decides.
 
 ## When a release stops at a schema change
 

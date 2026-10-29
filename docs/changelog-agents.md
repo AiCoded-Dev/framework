@@ -4,6 +4,11 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- When an approver declines a publish's approval card, `aicoded publish` and `aicoded status`
+  print `Declined by <email>: <reason>.` and `Publish again to ask for a new approval.` after the
+  decision, and exit 1. `aicoded status --json` and `release_status` carry it as `declined`, with
+  `by`, `reason` and `at`; a platform that sends no `declined` leaves it out, and the publish is
+  not declined.
 - `migrate.Normalize` upper-cases only SQL keywords, types and functions, from a fixed list;
   every other word keeps its case, so `INSERT INTO Visitors` and `INSERT INTO visitors` no
   longer compare alike, while `create table` and `CREATE TABLE` still do.
