@@ -322,9 +322,9 @@ Preview of demo at https://demo.acme.preview.aicoded.cloud/ until 2026-11-13T10:
 Invite up to five people in the console.
 ```
 
-- **Signing in.** A preview needs the scope `app:<id>:preview` of your sign-in, which a sign-in
-  made before previews existed lacks: until you run `aicoded login` again, `aicoded preview` fails
-  with E-PUB-005, "your sign-in does not carry it yet".
+- **Signing in.** A preview needs the scope `app:<id>:preview` of your sign-in. A sign-in made
+  before previews existed lacks it, and `aicoded preview` refreshes the sign-in once to get it, so
+  you do not sign in again; a sign-in that has ended is E-CLI-004, as for publishing.
 - **Which publish.** One that passed its checks and whose approval card was not declined, whatever
   its app type allows: a publish that *Needs approval* can be previewed while its card waits. Any
   other is E-REL-029.
