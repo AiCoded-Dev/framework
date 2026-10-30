@@ -138,10 +138,39 @@ func TestHashIgnoresOrder(t *testing.T) {
 }
 
 func TestCanonicalSets(t *testing.T) {
-	m := manifest.Manifest{App: "a1", Egress: []string{"b.example", "a.example", "b.example"}, Settings: []string{}, Access: map[string]manifest.Access{}}
+	m := manifest.Manifest{App: "a1", Egress: []manifest.Egress{{Host: "b.example"}, {Host: "a.example"}, {Host: "b.example"}}, Settings: []string{}, Access: map[string]manifest.Access{}}
 	const want = `{"app":"a1","egress":["a.example","b.example"]}`
 	assert.JSONEq(t, want, string(manifest.Canonical(m)), "every list is a set, and what is empty is not stated")
 	sum := sha256.Sum256([]byte(want))
 	assert.Equal(t, "sha256:"+hex.EncodeToString(sum[:]), manifest.Hash(m), "the hash is of the canonical form, byte for byte")
-	assert.Equal(t, []string{"b.example", "a.example", "b.example"}, m.Egress, "the manifest is not changed")
+	assert.Equal(t, []manifest.Egress{{Host: "b.example"}, {Host: "a.example"}, {Host: "b.example"}}, m.Egress, "the manifest is not changed")
+}
+
+// Permission lists without egress, or with plain hosts only, hash as they did before keys could
+// be bound to hosts.
+func TestHashBeforeBindings(t *testing.T) {
+	assert.Equal(t, "sha256:e0e32e6a80beec0584fbeeddad346e3817de2f85dc38700f3cc16b1f9e8bd6b4", manifest.Hash(load(t, ordered)))
+	noEgress := strings.Replace(ordered, "egress: [a.example, b.example]\n", "", 1)
+	assert.Equal(t, "sha256:16614a4fc2c28cab9a0426bc307e20179e2cefe05496c604e249208a43d10805", manifest.Hash(load(t, noEgress)))
+}
+
+func TestCanonicalBindings(t *testing.T) {
+	key := manifest.Egress{Host: "b.example", Secret: "k", Header: "Authorization", Prefix: "Bearer "}
+	m := manifest.Manifest{App: "a1", Egress: []manifest.Egress{{Host: "c.example"}, key, {Host: "a.example", Secret: "k", Header: "X-Key"}, key}}
+	const want = `{"app":"a1","egress":[{"host":"a.example","secret":"k","header":"X-Key"},` +
+		`{"host":"b.example","secret":"k","header":"Authorization","prefix":"Bearer "},"c.example"]}`
+	assert.JSONEq(t, want, string(manifest.Canonical(m)))
+	sum := sha256.Sum256([]byte(want))
+	assert.Equal(t, "sha256:"+hex.EncodeToString(sum[:]), manifest.Hash(m), "plain hosts and bindings sorted by host, byte for byte")
+
+	for name, e := range map[string]manifest.Egress{
+		"plain":  {Host: "b.example"},
+		"secret": {Host: "b.example", Secret: "j", Header: "Authorization", Prefix: "Bearer "},
+		"header": {Host: "b.example", Secret: "k", Header: "X-Key", Prefix: "Bearer "},
+		"prefix": {Host: "b.example", Secret: "k", Header: "Authorization"},
+		"host":   {Host: "d.example", Secret: "k", Header: "Authorization", Prefix: "Bearer "},
+	} {
+		other := manifest.Manifest{App: "a1", Egress: []manifest.Egress{{Host: "c.example"}, e, {Host: "a.example", Secret: "k", Header: "X-Key"}}}
+		assert.NotEqual(t, manifest.Hash(m), manifest.Hash(other), name)
+	}
 }

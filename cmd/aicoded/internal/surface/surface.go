@@ -34,7 +34,7 @@ func Of(m manifest.Manifest, writes []lint.Write) Surface {
 	for _, w := range writes {
 		s.Writes = append(s.Writes, w.Op+" "+w.Table)
 	}
-	s.Effects = len(writes) + len(m.Connectors()) + len(m.Egress)
+	s.Effects = len(writes) + len(m.Connectors()) + len(m.EgressHosts())
 	if m.Email != nil {
 		s.Effects += len(m.Email.ToDomains)
 	}

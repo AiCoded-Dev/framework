@@ -49,6 +49,8 @@ The permission list uses these codes for what its fields may hold:
   `confidential` and `personal`.
 - E-MAN-024: a permission list that is *Not allowed* whatever the app type: an audience that
   lists no one, or a data source with the class `health`, `hr` or `card`.
+- E-MAN-025: a key bound to a host in `egress` with a secret that is not declared, a bad header
+  or a bad prefix.
 
 Signing in to the platform uses these codes:
 

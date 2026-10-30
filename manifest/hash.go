@@ -12,8 +12,9 @@ import (
 
 // Canonical returns the form of m that Hash hashes: its JSON encoding, keyed by the names of
 // aicoded.yaml, with every list sorted and each item once, and with what is empty or false left
-// out. Two permission lists that differ only in the order of keys or of list items, or in
-// comments, have one canonical form.
+// out. An egress entry is its host alone when it binds no key and an object otherwise, the
+// entries sorted by host. Two permission lists that differ only in the order of keys or of list
+// items, or in comments, have one canonical form.
 func Canonical(m Manifest) []byte {
 	c := m
 	c.Audience = Audience{Internal: set(m.Audience.Internal), External: set(m.Audience.External)}
@@ -34,7 +35,15 @@ func Canonical(m Manifest) []byte {
 			return Serve{Callers: set(s.Callers), Require: set(s.Require), Apps: s.Apps}
 		}),
 	}
-	c.Egress = set(m.Egress)
+	c.Egress = nil
+	if len(m.Egress) > 0 {
+		c.Egress = slices.Clone(m.Egress)
+		slices.SortFunc(c.Egress, func(a, b Egress) int {
+			return cmp.Or(strings.Compare(a.Host, b.Host), strings.Compare(a.Secret, b.Secret),
+				strings.Compare(a.Header, b.Header), strings.Compare(a.Prefix, b.Prefix))
+		})
+		c.Egress = slices.Compact(c.Egress)
+	}
 	if m.Email != nil {
 		c.Email = &Email{From: m.Email.From, ToDomains: set(m.Email.ToDomains)}
 	}

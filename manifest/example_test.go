@@ -9,13 +9,23 @@ import (
 // Parse checks a permission list and returns its fields. A list with problems returns every
 // problem, each with a code and its position.
 func ExampleParse() {
-	m, err := manifest.Parse(manifest.FileName, []byte("app: rooms\naudience: {internal: [everyone]}\negress: [api.partner.example]\n"))
+	m, err := manifest.Parse(manifest.FileName, []byte(`app: rooms
+audience: {internal: [everyone]}
+egress:
+  - hooks.partner.example
+  - {host: api.partner.example, secret: partner_api_key, header: Authorization, prefix: "Bearer "}
+secrets: [partner_api_key]
+`))
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(m.Egress)
-	// Output: [api.partner.example]
+	fmt.Println(m.EgressHosts())
+	b, _ := m.Binding("api.partner.example")
+	fmt.Printf("%s in %s after %q\n", b.Secret, b.Header, b.Prefix)
+	// Output:
+	// [api.partner.example hooks.partner.example]
+	// partner_api_key in Authorization after "Bearer "
 }
 
 // Diff lists what changed between two permission lists, field by field, as the platform's
@@ -29,7 +39,7 @@ func ExampleDiff() {
 	after := manifest.Manifest{
 		App:      "rooms",
 		Access:   map[string]manifest.Access{"/rooms/{id}": {Require: []string{"staff"}, Guard: true}},
-		Egress:   []string{"api.partner.example"},
+		Egress:   []manifest.Egress{{Host: "api.partner.example"}},
 		Settings: []string{"report_day", "greeting"},
 	}
 	for _, c := range manifest.Diff(before, after) {

@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"cmp"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -36,7 +37,7 @@ type Manifest struct {
 	Data      []Data            `yaml:"data" json:"data,omitzero"`
 	Access    map[string]Access `yaml:"access" json:"access,omitzero"`
 	Services  Services          `yaml:"services" json:"services,omitzero"`
-	Egress    []string          `yaml:"egress" json:"egress,omitzero"`
+	Egress    []Egress          `yaml:"egress" json:"egress,omitzero"`
 	Email     *Email            `yaml:"email" json:"email,omitzero"`
 	Schedule  []Job             `yaml:"schedule" json:"schedule,omitzero"`
 	Settings  []string          `yaml:"settings" json:"settings,omitzero"`
@@ -98,6 +99,89 @@ type Data struct {
 type Email struct {
 	From      string   `yaml:"from" json:"from,omitzero"`
 	ToDomains []string `yaml:"to_domains" json:"to_domains,omitzero"`
+}
+
+// Egress is one entry of egress: the host of an outside service the app calls, and, when the
+// entry binds a key, the secret the runner adds to every request to the host, in the header
+// Header after Prefix. In aicoded.yaml, and in JSON, a plain entry is the host alone and a
+// binding is a mapping of host, secret, header and prefix.
+type Egress struct {
+	Host   string `yaml:"host" json:"host"`
+	Secret string `yaml:"secret" json:"secret,omitzero"`
+	Header string `yaml:"header" json:"header,omitzero"`
+	Prefix string `yaml:"prefix" json:"prefix,omitzero"`
+}
+
+// Bound reports whether the entry binds a key to its host.
+func (e Egress) Bound() bool {
+	return e.Secret != ""
+}
+
+// plain reports whether the entry has nothing but its host.
+func (e Egress) plain() bool {
+	return e == Egress{Host: e.Host}
+}
+
+// UnmarshalYAML reads a scalar as the host alone and a mapping as the entry's fields.
+func (e *Egress) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind == yaml.ScalarNode {
+		*e = Egress{}
+		return n.Decode(&e.Host)
+	}
+	type fields Egress
+	return n.Decode((*fields)(e))
+}
+
+// MarshalJSON writes a plain entry as its host and a binding as an object.
+func (e Egress) MarshalJSON() ([]byte, error) {
+	if e.plain() {
+		return json.Marshal(e.Host)
+	}
+	type fields Egress
+	return json.Marshal(fields(e))
+}
+
+// UnmarshalJSON reads what MarshalJSON writes.
+func (e *Egress) UnmarshalJSON(data []byte) error {
+	if len(data) > 0 && data[0] == '"' {
+		*e = Egress{}
+		return json.Unmarshal(data, &e.Host)
+	}
+	type fields Egress
+	return json.Unmarshal(data, (*fields)(e))
+}
+
+// EgressHosts returns the hosts of egress, sorted, each once.
+func (m Manifest) EgressHosts() []string {
+	hosts := make([]string, 0, len(m.Egress))
+	for _, e := range m.Egress {
+		hosts = append(hosts, e.Host)
+	}
+	return set(hosts)
+}
+
+// Binding returns the entry of egress that binds a key to host, and false when host is not
+// listed or is listed without a key.
+func (m Manifest) Binding(host string) (Egress, bool) {
+	for _, e := range m.Egress {
+		if e.Host == host && e.Bound() {
+			return e, true
+		}
+	}
+	return Egress{}, false
+}
+
+// BoundSecret returns the entry of egress that binds the secret name, the first by host when
+// several do, and false when none does.
+func (m Manifest) BoundSecret(name string) (Egress, bool) {
+	var first Egress
+	found := false
+	for _, e := range m.Egress {
+		if e.Bound() && e.Secret == name && (!found || e.Host < first.Host) {
+			first, found = e, true
+		}
+	}
+	return first, found
 }
 
 // SQLDB reports whether the app declares its SQL database.
@@ -313,6 +397,9 @@ func (c *checker) unknownKeys() {
 	for name, s := range pairs(value(services, "serves")) {
 		c.keys(s, keys[Serve](), fmt.Sprintf("services.serves %q", name), generated)
 	}
+	for _, e := range seq(c.section("egress")) {
+		c.keys(e, keys[Egress](), "egress", "")
+	}
 	c.keys(c.section("email"), keys[Email](), "email", "")
 	for _, j := range seq(c.section("schedule")) {
 		c.keys(j, keys[Job](), "schedule", "")
@@ -370,7 +457,7 @@ func (c *checker) check(m Manifest) {
 	c.checkAudience(m.Audience, c.section("audience"))
 	c.checkData(m.Data, c.section("data"))
 	c.checkAccess(m.Access, c.section("access"))
-	c.checkEgress(m.Egress, c.section("egress"))
+	c.checkEgress(m.Egress, m.Secrets, c.section("egress"))
 	c.section("email")
 	c.checkEmail(m.Email)
 	c.checkSchedule(m.Schedule, c.section("schedule"))

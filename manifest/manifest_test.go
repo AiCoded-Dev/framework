@@ -245,7 +245,7 @@ func TestFullList(t *testing.T) {
 			Calls:  map[string][]string{"inventory": {"ReserveParts"}},
 			Serves: map[string]manifest.Serve{"RoomStatus": {Callers: []string{"front-desk"}, Require: []string{"hotel-ops"}}},
 		},
-		Egress:    []string{},
+		Egress:    []manifest.Egress{{Host: "api.partner.example", Secret: "partner_api_key", Header: "Authorization", Prefix: "Bearer "}},
 		Email:     &manifest.Email{From: "ops@acme.example", ToDomains: []string{"acme.example"}},
 		Schedule:  []manifest.Job{{Cron: "0 6 * * *", Name: "daily-summary"}},
 		Settings:  []string{"report_day"},
@@ -268,13 +268,13 @@ ttl: 1d
 `)
 	assert.Equal(t, "group:ops.lisbon", m.Owner)
 	assert.Equal(t, manifest.Audience{Internal: []string{"everyone", "group:hr_leads"}, External: []string{"idp:partners", "magic-link"}}, m.Audience)
-	assert.Equal(t, []string{"api.partner.example", "hooks.slack.com"}, m.Egress)
+	assert.Equal(t, []manifest.Egress{{Host: "api.partner.example"}, {Host: "hooks.slack.com"}}, m.Egress)
 	assert.Equal(t, "1d", m.TTL)
 	assert.Equal(t, "group:hr_leads", load(t, a1("owner: group:hr_leads")).Owner)
 	assert.Equal(t, "3650d", load(t, a1("ttl: 3650d")).TTL)
 
 	empty := "app: a1\nclass:\nowner: ''\naudience:\n  internal: [everyone]\n  external:\negress: []\nschedule:\nsize:\nresources: ''\nttl: ~\n"
-	assert.Equal(t, manifest.Manifest{App: "a1", Audience: manifest.Audience{Internal: []string{"everyone"}}, Egress: []string{}}, load(t, empty),
+	assert.Equal(t, manifest.Manifest{App: "a1", Audience: manifest.Audience{Internal: []string{"everyone"}}, Egress: []manifest.Egress{}}, load(t, empty),
 		"an empty value is not stated")
 }
 

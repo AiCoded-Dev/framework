@@ -17,7 +17,11 @@ access:                              # written by aicoded generate from <ssr:acc
 services:                            # generated call graph
   calls: {inventory: [ReserveParts]}
   serves: {RoomStatus: {callers: [front-desk], require: ["hotel-ops"]}}
-egress: []                           # allowed outbound hosts
+egress:                              # outside services it calls, over HTTPS
+  - host: api.partner.example        # the runner adds the key to every request
+    secret: partner_api_key
+    header: Authorization
+    prefix: "Bearer "
 email:
   from: ops@acme.example
   to_domains: [acme.example]

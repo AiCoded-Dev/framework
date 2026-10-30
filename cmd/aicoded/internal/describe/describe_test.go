@@ -186,7 +186,9 @@ func TestDescribeReach(t *testing.T) {
 	require.NoError(t, os.WriteFile(yaml, append(data, `data:
   - source: connector:crm
     classes: [internal]
-egress: [api.partner.example, hooks.partner.example]
+egress:
+  - hooks.partner.example
+  - {host: api.partner.example, secret: token, header: Authorization, prefix: "Bearer "}
 schedule:
   - {cron: "0 6 * * *", job: daily-summary}
 `...), 0o600))
@@ -197,6 +199,7 @@ schedule:
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"apps": [{"name": "hello", "dir": `+quote(filepath.Join(root, "hello"))+`, "audience": {"external": ["magic-link"]},
 		"connectors": ["crm"], "egress": ["api.partner.example", "hooks.partner.example"],
+		"bindings": [{"host": "api.partner.example", "secret": "token", "header": "Authorization", "prefix": "Bearer "}],
 		"schedule": [{"job": "daily-summary", "cron": "0 6 * * *"}], "settings": ["greeting"], "secrets": ["token"],
 		"surface": {"size": 3, "entry_points": 1, "effects": 3}}]}`, string(data))
 }
@@ -265,11 +268,15 @@ func TestDescribeText(t *testing.T) {
 			Stores:     []string{"photos"},
 			Connectors: []string{"crm", "m365-sharepoint"},
 			Email:      &Email{From: "ops@acme.example", ToDomains: []string{"acme.example"}},
-			Egress:     []string{"api.partner.example", "hooks.partner.example"},
-			Schedule:   []Job{{Name: "daily-summary", Cron: "0 6 * * *"}, {Name: "sync", Cron: "*/15 * * * *"}},
-			Settings:   []string{"report_day"},
-			Modules:    []string{"golang.org/x/text"},
-			Size:       "M", Resources: "medium", TTL: "90d",
+			Egress:     []string{"api.partner.example", "hooks.partner.example", "maps.partner.example"},
+			Bindings: []Binding{
+				{Host: "api.partner.example", Secret: "partner_api_key", Header: "Authorization", Prefix: "Bearer "},
+				{Host: "maps.partner.example", Secret: "maps_key", Header: "X-Api-Key"},
+			},
+			Schedule: []Job{{Name: "daily-summary", Cron: "0 6 * * *"}, {Name: "sync", Cron: "*/15 * * * *"}},
+			Settings: []string{"report_day"},
+			Modules:  []string{"golang.org/x/text"},
+			Size:     "M", Resources: "medium", TTL: "90d",
 			Surface: surface.Surface{Size: 5, EntryPoints: 3, Effects: 5},
 		},
 	}}
@@ -309,7 +316,9 @@ app ops (/w/ops)
   files photos
   connectors crm, m365-sharepoint
   email from ops@acme.example to acme.example
-  egress api.partner.example, hooks.partner.example
+  egress api.partner.example, hooks.partner.example, maps.partner.example
+  binding api.partner.example  secret partner_api_key  header Authorization  prefix "Bearer "
+  binding maps.partner.example  secret maps_key  header X-Api-Key
   schedule daily-summary  cron 0 6 * * *
   schedule sync  cron */15 * * * *
   settings report_day

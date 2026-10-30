@@ -40,6 +40,7 @@ type App struct {
 	Connectors []string            `json:"connectors,omitempty"`
 	Email      *Email              `json:"email,omitempty"`
 	Egress     []string            `json:"egress,omitempty"`
+	Bindings   []Binding           `json:"bindings,omitempty"`
 	Schedule   []Job               `json:"schedule,omitempty"`
 	Settings   []string            `json:"settings,omitempty"`
 	Secrets    []string            `json:"secrets,omitempty"` // names only
@@ -68,6 +69,15 @@ type Audience struct {
 type Job struct {
 	Name string `json:"job"`
 	Cron string `json:"cron"`
+}
+
+// Binding is a key the runner adds to every request to an outside service: the secret's name,
+// never its value, the header it goes in and the text before it.
+type Binding struct {
+	Host   string `json:"host"`
+	Secret string `json:"secret"`
+	Header string `json:"header"`
+	Prefix string `json:"prefix,omitempty"`
 }
 
 // Page is one page of the access section: its path, the role rules a viewer must meet, whether a
@@ -137,7 +147,7 @@ func describeApp(ctx context.Context, a workspace.App, names map[string]string) 
 		SQLDB:      m.SQLDB(),
 		Stores:     m.Stores(),
 		Connectors: m.Connectors(),
-		Egress:     m.Egress,
+		Egress:     m.EgressHosts(),
 		Settings:   m.Settings,
 		Secrets:    m.Secrets,
 		Modules:    m.Modules,
@@ -147,6 +157,11 @@ func describeApp(ctx context.Context, a workspace.App, names map[string]string) 
 		Warnings:   res.Warnings,
 		Findings:   problem.From(a.Name, err),
 		Routes:     res.Routes,
+	}
+	for _, host := range d.Egress {
+		if b, ok := m.Binding(host); ok {
+			d.Bindings = append(d.Bindings, Binding{Host: b.Host, Secret: b.Secret, Header: b.Header, Prefix: b.Prefix})
+		}
 	}
 	if len(m.Audience.Internal) > 0 || len(m.Audience.External) > 0 {
 		d.Audience = &Audience{Internal: m.Audience.Internal, External: m.Audience.External}

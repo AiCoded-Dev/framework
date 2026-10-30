@@ -59,6 +59,13 @@ func (s Summary) WriteText(w io.Writer) error {
 			b.WriteString("\n")
 		}
 		line(&b, "egress", a.Egress)
+		for _, k := range a.Bindings {
+			fmt.Fprintf(&b, "  binding %s  secret %s  header %s", k.Host, k.Secret, k.Header)
+			if k.Prefix != "" {
+				fmt.Fprintf(&b, "  prefix %q", k.Prefix)
+			}
+			b.WriteString("\n")
+		}
 		for _, j := range a.Schedule {
 			fmt.Fprintf(&b, "  schedule %s  cron %s\n", j.Name, j.Cron)
 		}

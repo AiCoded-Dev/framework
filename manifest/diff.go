@@ -1,6 +1,7 @@
 package manifest
 
 import (
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -18,7 +19,9 @@ type Change struct{ Field, Key, Before, After string }
 // source's classes, sorted; an access path's "require <rules>", then "; guard" or "; shared",
 // then "; calls <names>", when they apply, its lists in written order; a served function's
 // "callers <apps>", then "; require <rules>" and "; apps" when they apply, its lists sorted; a
-// job's cron. The functions called from another app change one by one, keyed by that app.
+// job's cron. Egress changes by each host removed or added, then by each key binding, keyed by its
+// host: "secret <name> in <header>", then ` after "<prefix>"` with a prefix, and empty for a host
+// without a key. The functions called from another app change one by one, keyed by that app.
 func Diff(before, after Manifest) []Change {
 	var c changes
 	c.value("app", "", before.App, after.App)
@@ -32,7 +35,8 @@ func Diff(before, after Manifest) []Change {
 		c.set("services.calls", app, before.Services.Calls[app], after.Services.Calls[app])
 	}
 	c.keyed("services.serves", serveText(before.Services.Serves), serveText(after.Services.Serves))
-	c.set("egress", "", before.Egress, after.Egress)
+	c.set("egress", "", before.EgressHosts(), after.EgressHosts())
+	c.keyed("egress", bindingText(before.Egress), bindingText(after.Egress))
 	be, ae := emailOf(before.Email), emailOf(after.Email)
 	c.value("email.from", "", be.From, ae.From)
 	c.set("email.to_domains", "", be.ToDomains, ae.ToDomains)
@@ -137,6 +141,20 @@ func serveText(serves map[string]Serve) map[string]string {
 			text += "; apps"
 		}
 		out[name] = text
+	}
+	return out
+}
+
+func bindingText(entries []Egress) map[string]string {
+	out := map[string]string{}
+	for _, e := range entries {
+		if e.Bound() {
+			text := fmt.Sprintf("secret %s in %s", e.Secret, e.Header)
+			if e.Prefix != "" {
+				text += fmt.Sprintf(" after %q", e.Prefix)
+			}
+			out[e.Host] = text
+		}
 	}
 	return out
 }

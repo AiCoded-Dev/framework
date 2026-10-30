@@ -77,10 +77,27 @@ or left empty, is not stated.
     building block reads one yet.
 
   Names are lower-case letters, digits and dashes, and each source is listed once (E-MAN-007).
-- `egress` lists the outside services the app calls, by host name, over HTTPS on port 443: a
-  lower-case name such as `api.partner.example`, with no scheme, port, path, wildcard or IP
-  address, and none whose last label is `localhost`, `local`, `internal` or `arpa`, each once
-  (E-MAN-018). No building block calls one yet.
+- `egress` lists the outside services the app calls over HTTPS on port 443. An entry is a host
+  alone, or a host with a key that the runner adds to every request to it:
+
+  ```yaml
+  egress:
+    - hooks.partner.example        # a host alone
+    - host: api.partner.example    # a host with a key
+      secret: partner_api_key      # a secret declared in secrets
+      header: Authorization        # the header the key goes in
+      prefix: "Bearer "            # text before the key, if the service wants one
+  ```
+
+  A host is a lower-case name such as `api.partner.example`, with no scheme, port, path,
+  wildcard or IP address, none whose last label is `localhost`, `local`, `internal` or `arpa`,
+  and none of the platform's own, such as `aicoded.cloud`, `aicoded.dev` and their subdomains.
+  Each host is listed once, alone or with a key (E-MAN-018). A key's `secret` is declared in
+  `secrets`; its `header` is a header name of at most 64 characters, and not `Host`,
+  `Content-Length`, `Content-Type`, `Cookie` or a header of the connection itself, such as
+  `Connection` or `Transfer-Encoding`; its `prefix`, which may be left out, is at most 64
+  printable ASCII characters (E-MAN-025). One secret may go to several hosts. The app never reads
+  a key it binds: it calls the service with `outbound.Client()`, and the runner adds the key.
 - `email` has `from`, one plain lower-case address, and `to_domains`, the lower-case domains the
   app may send to, with no wildcards and no non-ASCII names (E-MAN-009). See [mail](mail.md).
 - `schedule` lists the app's scheduled jobs, each as `{cron: "<expression>", job: <name>}`
@@ -111,8 +128,8 @@ An AI assistant writes `owner` and `audience` when the person says who owns and 
 leaves `class`, `size`, `resources` and `ttl` out unless the person or their administrator gives
 them: security and the budget owner set them.
 
-An unknown key is an error (E-MAN-014): at the top level, in `audience`, in each entry of `data`
-and `schedule`, in `email`, and in `access` and `services`, so that a misspelt key never goes
+An unknown key is an error (E-MAN-014): at the top level, in `audience`, in each entry of `data`,
+`egress` and `schedule`, in `email`, and in `access` and `services`, so that a misspelt key never goes
 unseen. The file may not use an anchor, an alias or a merge key, `&name`, `*name` or `<<`: write
 every value out in full (E-MAN-003). `aicoded check` reports every problem of the file at once, in
 line order.
@@ -173,6 +190,7 @@ section to add when the app reaches for more:
 | reads a setting with `config.String` | its name in `settings` | E-MAN-001 |
 | reads a secret with `secrets.Get` | its name in `secrets` | E-MAN-002 |
 | calls a function of another app | the call in `services.calls` | E-RPC-008 |
+| calls an outside service with `outbound.Client()` | its host in `egress` | E-OUT-001 |
 
 Every page needs an access rule on its path, so every page is in `access`. Together the sections
 say, in a form security can read, who uses the app, what data it reaches and where its mail goes,
@@ -180,17 +198,20 @@ without reading its code.
 
 ## What the platform does with it
 
-- `data`, `email`, `settings`, `secrets`, `modules`, `access` and `services` are enforced as
-  above, by the runner, `aicoded check` and the delivery pipeline.
-- `class`, `audience`, `data`, `email.to_domains` and `egress` are compared with the app type
-  when a publish passes, and decide whether its release is *Pre-approved* or *Needs approval*;
-  see [app types](app-types.md). The runner lets in only the people `audience` names, through
+- `data`, `egress`, `email`, `settings`, `secrets`, `modules`, `access` and `services` are
+  enforced as above, by the runner, `aicoded check` and the delivery pipeline.
+- `class`, `audience`, `data`, `email.to_domains` and the hosts of `egress` are compared with
+  the app type when a publish passes, and decide whether its release is *Pre-approved* or *Needs
+  approval*; see [app types](app-types.md). A key that is new, or that goes to a host in another
+  way than in the app's live release, always *Needs approval*: the approver sees which key goes
+  to which outside service. The runner lets in only the people `audience` names, through
   the organisation's group map.
 - The platform records the other fields, `owner`, `schedule`, `size`, `resources` and `ttl`,
   and shows each change to the permission list in the app's change record. Holding the app to
-  them comes later, with limits. Until the platform runs outside services and schedules, a
-  release to production refuses a permission list with `egress` hosts or `schedule` jobs
-  (E-REL-017), and until outside people can sign in, one with `audience.external` (E-REL-004).
+  them comes later, with limits. Until the platform runs schedules, a release to production
+  refuses a permission list with `schedule` jobs, and one with `egress` that was built with a
+  framework older than v0.10.0 (E-REL-017); until outside people can sign in, one with
+  `audience.external` (E-REL-004).
 
 ## See also
 

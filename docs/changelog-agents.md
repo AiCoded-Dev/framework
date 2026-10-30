@@ -4,6 +4,20 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- An `egress` entry is a host alone, as before, or a mapping that binds a key to the host:
+  `{host: api.partner.example, secret: partner_api_key, header: Authorization, prefix: "Bearer "}`.
+  The runner adds the secret's value, after the prefix, in the header of every request to the
+  host, so the app never reads it. The secret is declared in `secrets`; a bad binding is
+  E-MAN-025, and an unknown key in an entry E-MAN-014. Each host is listed once, alone or with a
+  key, and the platform's own hosts, such as `aicoded.cloud`, `aicoded.dev` and their subdomains,
+  are refused (E-MAN-018). In Go, `manifest.Manifest.Egress` is a `[]manifest.Egress` of `Host`,
+  `Secret`, `Header` and `Prefix`; `EgressHosts`, `Binding`, `BoundSecret` and
+  `manifest.PlatformHost` read it. The canonical form and hash of a permission list whose
+  entries are hosts alone are unchanged; a binding is an object in it, sorted by host.
+  `manifest.Diff` lists each host added or removed as before, then each key binding that changed,
+  keyed by its host, as `secret <name> in <header>` with ` after "<prefix>"` when it has one.
+  `aicoded describe` lists the bindings, with the secret's name and never its value.
+
 - `aicoded preview <id>` and the MCP tool `preview_publish {publish}` run a publish that passed as
   its app's preview on the platform, at `<app>.<organisation>.preview.aicoded.cloud`, for 14 days
   from its first start; a newer publish replaces the version it runs. `aicoded preview end [dir]`
