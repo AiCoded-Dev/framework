@@ -56,11 +56,13 @@ type outboundService struct {
 	egress manifest.Manifest
 	// slots holds a token for each request under way.
 	slots chan struct{}
+	// keys keeps the values of the bound keys.
+	keys *keyCache
 }
 
 func newOutboundService(s *Server, egress []manifest.Egress) *outboundService {
 	return &outboundService{s: s, egress: manifest.Manifest{Egress: egress},
-		slots: make(chan struct{}, runnerproto.MaxOutboundRequests)}
+		slots: make(chan struct{}, runnerproto.MaxOutboundRequests), keys: newKeyCache()}
 }
 
 // outboundCall is what the span of one request records.
@@ -133,7 +135,7 @@ func (o *outboundService) do(ctx context.Context, msg *runnerv1.DoRequest, call 
 	}
 	var key string
 	if b, ok := o.egress.Binding(u.Host); ok {
-		v, err := o.s.providers.Secrets.Secret(ctx, b.Secret)
+		v, err := o.keys.get(ctx, b.Secret, o.s.providers.Secrets.Secret)
 		if err != nil {
 			return nil, providerError(err)
 		}
@@ -149,7 +151,7 @@ func (o *outboundService) do(ctx context.Context, msg *runnerv1.DoRequest, call 
 	}
 	out.Header = h
 	resp, err := o.s.providers.Outbound.Do(ctx, out)
-	if err != nil || resp == nil {
+	if err != nil || resp == nil || resp.Body == nil {
 		return nil, unreachable(u.Host, err, key)
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -228,11 +230,11 @@ func badHeader(msg string) error {
 }
 
 // unreachable returns what the app gets for err, an error of Outbound for a request to host
-// that carried key: a coded error by its code and message, unless either quotes key, and any
+// that carried key: an E-OUT error by its code and message, unless either quotes key, and any
 // other error as E-OUT-008 with a fixed message.
 func unreachable(host string, err error, key string) error {
 	var e *errs.Error
-	if errors.As(err, &e) && (key == "" || !strings.Contains(e.Msg+e.Fix, key)) {
+	if errors.As(err, &e) && strings.HasPrefix(e.Code, "E-OUT-") && (key == "" || !strings.Contains(e.Msg+e.Fix, key)) {
 		return errs.New(e.Code, e.Msg, e.Fix)
 	}
 	return errs.New("E-OUT-008", quote(host)+" could not be reached", "check the host name, or try again later")

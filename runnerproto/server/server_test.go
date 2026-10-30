@@ -138,6 +138,9 @@ func TestHelloVersions(t *testing.T) {
 	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err))
 	assert.Equal(t, "E-RUN-014", coded(t, err).Code, "protocol 3 has no outbound")
 	assert.Equal(t, "update aicoded.dev/framework to v0.10.0 or newer", coded(t, err).Fix)
+
+	preview, _ := serveWith(t, func(o *Options) { o.Env = EnvPreview; o.Egress = []manifest.Egress{} })
+	assert.Equal(t, "E-RUN-014", coded(t, sayHello(preview, 3)).Code, "by the permission list, whatever the preview reaches")
 }
 
 func TestReady(t *testing.T) {

@@ -378,7 +378,10 @@ func TestOutboundNeverLeaksTheKey(t *testing.T) {
 	prev := log.Writer()
 	log.SetOutput(&logged)
 	t.Cleanup(func() { log.SetOutput(prev) })
-	c, f := serve(t)
+	f := newFakes()
+	opts := options(t, f)
+	s := start(t, opts)
+	c := dial(opts.Dir)
 	var appErrs []error
 
 	f.outbound.answerWith(func(r *http.Request) (*http.Response, error) {
@@ -411,6 +414,7 @@ func TestOutboundNeverLeaksTheKey(t *testing.T) {
 	appErrs = append(appErrs, err)
 
 	f.secrets.set("partner_api_key", partnerKey+"\r\nX-Evil: 1")
+	s.outbound.keys.setClock(later(2 * time.Minute))
 	_, err = do(t, c, get("https://api.partner.example/"))
 	assert.Equal(t, "E-OUT-009", coded(t, err).Code, "a key that cannot go in a header")
 	appErrs = append(appErrs, err)
@@ -425,4 +429,92 @@ func TestOutboundNeverLeaksTheKey(t *testing.T) {
 		assert.NotContains(t, sp.String(), partnerKey)
 	}
 	assert.NotContains(t, logged.String(), partnerKey)
+}
+
+// setClock makes the key cache read the time from now.
+func (c *keyCache) setClock(now func() time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = now
+}
+
+// later returns a clock d after the real one.
+func later(d time.Duration) func() time.Time { return func() time.Time { return time.Now().Add(d) } }
+
+func TestOutboundReadsABoundKeyOnceAMinute(t *testing.T) {
+	f := newFakes()
+	opts := options(t, f)
+	s := start(t, opts)
+	c := dial(opts.Dir)
+	reads := func() int { return len(f.secrets.seen()) }
+
+	release := make(chan struct{})
+	f.secrets.hold(release)
+	var wg sync.WaitGroup
+	for range runnerproto.MaxOutboundRequests {
+		wg.Go(func() {
+			_, err := do(t, c, get("https://api.partner.example/"))
+			assert.NoError(t, err)
+		})
+	}
+	require.Eventually(t, func() bool { return len(s.outbound.slots) == runnerproto.MaxOutboundRequests }, 5*time.Second, time.Millisecond,
+		"every request waits for the key")
+	close(release)
+	wg.Wait()
+	assert.Equal(t, 1, reads(), "requests that miss together share one read")
+	for _, r := range f.outbound.got() {
+		assert.Equal(t, "Bearer "+partnerKey, r.header.Get("Authorization"))
+	}
+
+	s.outbound.keys.setClock(later(59 * time.Second))
+	_, err := do(t, c, get("https://api.partner.example/"))
+	require.NoError(t, err)
+	assert.Equal(t, 1, reads(), "kept for a minute")
+
+	s.outbound.keys.setClock(later(61 * time.Second))
+	_, err = do(t, c, get("https://api.partner.example/"))
+	require.NoError(t, err)
+	assert.Equal(t, 2, reads(), "read again after a minute")
+
+	f.secrets.fail(errors.New("store down"))
+	s.outbound.keys.setClock(later(3 * time.Minute))
+	_, err = do(t, c, get("https://api.partner.example/"))
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err))
+	f.secrets.fail(nil)
+	_, err = do(t, c, get("https://api.partner.example/"))
+	require.NoError(t, err, "a failed read is not kept")
+	assert.Equal(t, 4, reads())
+
+	_, err = c.secrets.GetSecret(t.Context(), connect.NewRequest(&runnerv1.GetSecretRequest{Name: "partner_api_key"}))
+	assert.Equal(t, "E-RUN-015", coded(t, err).Code, "the cache never reaches the app")
+	assert.NotContains(t, err.Error(), partnerKey)
+}
+
+func TestOutboundRefusesAResponseWithoutABody(t *testing.T) {
+	c, f := serve(t)
+	f.outbound.answerWith(func(*http.Request) (*http.Response, error) { return &http.Response{StatusCode: http.StatusOK}, nil })
+	_, err := do(t, c, get("https://status.partner.example/"))
+	assert.Equal(t, "E-OUT-008", coded(t, err).Code)
+}
+
+func TestOutboundPassesOnlyOutboundCodes(t *testing.T) {
+	c, f := serve(t)
+	f.outbound.answerWith(func(*http.Request) (*http.Response, error) {
+		return nil, errs.New("E-RUN-012", "secrets read too often at 10.0.0.7", "read less")
+	})
+	_, err := do(t, c, get("https://status.partner.example/"))
+	e := coded(t, err)
+	assert.Equal(t, "E-OUT-008", e.Code)
+	assert.Equal(t, `"status.partner.example" could not be reached`, e.Msg)
+
+	spans, _ := f.telemetry.got()
+	require.Len(t, spans, 1)
+	assert.Equal(t, map[string]string{
+		"server.address":                  "status.partner.example",
+		"http.request.method":             "GET",
+		"aicoded.outbound.request_bytes":  "0",
+		"aicoded.outbound.response_bytes": "0",
+		"aicoded.outbound.refused":        "E-OUT-008",
+	}, spans[0].GetAttributes())
+	assert.Equal(t, "E-OUT-008", spans[0].GetError())
 }

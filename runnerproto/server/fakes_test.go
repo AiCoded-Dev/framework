@@ -318,6 +318,7 @@ func (f *fakeMail) Move(_ context.Context, id, folder string) error {
 type fakeSecrets struct {
 	recorder
 	values, settings map[string]string
+	block            chan struct{} // when set, each read waits for it to close
 }
 
 func (f *fakeSecrets) Secret(_ context.Context, name string) (string, error) {
@@ -325,8 +326,20 @@ func (f *fakeSecrets) Secret(_ context.Context, name string) (string, error) {
 		return "", err
 	}
 	f.mu.Lock()
+	block := f.block
+	f.mu.Unlock()
+	if block != nil {
+		<-block
+	}
+	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.values[name], nil
+}
+
+func (f *fakeSecrets) hold(block chan struct{}) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.block = block
 }
 
 func (f *fakeSecrets) set(name, value string) {
