@@ -1,6 +1,6 @@
 // Package platformtest fakes the platform on 127.0.0.1, for the tests of aicoded: its sign-in,
-// token, revocation and whoami endpoints, and the builder API that aicoded publish and status
-// call.
+// token, revocation and whoami endpoints, and the builder API that aicoded publish, status,
+// logs, traces and preview call.
 package platformtest
 
 import (
@@ -28,8 +28,8 @@ const (
 )
 
 // Platform is a fake platform. Everyone who signs in gets the scope app:create, and the scopes
-// app:<id>:release:request, app:<id>:status and app:<id>:logs of each app they own that is not archived, as they
-// are when the token is issued.
+// app:<id>:release:request, app:<id>:status, app:<id>:logs and app:<id>:preview of each app they
+// own that is not archived, as they are when the token is issued.
 type Platform struct {
 	// URL is its address, http://127.0.0.1:<port>.
 	URL string
@@ -78,6 +78,9 @@ func New(t testing.TB) *Platform {
 	mux.HandleFunc("POST /v1/apps/migrations", p.getMigrations)
 	mux.HandleFunc("POST /v1/publishes/create", p.createPublish)
 	mux.HandleFunc("POST /v1/publishes/get", p.getPublish)
+	mux.HandleFunc("POST /v1/previews/start", p.startPreview)
+	mux.HandleFunc("POST /v1/previews/get", p.getPreview)
+	mux.HandleFunc("POST /v1/previews/end", p.endPreview)
 	mux.HandleFunc("GET /v1/apps/{app}/logs", p.readTelemetry)
 	mux.HandleFunc("GET /v1/apps/{app}/spans", p.readTelemetry)
 	mux.HandleFunc("GET /v1/apps/{app}/traces/{trace}", p.readTelemetry)

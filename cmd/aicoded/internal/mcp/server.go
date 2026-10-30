@@ -39,6 +39,9 @@ Work in this loop:
    the status is passed, failed, refused or error, tell the person the outcome, with the release
    of a publish that passed (Pre-approved, Needs approval and why, or Not released), and fix its
    problems as you fix check's. On E-CLI-004, ask the person to run aicoded login.
+6. Only when the person asks for a preview on the platform: call preview_publish with the id of
+   a publish that passed, and tell the person its url. preview_end ends it. Invite no one: the
+   person picks who sees the preview, in the console.
 aicoded.yaml is the app's permission list: write app, owner, data, email, settings, secrets
 and modules by hand.
 aicoded generate writes its access and services sections, every *_gen.go and *_gen.ts file,

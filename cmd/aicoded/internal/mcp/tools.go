@@ -133,6 +133,21 @@ type releaseStatusIn struct {
 	ID string `json:"id"`
 }
 
+type previewPublishIn struct {
+	Publish string `json:"publish"`
+}
+
+// previewOut is the preview a publish runs as, and what to tell the person.
+type previewOut struct {
+	platform.Preview
+	Next string `json:"next"`
+}
+
+type previewEndOut struct {
+	App   string `json:"app"`
+	Ended bool   `json:"ended"`
+}
+
 // envProps are the properties of the telemetry tools' schemas that onPlatform holds.
 const envProps = `"env": {"type": "string", "enum": ["dev", "preview", "production"], "description": "dev, the default, reads aicoded dev on this computer; preview or production reads the app on the platform, with the person's sign-in, which needs app"},
     "since": {"type": "string", "description": "on the platform, read from this time on: RFC 3339, or a while ago such as 30m, 6h or 2d; an hour before until by default, at most 7 days before it"},
@@ -187,6 +202,14 @@ var (
     "id": {"type": "string", "pattern": "^pub_[a-z2-7]{26}$", "description": "the id that publish returned"}
   },
   "required": ["id"],
+  "additionalProperties": false
+}`)
+	previewPublishSchema = json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "publish": {"type": "string", "pattern": "^pub_[a-z2-7]{26}$", "description": "the id of a publish that passed, which publish returned"}
+  },
+  "required": ["publish"],
   "additionalProperties": false
 }`)
 )
@@ -312,6 +335,13 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 		InputSchema: releaseStatusSchema,
 		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, the problems with their code, file:line and fix, and the notes, in the same shape, which do not stop the publish; release, the decision on releasing a publish that passed: its tier (R1 Pre-approved, R2 Needs approval, R3 Not allowed), the app type, the reasons it needs approval, its state (due, waiting, released, failed, replaced, refused or superseded) and whether it is live; and draft, what became of the app's schema-change draft, .aicoded/migration.sql: sent with a publish that has not ended, settled (deleted once that publish passed, or kept, as draft_note says), or none."},
 		s.releaseStatus)
+	changesPreview := &mcpsdk.ToolAnnotations{DestructiveHint: &yes, OpenWorldHint: &yes}
+	tool(srv, &mcpsdk.Tool{Name: "preview_publish", Annotations: changesPreview, InputSchema: previewPublishSchema,
+		Description: "Run a publish that passed as its app's preview on the platform, only when the person asks: one preview per app, for 14 days from its first start, which this publish replaces the version of. It returns the preview's address and end, and reset when the preview's data was deleted, since the version it ran had schema changes that this publish does not continue. Only the person invites viewers, in the console."},
+		s.previewPublish)
+	tool(srv, &mcpsdk.Tool{Name: "preview_end", Annotations: changesPreview,
+		Description: "End the preview of an app on the platform, only when the person asks: its address stops answering and its data is deleted."},
+		s.previewEnd)
 }
 
 // tool adds a tool whose error reaches the client as a tool error with the text of its problems.
@@ -447,6 +477,39 @@ func (s *server) settle(ctx context.Context, c *platform.Client, p platform.Publ
 		}
 	}
 	return draftState{Draft: "none"}
+}
+
+func (s *server) previewPublish(ctx context.Context, in previewPublishIn) (previewOut, error) {
+	if !platform.PublishID.MatchString(in.Publish) {
+		return previewOut{}, errors.New("the id of a publish is pub_ and 26 lowercase letters and digits")
+	}
+	c, err := s.platformClient()
+	if err != nil {
+		return previewOut{}, err
+	}
+	pv, err := c.PreviewStart(ctx, in.Publish)
+	if err != nil {
+		return previewOut{}, err
+	}
+	next := "tell the person the preview's url and when it expires"
+	if pv.Reset {
+		next += ", and that its data was reset: the preview had run schema changes that this publish does not continue"
+	}
+	return previewOut{Preview: pv, Next: next + "; the person invites up to five people in the console, and you invite no one"}, nil
+}
+
+func (s *server) previewEnd(ctx context.Context, in appIn) (previewEndOut, error) {
+	if err := validApp(in.App, false); err != nil {
+		return previewEndOut{}, err
+	}
+	c, err := s.platformClient()
+	if err != nil {
+		return previewEndOut{}, err
+	}
+	if err := c.PreviewEnd(ctx, in.App); err != nil {
+		return previewEndOut{}, err
+	}
+	return previewEndOut{App: in.App, Ended: true}, nil
 }
 
 // platformClient returns a client of the platform that AICODED_PLATFORM names.

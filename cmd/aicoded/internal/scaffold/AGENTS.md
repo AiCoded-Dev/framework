@@ -103,8 +103,7 @@ not for changing the framework itself. Follow them in every change.
    its code, `file:line` and fix. Lint applies the rules for app code that `guides/rules` lists
    (E-LINT codes). `aicoded check --frozen` writes nothing and reports every generated file that
    is out of date: run it before you commit.
-5. `aicoded explain <topic>` prints a page of the docs: a guide such as `guides/forms`, a task
-   recipe, the changelog or the page of an error code.
+5. `aicoded explain <topic>` prints a page of the docs, such as `guides/forms` or an error code.
 
 Local values live outside the repository, in the developer's `dev.yaml`: the values of settings
 and secrets, `mysql:` for an app with a database, and the test personas. Its format is on the
@@ -119,8 +118,7 @@ With MCP, the same loop is a set of tools that take app names, never paths. Add 
 - `what_broke` lists the failed apps, error log lines and failed spans; `describe` sums up apps;
 - `logs`, `traces`, `trace`, `mail_list` and `mail_get` show what `aicoded dev` saw, and
   `mail_receive` delivers a test mail; with `env` set to `preview` or `production`, `logs`,
-  `traces` and `trace` read an app on the platform: only when asked, as they hold real data;
-- `publish` and `release_status` publish an app and show the outcome, as below.
+  `traces` and `trace` read an app on the platform: only when asked, as they hold real data.
 
 ## Publishing
 
@@ -130,7 +128,9 @@ MCP tool `publish` with the app and a summary: it runs `aicoded check --frozen` 
 sends the commit to the platform's delivery pipeline and gives a publish id. `aicoded status <id>`,
 or `release_status`, shows the steps, the problems, the notes (which never stop a publish) and the
 outcome. Tell the developer the outcome, and fix its problems as those of `aicoded check`. On
-E-CLI-004, ask the developer to run `aicoded login`: signing in needs a person.
+E-CLI-004, ask the developer to run `aicoded login`: signing in needs a person. Only when asked,
+`aicoded preview <id>` or `preview_publish` runs a publish that passed as the app's preview on the
+platform, and `preview_end` ends it. Invite no one: the developer picks who sees it, in the console.
 
 ## Where to read
 

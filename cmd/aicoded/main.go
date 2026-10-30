@@ -38,6 +38,7 @@ commands:
   logout          revoke the sign-in to the platform and forget it
   logs [dir]      print the log lines of the app in dir on the platform (--env preview|production, --app, --since, --until, --level, --trace, --limit, --json)
   mcp [dir]       serve the AI assistant's tools for the apps in dir over MCP on stdin and stdout
+  preview <id>    run the publish <id> as its app's preview on the platform; preview end [dir] ends the preview of the app in dir and deletes its data
   publish [dir]   send the commit of the app in dir to the platform's delivery pipeline and wait for the outcome (--app <name>, -m <summary>, --no-wait)
   rpc add <app>   let the app in the current directory call the functions of the app named <app>
   status <id>     print the steps, problems and outcome of a publish (--json)
@@ -161,6 +162,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runLogs(args, stdout, stderr)
 	case "mcp":
 		return runMCP(args, stdout, stderr)
+	case "preview":
+		return runPreview(args, stdout, stderr)
 	case "publish":
 		return runPublish(args, stdout, stderr)
 	case "rpc":

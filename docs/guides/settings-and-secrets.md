@@ -90,6 +90,9 @@ without it.
 - Read a secret once, when the app starts or first needs it, and keep the value in memory: an app
   that reads its secrets more than 20 times a second, after 100 at once, or 8 at once, fails with
   E-RUN-012.
+- An app's preview has values of its own, set the same way for the preview, and never reads the
+  production values. A preview whose permission list declares a value with none set for the
+  preview does not start: E-REL-030 lists the names. See [publishing](publishing.md).
 
 ## See also
 

@@ -138,6 +138,18 @@ type builder struct {
 	telemetryRefusal *refusal
 	// migrations holds the steps /v1/apps/migrations answers for each app.
 	migrations map[string][]migrate.Step
+	// previews holds each app's preview by the app's name; previewRefusal refuses the next start
+	// of a preview, when set, and resetNext makes the next start report that it reset the data.
+	previews       map[string]*fakePreview
+	previewRefusal *refusal
+	resetNext      bool
+}
+
+// fakePreview is an app's preview: the publish it runs, and since when and until when.
+type fakePreview struct {
+	publish          string
+	started, expires time.Time
+	ended            bool
 }
 
 type fakeApp struct {
@@ -158,8 +170,8 @@ type fakePublish struct {
 }
 
 type refusal struct {
-	status          int
-	errorCode, code string
+	status                       int
+	errorCode, code, description string
 }
 
 // uploadMeta is the meta part of an upload.
@@ -172,7 +184,7 @@ type uploadMeta struct {
 
 func newBuilder() builder {
 	return builder{newApps: 10, answers: []Publish{Passed()}, requests: map[string]int{}, telemetry: map[string][]map[string]any{},
-		migrations: map[string][]migrate.Step{}}
+		migrations: map[string][]migrate.Step{}, previews: map[string]*fakePreview{}}
 }
 
 // SignIn keeps a sign-in to the fake in the test's home, as aicoded login does.
@@ -239,7 +251,7 @@ func (p *Platform) RejectTokens(n int) {
 func (p *Platform) RefuseUpload(status int, errorCode, code string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.refused = &refusal{status, errorCode, code}
+	p.refused = &refusal{status, errorCode, code, "refused as the test asked"}
 }
 
 // Telemetry makes the read of path, such as /v1/apps/demo/logs, answer the rows whose env is the
@@ -257,7 +269,7 @@ func (p *Platform) RefuseTelemetry(status int, errorCode, code string) {
 	defer p.mu.Unlock()
 	p.telemetryRefusal = nil
 	if status != 0 {
-		p.telemetryRefusal = &refusal{status, errorCode, code}
+		p.telemetryRefusal = &refusal{status, errorCode, code, "refused as the test asked"}
 	}
 }
 
@@ -267,6 +279,44 @@ func (p *Platform) SetMigrations(name string, steps ...migrate.Step) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.migrations[name] = steps
+}
+
+// AddPublish adds a publish of a new commit of the app name, as if it had been uploaded, and
+// returns its id.
+func (p *Platform) AddPublish(name string) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	b := make([]byte, 20)
+	_, _ = rand.Read(b)
+	pub := &fakePublish{id: publishID(), sha: fmt.Sprintf("%x", b), summary: "Change", app: p.app(name), created: time.Now()}
+	p.pubs = append(p.pubs, pub)
+	return pub.id
+}
+
+// RefusePreview refuses the next start of a preview with status, the error errorCode, the
+// framework's code and the description.
+func (p *Platform) RefusePreview(status int, errorCode, code, description string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.previewRefusal = &refusal{status, errorCode, code, description}
+}
+
+// ResetPreviewData makes the next start of a preview report that it reset the preview's data.
+func (p *Platform) ResetPreviewData() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.resetNext = true
+}
+
+// Preview returns the publish the preview of the app name runs, and whether one runs.
+func (p *Platform) Preview(name string) (string, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	pv := p.previews[name]
+	if pv == nil || pv.ended {
+		return "", false
+	}
+	return pv.publish, true
 }
 
 // Reads returns the reads of telemetry the fake answered, each its path and query, oldest first.
@@ -296,7 +346,7 @@ func (p *Platform) scopes() []string {
 	for _, a := range p.apps {
 		if a.owner == Email && !a.archived {
 			scopes = append(scopes, fmt.Sprintf("app:%d:release:request", a.id), fmt.Sprintf("app:%d:status", a.id),
-				fmt.Sprintf("app:%d:logs", a.id))
+				fmt.Sprintf("app:%d:logs", a.id), fmt.Sprintf("app:%d:preview", a.id))
 		}
 	}
 	return scopes
@@ -461,7 +511,7 @@ func (p *Platform) readTelemetry(w http.ResponseWriter, r *http.Request) {
 	case env != "preview" && env != "production":
 		apiError(w, http.StatusBadRequest, "invalid_request", "E-PUB-017", "env must be preview or production")
 	case p.telemetryRefusal != nil:
-		apiError(w, p.telemetryRefusal.status, p.telemetryRefusal.errorCode, p.telemetryRefusal.code, "refused as the test asked")
+		apiError(w, p.telemetryRefusal.status, p.telemetryRefusal.errorCode, p.telemetryRefusal.code, p.telemetryRefusal.description)
 	default:
 		p.reads = append(p.reads, r.URL.RequestURI())
 		rows := []map[string]any{}
@@ -471,6 +521,113 @@ func (p *Platform) readTelemetry(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		writeJSON(w, http.StatusOK, rows)
+	}
+}
+
+// previewHost is the host of the preview of the app name.
+func previewHost(name string) string { return name + "." + Org + ".preview.aicoded.cloud" }
+
+// startPreview starts the preview of a publish as the platform does: the publish must be of an
+// app the token carries the preview scope of, and have passed and not been declined. A start
+// while the app's preview runs replaces its publish and keeps its times.
+func (p *Platform) startPreview(w http.ResponseWriter, r *http.Request) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var in struct {
+		Publish string `json:"publish"`
+	}
+	s, ok := p.builderCall(w, r, &in)
+	if !ok {
+		return
+	}
+	i := slices.IndexFunc(p.pubs, func(pub *fakePublish) bool { return pub.id == in.Publish })
+	if i < 0 {
+		apiError(w, http.StatusNotFound, "not_found", "E-PUB-013", "no publish has that id")
+		return
+	}
+	pub := p.pubs[i]
+	a := pub.app
+	answer := p.answer(pub, false)
+	switch f := p.previewRefusal; {
+	case !may(s, a, "preview"):
+		notYours(w, a)
+		return
+	case answer.Status != "passed" || answer.Declined != nil:
+		apiError(w, http.StatusConflict, "conflict", "E-REL-029", "the publish "+pub.id+" did not pass its checks")
+		return
+	case f != nil:
+		p.previewRefusal = nil
+		apiError(w, f.status, f.errorCode, f.code, f.description)
+		return
+	}
+	pv := p.previews[a.name]
+	if pv == nil || pv.ended {
+		now := time.Now().UTC().Truncate(time.Second)
+		pv = &fakePreview{started: now, expires: now.Add(336 * time.Hour)}
+		p.previews[a.name] = pv
+	}
+	pv.publish = pub.id
+	reset := p.resetNext
+	p.resetNext = false
+	writeJSON(w, http.StatusCreated, map[string]any{"app": a.name, "host": previewHost(a.name), "url": "https://" + previewHost(a.name) + "/",
+		"publish": pub.id, "started": pv.started.Format(time.RFC3339), "expires": pv.expires.Format(time.RFC3339), "reset": reset})
+}
+
+// previewApp reads the app of a request about its preview and returns the app and its preview,
+// or nil. It answers the request and returns false when the app is unknown or the token does not
+// carry its preview scope.
+func (p *Platform) previewApp(w http.ResponseWriter, r *http.Request) (*fakeApp, *fakePreview, bool) {
+	var in struct {
+		App string `json:"app"`
+	}
+	s, ok := p.builderCall(w, r, &in)
+	if !ok {
+		return nil, nil, false
+	}
+	a := p.app(in.App)
+	switch {
+	case a == nil:
+		apiError(w, http.StatusNotFound, "not_found", "E-PUB-019", "your organisation has no app of that name")
+		return nil, nil, false
+	case !may(s, a, "preview"):
+		notYours(w, a)
+		return nil, nil, false
+	}
+	return a, p.previews[a.name], true
+}
+
+// getPreview answers the state of an app's preview as the platform does.
+func (p *Platform) getPreview(w http.ResponseWriter, r *http.Request) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	a, pv, ok := p.previewApp(w, r)
+	switch {
+	case !ok:
+	case pv == nil:
+		writeJSON(w, http.StatusOK, map[string]any{"state": "none"})
+	default:
+		state := "running"
+		if pv.ended {
+			state = "ended"
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"state": state, "publish": pv.publish, "host": previewHost(a.name),
+			"url": "https://" + previewHost(a.name) + "/", "started": pv.started.Format(time.RFC3339), "expires": pv.expires.Format(time.RFC3339)})
+	}
+}
+
+// endPreview ends an app's preview as the platform does: 204, or 404 with no code when no
+// preview of the app runs.
+func (p *Platform) endPreview(w http.ResponseWriter, r *http.Request) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	_, pv, ok := p.previewApp(w, r)
+	switch {
+	case !ok:
+	case pv == nil || pv.ended:
+		apiError(w, http.StatusNotFound, "not_found", "", "no preview of the app is running")
+	default:
+		pv.ended = true
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 
@@ -514,7 +671,7 @@ func (p *Platform) createPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	case f != nil:
 		p.refused = nil
-		apiError(w, f.status, f.errorCode, f.code, "refused as the test asked")
+		apiError(w, f.status, f.errorCode, f.code, f.description)
 		return
 	}
 	prerequisites, refs, ok := bundleHeader(bundle)

@@ -3,7 +3,7 @@
 `aicoded publish` sends a commit of an app to the platform's delivery pipeline, which checks it
 and writes a change record for it, and `aicoded status` shows the outcome. This guide covers
 signing in, the clean commit, what is sent, the waiting, reading the outcome, what the delivery
-pipeline checks and the codes.
+pipeline checks, previews on the platform and the codes.
 
 ## Signing in
 
@@ -307,6 +307,56 @@ data.
   publish shows E-MIG-005 as a note, and the platform's operator records the step before the next
   release. Nothing in the app needs to change.
 
+## Preview
+
+A publish that passed can run on the platform as the app's preview, so that you and a few people
+you pick try it before it goes live. Starting one is a step of its own, never part of publishing,
+and only the app's owner takes it, with the id of the publish:
+
+```sh
+aicoded preview pub_7kq2m4x5c3v6b5n6d2f7hjrt2a
+```
+
+```text
+Preview of demo at https://demo.acme.preview.aicoded.cloud/ until 2026-11-13T10:00:00Z.
+Invite up to five people in the console.
+```
+
+- **Which publish.** One that passed its checks and whose approval card was not declined, whatever
+  its app type allows: a publish that *Needs approval* can be previewed while its card waits. Any
+  other is E-REL-029.
+- **One per app,** at `<app>.<organisation>.preview.aicoded.cloud`, for 14 days from its first
+  start, never extended. A start with a newer publish replaces the version the preview runs,
+  keeps its database and runs the new schema changes on it, destructive ones too. When the new
+  publish does not continue the schema changes the preview ran, such as after a declined publish,
+  the preview's data is deleted and the schema changes run from the start, and
+  `aicoded preview` prints
+  `Its data was reset: the preview had run schema changes that this publish does not continue.`
+- **Data.** A preview starts with an empty database, with the app's schema changes applied, and
+  empty file stores. People enter test data of their own through the app; never put real data in
+  it.
+- **Who sees it.** You, as the app's owner; up to five people of the organisation who have signed
+  in before, whom you pick in the console (E-REL-031 refuses a sixth); and, while an approval card
+  of the app waits, whoever may approve it. The permission list's audience does not apply there,
+  and nobody outside the organisation sees a preview; the app's own access rules still apply
+  inside it. Your AI assistant invites no one.
+- **Values.** A preview reads its own setting and secret values, which the app's owner or a
+  security admin sets for the preview in the console, never the production values. A value the
+  permission list declares and the preview lacks is E-REL-030.
+- **Mail.** A preview sends no mail: each message the app sends is kept for the app's owner to
+  read in the console, the newest 200, each of up to 1 MiB (E-MAIL-011).
+- **Logs and traces.** `aicoded logs --env preview` and `aicoded traces --env preview` read the
+  preview's.
+- **The end.** `aicoded preview end` in the app's folder, or the console, ends the preview at
+  once, and it ends by itself after 14 days; a security admin may end it in the console too. Its
+  address stops answering at once, then its tables and files are deleted. A start after the end
+  begins a new preview, with empty data and 14 days of its own.
+- **Records.** Each start, new version, reset of the data, person added or removed, and end is in
+  a change record of the app.
+
+With `aicoded mcp`, the tools `preview_publish` and `preview_end` do the same, and your AI
+assistant calls them only when you ask.
+
 ## What security sees
 
 Security will approve what the app may do, not its code. The permission list is that statement, so
@@ -340,6 +390,7 @@ says which sections are enforced today, and which the platform only records for 
 - E-GATE-029 to E-GATE-037: what the simulated attacks find in the running app.
 - E-MIG-001 to E-MIG-007: the draft of schema changes, and the migrations a release applies.
 - E-REL-019 to E-REL-021: a publish that fails when the platform decides on its release.
+- E-REL-029 and E-REL-030: a preview that the platform does not start.
 - E-GATE-021 to E-GATE-025, E-GATE-038 to E-GATE-047, E-MIG-003, E-DATA-001 and E-DATA-002:
   notes, which do not stop a publish.
 
@@ -360,8 +411,9 @@ running an app in production without the platform, `aicoded run`, comes later.
 
 ## See also
 
-- [Tools](tools.md): `aicoded publish`, `aicoded status`, `aicoded check` and `aicoded login`.
-- [MCP](mcp.md): the `publish` and `release_status` tools.
+- [Tools](tools.md): `aicoded publish`, `aicoded status`, `aicoded preview`, `aicoded check` and
+  `aicoded login`.
+- [MCP](mcp.md): the `publish`, `release_status`, `preview_publish` and `preview_end` tools.
 - [Simulated attacks](simulated-attacks.md): what the `attacks` and `personal-data` steps do.
 - [App types](app-types.md): what goes live on its own and what needs approval.
 - [Schema changes](schema-changes.md): the draft that a publish carries.

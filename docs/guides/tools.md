@@ -1,8 +1,8 @@
 # Tools: the aicoded commands
 
 `aicoded` creates apps, generates their code, checks them, describes them, explains its errors
-and docs, connects apps that call each other, signs you in to the platform and publishes apps
-to it. Every problem it reports has a code, a `file:line` where there is one, a one-line fix and
+and docs, connects apps that call each other, signs you in to the platform, publishes apps to it
+and runs their previews there. Every problem it reports has a code, a `file:line` where there is one, a one-line fix and
 a docs link.
 
 ## The commands
@@ -21,6 +21,8 @@ aicoded logout
 aicoded whoami [--json]
 aicoded publish [--app <name>] [-m <summary>] [--no-wait] [dir]
 aicoded status [--json] <id>
+aicoded preview <id>
+aicoded preview end [dir]
 aicoded logs --env <env> [--app <name>] [--since <time>] [--until <time>] [--level <level>] [--trace <id>] [--limit <n>] [--json] [dir]
 aicoded traces --env <env> [--app <name>] [--since <time>] [--until <time>] [--trace <id>] [--limit <n>] [--json] [dir]
 aicoded version
@@ -273,6 +275,24 @@ its steps, its problems, its notes, the decision on releasing it and its status,
 with 1 when the publish failed, was refused or ended in error. An id is `pub_` and 26 lowercase
 letters and digits; another shape exits with 2. An id the platform does not know in your organisation is E-PUB-013, a publish of
 another builder's app E-PUB-005, and one of an app of yours that was archived E-PUB-006.
+
+## aicoded preview
+
+`aicoded preview <id>` runs the publish `<id>` as its app's preview on the platform, and
+`aicoded preview end [dir]` ends the preview of the app in `dir`; see
+[publishing](publishing.md). Only the app's owner may do either. `aicoded preview <id>`
+prints the preview's address and when it expires, in RFC 3339:
+
+```text
+Preview of demo at https://demo.acme.preview.aicoded.cloud/ until 2026-11-13T10:00:00Z.
+Invite up to five people in the console.
+```
+
+A publish that has not passed its checks is E-REL-029, and one whose permission list declares a
+setting or a secret with no value for the preview E-REL-030. An id is `pub_` and 26 lowercase
+letters and digits; another shape exits with 2. `aicoded preview end` prints
+`Preview of <app> ended; its data is being deleted.`, or exits with 1 and says that no preview of
+the app is running.
 
 ## aicoded logs
 

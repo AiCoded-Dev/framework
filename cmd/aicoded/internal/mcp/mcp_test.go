@@ -216,7 +216,7 @@ func TestToolsListed(t *testing.T) {
 	res, err := cs.ListTools(t.Context(), nil)
 	require.NoError(t, err)
 	readOnly := map[string]bool{}
-	var openWorld []string
+	var openWorld, destructive []string
 	for _, tool := range res.Tools {
 		require.NotNil(t, tool.Annotations, tool.Name)
 		require.NotNil(t, tool.Annotations.OpenWorldHint, tool.Name)
@@ -226,15 +226,19 @@ func TestToolsListed(t *testing.T) {
 		}
 		if !tool.Annotations.ReadOnlyHint {
 			require.NotNil(t, tool.Annotations.DestructiveHint, tool.Name)
-			assert.False(t, *tool.Annotations.DestructiveHint, tool.Name)
+			if *tool.Annotations.DestructiveHint {
+				destructive = append(destructive, tool.Name)
+			}
 		}
 	}
 	assert.Equal(t, map[string]bool{
 		"app_create": false, "check": false, "preview": false, "mail_receive": false, "publish": false,
 		"what_broke": true, "describe": true, "howto": true, "logs": true, "traces": true, "trace": true,
-		"mail_list": true, "mail_get": true, "release_status": false,
+		"mail_list": true, "mail_get": true, "release_status": false, "preview_publish": false, "preview_end": false,
 	}, readOnly)
-	assert.ElementsMatch(t, []string{"publish", "release_status", "logs", "traces", "trace"}, openWorld, "only these reach the platform")
+	assert.ElementsMatch(t, []string{"publish", "release_status", "logs", "traces", "trace", "preview_publish", "preview_end"}, openWorld,
+		"only these reach the platform")
+	assert.ElementsMatch(t, []string{"preview_publish", "preview_end"}, destructive, "only these may delete a preview's data")
 }
 
 func TestHowto(t *testing.T) {
@@ -311,6 +315,7 @@ func TestInstructionsNameTheOverview(t *testing.T) {
 	assert.Contains(t, cs.InitializeResult().Instructions, "howto guides/overview")
 	assert.Contains(t, cs.InitializeResult().Instructions, "call publish with the app and a summary")
 	assert.Contains(t, cs.InitializeResult().Instructions, "Call release_status with that id")
+	assert.Contains(t, cs.InitializeResult().Instructions, "Invite no one")
 }
 
 func TestAppNamesAreChecked(t *testing.T) {
@@ -330,6 +335,7 @@ func TestAppNamesAreChecked(t *testing.T) {
 			"describe":     {"app": name},
 			"app_create":   {"name": name},
 			"publish":      {"app": name, "summary": "First"},
+			"preview_end":  {"app": name},
 		} {
 			if name == "" && (tool == "logs" || tool == "traces" || tool == "what_broke" || tool == "check" || tool == "describe") {
 				continue // no app means every app
@@ -353,13 +359,15 @@ func TestSchemasAreChecked(t *testing.T) {
 	home := testhome.Set(t)
 	cs := connect(t, t.TempDir(), io.Discard)
 	for tool, args := range map[string]map[string]any{
-		"trace":          {"trace_id": "../x"},
-		"logs":           {"level": "TRACE"},
-		"traces":         {"limit": 201},
-		"preview":        {"app": "hello", "path": "/etc"},
-		"howto":          {"topic": "E-DEV-001", "file": "/etc/passwd"},
-		"publish":        {"app": "hello", "summary": "First", "path": "/etc"},
-		"release_status": {"id": "../pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		"trace":           {"trace_id": "../x"},
+		"logs":            {"level": "TRACE"},
+		"traces":          {"limit": 201},
+		"preview":         {"app": "hello", "path": "/etc"},
+		"howto":           {"topic": "E-DEV-001", "file": "/etc/passwd"},
+		"publish":         {"app": "hello", "summary": "First", "path": "/etc"},
+		"release_status":  {"id": "../pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		"preview_publish": {"publish": "../pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		"preview_end":     {"app": "demo", "path": "/etc"},
 	} {
 		res := call(t, cs, tool, args)
 		assert.True(t, res.IsError, tool)
@@ -703,4 +711,47 @@ func TestTelemetryToolsReadThePlatform(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotRegexp(t, `aicoded_(at|rt)_`, string(data))
 	}
+}
+
+func TestMCPPreviewTools(t *testing.T) {
+	testhome.Set(t)
+	p := platformtest.New(t)
+	t.Setenv("AICODED_PLATFORM", p.URL)
+	p.SignIn(t)
+	p.AddApp("demo", platformtest.Email)
+	cs := connect(t, t.TempDir(), io.Discard)
+
+	tools, err := cs.ListTools(t.Context(), nil)
+	require.NoError(t, err)
+	byName := map[string]*mcpsdk.Tool{}
+	for _, tool := range tools.Tools {
+		byName[tool.Name] = tool
+	}
+	require.Contains(t, byName, "preview_publish")
+	require.Contains(t, byName, "preview_end")
+	local := *byName["preview"]
+	local.OutputSchema = nil
+	data, err := json.Marshal(local)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"name": "preview", "annotations": {"readOnlyHint": false, "idempotentHint": true, "destructiveHint": false, "openWorldHint": false},
+		"description": "Build and start, or restart, an app in aicoded dev and return its state and local address, or the problems that stop it.",
+		"inputSchema": {"type": "object", "required": ["app"], "additionalProperties": false,
+			"properties": {"app": {"type": "string", "description": "the app's name, from the app: line of its aicoded.yaml"}}}}`,
+		string(data), "the local preview tool is unchanged")
+
+	id := p.AddPublish("demo")
+	out := result[previewOut](t, call(t, cs, "preview_publish", map[string]any{"publish": id}))
+	assert.Equal(t, "https://demo.acme.preview.aicoded.cloud/", out.URL)
+	assert.Equal(t, id, out.Publish)
+	assert.Contains(t, out.Next, "the person invites")
+	ended := result[previewEndOut](t, call(t, cs, "preview_end", map[string]any{"app": "demo"}))
+	assert.Equal(t, previewEndOut{App: "demo", Ended: true}, ended)
+	res := call(t, cs, "preview_end", map[string]any{"app": "demo"})
+	assert.True(t, res.IsError)
+	assert.Equal(t, "no preview of demo is running", text(res))
+
+	p.Answers(platformtest.Failed(1, 10))
+	res = call(t, cs, "preview_publish", map[string]any{"publish": id})
+	assert.True(t, res.IsError)
+	assert.Contains(t, text(res), "E-REL-029: the publish "+id+" did not pass its checks\n  fix: preview a publish that passed its checks")
 }

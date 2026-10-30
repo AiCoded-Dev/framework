@@ -14,14 +14,14 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | CHK | `aicoded check` and the Go build it runs, also in `aicoded dev` |
 | LINT | the rules for app code that `aicoded check` applies after `go vet`, listed in [the rules guide](../guides/rules.md) |
 | CLI | `aicoded init`, `aicoded explain`, `aicoded login`, `logout` and `whoami`, the sign-in that `aicoded publish` and `status` use, and the `app_create` and `howto` tools of `aicoded mcp` |
-| PUB | `aicoded publish` and `aicoded status`, and the `publish` and `release_status` tools of `aicoded mcp` |
+| PUB | `aicoded publish`, `aicoded status` and `aicoded preview`, and the `publish`, `release_status`, `preview_publish` and `preview_end` tools of `aicoded mcp` |
 | GATE | the security checks of the platform's delivery pipeline, in the problems and notes of a publish |
-| REL | the platform's release of a publish to production, and the approval of an approval card in the console |
+| REL | the platform's release of a publish to production, the approval of an approval card in the console, and an app's preview |
 | DATA | notes on where the app's data goes, in `aicoded check` and the delivery pipeline: they never stop a check or a publish |
 | MIG | schema changes: the draft `.aicoded/migration.sql` in `aicoded check`, `aicoded dev` and the delivery pipeline, and the migrations applied to a database |
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
-| MAIL | mail rules, the mailbox where a target keeps none, the messages a runner takes at once, and the operator's mail domains |
+| MAIL | mail rules, the mailbox where a target keeps none, the messages a runner takes at once, a preview's messages, and the operator's mail domains |
 | LOGIN | company login, which signs people in to the apps of their organisation |
 
 Calls between apps use these codes:
@@ -166,6 +166,15 @@ it was approved or declined already:
   permission list, built app or decision, or a card already approved or declined.
 - E-REL-027: a person who is not in the app type's approver group.
 
+Starting a preview with `aicoded preview` or the `preview_publish` tool uses these codes, each a
+start that the platform refuses, so that a preview that runs keeps its version:
+
+- E-REL-029: a publish that has not passed its checks, or whose approval card was declined.
+- E-REL-030: a setting or a secret that the permission list declares and that has no value set
+  for the preview in the console.
+
+E-REL-031 refuses the app's owner a sixth person to see the app's preview, in the console.
+
 E-REL-009 refuses the operator's purge of a publish that a live or pending release runs.
 
 E-REL-016 refuses the operator's renaming or archiving of an app that has a release live or
@@ -180,6 +189,9 @@ reach.
 
 E-MAIL-010 refuses, on the platform, a message with a new idempotency key while 10 000 of the app's
 messages are being sent.
+
+E-MAIL-011 refuses, in a preview on the platform, a message over 1 MiB: a preview sends no mail,
+and keeps each message for the app's owner to read in the console.
 
 E-RUN-005 refuses an app's call to a building block the runner does not provide; none on the
 platform today.

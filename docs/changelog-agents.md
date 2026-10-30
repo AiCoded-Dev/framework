@@ -4,6 +4,18 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `aicoded preview <id>` and the MCP tool `preview_publish {publish}` run a publish that passed as
+  its app's preview on the platform, at `<app>.<organisation>.preview.aicoded.cloud`, for 14 days
+  from its first start; a newer publish replaces the version it runs. `aicoded preview end [dir]`
+  and the tool `preview_end {app}` end it and delete its data. Only the app's owner does either,
+  with the new builder scope `app:<id>:preview`, and only when the person asks; the person picks up
+  to five people to see the preview in the console, and the AI assistant invites no one. The local
+  `preview` tool of `aicoded dev` is unchanged. See the guide `guides/publishing`.
+- E-REL-029 refuses a preview of a publish that has not passed its checks or whose approval card
+  was declined, and E-REL-030 one whose permission list declares a setting or a secret with no
+  value set for the preview. E-REL-031 refuses the owner a sixth person to see the preview, in the
+  console. E-MAIL-011 refuses a preview's message over 1 MiB: a preview sends no mail, and keeps
+  each message for the app's owner to read in the console.
 - E-REL-028 refuses the platform's operator `admin secrets put` and `delete` for an app of another
   organisation: the app's owner or a security admin sets its values in the console.
 - After `Declined by <email>: <reason>.` and `Publish again to ask for a new approval.`,
