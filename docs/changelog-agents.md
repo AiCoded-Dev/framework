@@ -21,6 +21,8 @@ Changes to the API that AI assistants build apps with. Newest first.
   value set for the preview. E-REL-031 refuses the owner a sixth person to see the preview, in the
   console. E-MAIL-011 refuses a preview's message over 1 MiB: a preview sends no mail, and keeps
   each message for the app's owner to read in the console.
+- E-REL-009 also refuses the platform's operator the purge of a publish that the app's running
+  preview runs.
 - E-REL-028 refuses the platform's operator `admin secrets put` and `delete` for an app of another
   organisation: the app's owner or a security admin sets its values in the console.
 - After `Declined by <email>: <reason>.` and `Publish again to ask for a new approval.`,

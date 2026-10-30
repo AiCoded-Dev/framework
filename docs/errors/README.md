@@ -175,7 +175,8 @@ start that the platform refuses, so that a preview that runs keeps its version:
 
 E-REL-031 refuses the app's owner a sixth person to see the app's preview, in the console.
 
-E-REL-009 refuses the operator's purge of a publish that a live or pending release runs.
+E-REL-009 refuses the operator's purge of a publish that a live or pending release, or the app's
+running preview, runs.
 
 E-REL-016 refuses the operator's renaming or archiving of an app that has a release live or
 pending: such an app keeps its name and stays active until releases can be stopped.
