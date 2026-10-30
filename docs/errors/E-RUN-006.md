@@ -11,6 +11,13 @@ audience:
   internal: [group:hotel-staff]    # only people the group map puts in hotel-staff
 ```
 
-See [app types](../guides/app-types.md).
+At an app's preview, `<app>.<organisation>.preview.aicoded.cloud`, the audience does not apply.
+The platform shows this page, titled "You cannot open this preview", to everyone of the
+organisation but the app's owner, the up to five people the owner picked in the console, and,
+while an approval card of the app waits, whoever may approve it. It checks again every 15
+minutes, so a person the owner removed, or an approver once the card is approved or declined, sees
+this page too.
 
-**Fix:** if you should use the app, ask your security admin to add you to a group the app's audience names; the app's owner can add a mapped group to audience.internal and publish again
+See [app types](../guides/app-types.md) and [publishing](../guides/publishing.md).
+
+**Fix:** if you should use the app, ask your security admin to add you to a group the app's audience names; the app's owner can add a mapped group to audience.internal and publish again. At a preview: if you should see the preview, ask the app's owner to add you to its viewers in the console

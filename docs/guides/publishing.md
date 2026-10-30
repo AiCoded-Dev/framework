@@ -322,6 +322,9 @@ Preview of demo at https://demo.acme.preview.aicoded.cloud/ until 2026-11-13T10:
 Invite up to five people in the console.
 ```
 
+- **Signing in.** A preview needs the scope `app:<id>:preview` of your sign-in, which a sign-in
+  made before previews existed lacks: until you run `aicoded login` again, `aicoded preview` fails
+  with E-PUB-005, "your sign-in does not carry it yet".
 - **Which publish.** One that passed its checks and whose approval card was not declined, whatever
   its app type allows: a publish that *Needs approval* can be previewed while its card waits. Any
   other is E-REL-029.
@@ -339,7 +342,9 @@ Invite up to five people in the console.
   in before, whom you pick in the console (E-REL-031 refuses a sixth); and, while an approval card
   of the app waits, whoever may approve it. The permission list's audience does not apply there,
   and nobody outside the organisation sees a preview; the app's own access rules still apply
-  inside it. Your AI assistant invites no one.
+  inside it. Anyone else of the organisation gets the page E-RUN-006, and so does a person you
+  removed, or an approver once the card is decided, within 15 minutes. Your AI assistant invites
+  no one.
 - **Values.** A preview reads its own setting and secret values, which the app's owner or a
   security admin sets for the preview in the console, never the production values. A value the
   permission list declares and the preview lacks is E-REL-030.

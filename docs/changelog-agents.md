@@ -10,7 +10,12 @@ Changes to the API that AI assistants build apps with. Newest first.
   and the tool `preview_end {app}` end it and delete its data. Only the app's owner does either,
   with the new builder scope `app:<id>:preview`, and only when the person asks; the person picks up
   to five people to see the preview in the console, and the AI assistant invites no one. The local
-  `preview` tool of `aicoded dev` is unchanged. See the guide `guides/publishing`.
+  `preview` tool of `aicoded dev` is unchanged. See the guide `guides/publishing`. A sign-in made
+  before has no `app:<id>:preview`: `aicoded preview` fails with E-PUB-005 until the person runs
+  `aicoded login` again.
+- E-RUN-006 is also the page of a person of the organisation whom an app's preview does not admit:
+  anyone but its owner, the people the owner picked, and the approvers of the app's waiting
+  approval card. Its fix then asks the app's owner to add the person to the preview's viewers.
 - E-REL-029 refuses a preview of a publish that has not passed its checks or whose approval card
   was declined, and E-REL-030 one whose permission list declares a setting or a secret with no
   value set for the preview. E-REL-031 refuses the owner a sixth person to see the preview, in the

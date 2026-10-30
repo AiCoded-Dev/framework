@@ -196,7 +196,8 @@ and keeps each message for the app's owner to read in the console.
 E-RUN-005 refuses an app's call to a building block the runner does not provide; none on the
 platform today.
 
-E-RUN-006 is the page a runner shows to a signed-in person whom the app's audience does not name.
+E-RUN-006 is the page a runner shows to a signed-in person whom the app's audience does not name,
+and the page the platform shows at an app's preview to a person the preview does not admit.
 
 E-RUN-009 is the reason a runner reports for a release whose grants it cannot tell the resources
 of: a grant of a kind it does not know, or two of one kind.
