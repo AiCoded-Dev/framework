@@ -88,7 +88,7 @@ func (c *Client) PreviewEnd(ctx context.Context, app string) error {
 		return nil
 	case known(e.Code):
 		return refusal(e, e.Code, "the platform refused to end the preview of "+app)
-	case status == http.StatusNotFound:
+	case status == http.StatusNotFound && e.Error == "not_found":
 		return errors.New("no preview of " + app + " is running")
 	case status == http.StatusForbidden:
 		return refusal(e, "E-PUB-005", "the app "+app+" belongs to another builder")

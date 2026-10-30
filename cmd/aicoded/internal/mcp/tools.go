@@ -337,7 +337,7 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 		s.releaseStatus)
 	changesPreview := &mcpsdk.ToolAnnotations{DestructiveHint: &yes, OpenWorldHint: &yes}
 	tool(srv, &mcpsdk.Tool{Name: "preview_publish", Annotations: changesPreview, InputSchema: previewPublishSchema,
-		Description: "Run a publish that passed as its app's preview on the platform, only when the person asks: one preview per app, for 14 days from its first start, which this publish replaces the version of. It returns the preview's address and end, and reset when the preview's data was deleted, since the version it ran had schema changes that this publish does not continue. Only the person invites viewers, in the console."},
+		Description: "Run a publish that passed as its app's preview on the platform, only when the person asks: one preview per app, for 14 days from its first start; this publish replaces the version it runs. It returns the preview's address and when it expires, and reset, true when the preview's data was deleted because the version it ran had schema changes that this publish does not continue. Only the person invites viewers, in the console."},
 		s.previewPublish)
 	tool(srv, &mcpsdk.Tool{Name: "preview_end", Annotations: changesPreview,
 		Description: "End the preview of an app on the platform, only when the person asks: its address stops answering and its data is deleted."},

@@ -107,6 +107,33 @@ func TestPreviewEnd(t *testing.T) {
 	assert.Equal(t, "E-PUB-005", errs.Code(c.PreviewEnd(t.Context(), "payroll")))
 }
 
+// A refusal or an answer the builder API does not give is never taken for a benign one.
+func TestPreviewOtherAnswers(t *testing.T) {
+	const id = "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"
+	for _, tc := range []struct {
+		status int
+		body   any
+		want   string
+	}{
+		{http.StatusNotFound, nil, "the platform answered 404"},
+		{http.StatusNotFound, map[string]string{"error": "no_route"}, "the platform answered 404: no_route: "},
+		{http.StatusInternalServerError, map[string]string{"error": "server_error", "error_description": "down"}, "the platform answered 500: server_error: down"},
+		{http.StatusOK, map[string]string{}, "the platform answered 200"},
+	} {
+		c := answering(t, tc.status, tc.body)
+		err := c.PreviewEnd(t.Context(), "demo")
+		require.EqualError(t, err, tc.want, "end, %d", tc.status)
+		if tc.status != http.StatusNotFound {
+			_, err = c.PreviewStart(t.Context(), id)
+			require.EqualError(t, err, tc.want, "start, %d", tc.status)
+		}
+	}
+	c := answering(t, http.StatusForbidden, nil)
+	assert.Equal(t, "E-PUB-005", errs.Code(c.PreviewEnd(t.Context(), "demo")), "a bare 403")
+	_, err := c.PreviewStart(t.Context(), id)
+	assert.Equal(t, "E-PUB-005", errs.Code(err), "a bare 403")
+}
+
 // answering returns a client, signed in, of a platform that answers every request with status
 // and the JSON of body.
 func answering(t *testing.T, status int, body any) *platform.Client {
