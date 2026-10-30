@@ -4,6 +4,8 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- E-REL-028 refuses the platform's operator `admin secrets put` and `delete` for an app of another
+  organisation: the app's owner or a security admin sets its values in the console.
 - After `Declined by <email>: <reason>.` and `Publish again to ask for a new approval.`,
   `aicoded publish` and `aicoded status` print `If it changed the schema, put the changes you still
   want back in .aicoded/migration.sql: they left the app's migrations.`: a declined publish's

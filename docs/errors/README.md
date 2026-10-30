@@ -157,7 +157,8 @@ Releasing uses these codes, each a release that the platform refuses before anyt
 - E-REL-023: a release or a rollback that *Needs approval*, asked for by the platform's operator.
 
 Approving an approval card in the console uses these codes, each an approval that the platform
-refuses, so that nothing is released and the card still waits:
+refuses, so that nothing is released. The card still waits, unless E-REL-026 refuses it because
+it was approved or declined already:
 
 - E-REL-024: an approver who built the publish.
 - E-REL-025: an approver who signed in more than five minutes ago.
@@ -169,6 +170,9 @@ E-REL-009 refuses the operator's purge of a publish that a live or pending relea
 
 E-REL-016 refuses the operator's renaming or archiving of an app that has a release live or
 pending: such an app keeps its name and stays active until releases can be stopped.
+
+E-REL-028 refuses the operator's setting or deleting a secret of an app of another organisation:
+the app's owner or a security admin sets it in the console.
 
 E-MAIL-009 refuses the operator's adding or verifying a mail domain of an organisation that has no
 target to register it at: one placed on no server, or whose server's target the platform cannot
