@@ -22,6 +22,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
 | MAIL | mail rules, the mailbox where a target keeps none, the messages a runner takes at once, a preview's messages, and the operator's mail domains |
+| OUT | the requests an app sends to outside services with `outbound.Client()`, which the runner checks against `egress` |
 | LOGIN | company login, which signs people in to the apps of their organisation |
 
 Calls between apps use these codes:
@@ -210,6 +211,9 @@ app runs.
 
 E-RUN-012 refuses, on the platform, an app's read of a secret past the runner's bound of its reads:
 100 at once, then 20 a second, and 8 under way at once.
+
+E-RUN-014 refuses the start of an app built with a framework older than v0.10.0 whose permission
+list declares `egress`, and E-RUN-015 an app's read of a secret that `egress` binds to a host.
 
 E-RUN-013 is the page a runner shows, with status 503, for an app whose new version did not start
 after a destructive schema change, which the earlier version cannot run on.

@@ -29,9 +29,11 @@ import (
 )
 
 var (
-	acme  = &manifest.Email{From: "ops@acme.example", ToDomains: []string{"acme.example"}}
-	notes = manifest.Manifest{App: "notes", Settings: []string{"greeting"}, Secrets: []string{"token"}, Email: acme,
-		Data: []manifest.Data{{Source: "filestore:docs", Classes: []string{"internal"}}}}
+	acme    = &manifest.Email{From: "ops@acme.example", ToDomains: []string{"acme.example"}}
+	partner = manifest.Egress{Host: "api.partner.example", Secret: "partner_api_key", Header: "Authorization", Prefix: "Bearer "}
+	notes   = manifest.Manifest{App: "notes", Settings: []string{"greeting"}, Secrets: []string{"partner_api_key", "token"}, Email: acme,
+		Data:   []manifest.Data{{Source: "filestore:docs", Classes: []string{"internal"}}},
+		Egress: []manifest.Egress{partner, {Host: "status.partner.example"}, {Host: "xn--bcher-kva.example"}}}
 	csrfKey = bytes.Repeat([]byte{7}, MinCSRFKey)
 )
 
@@ -41,19 +43,22 @@ type fakes struct {
 	mail      *fakeMail
 	secrets   *fakeSecrets
 	telemetry *fakeTelemetry
+	outbound  *fakeOutbound
 }
 
 func newFakes() *fakes {
 	return &fakes{
-		files:     &fakeFiles{entries: map[string]*fakeEntry{}},
-		mail:      &fakeMail{},
-		secrets:   &fakeSecrets{values: map[string]string{"token": "s3cret", "other": "x"}, settings: map[string]string{"greeting": "hi", "extra": "x"}},
+		files: &fakeFiles{entries: map[string]*fakeEntry{}},
+		mail:  &fakeMail{},
+		secrets: &fakeSecrets{values: map[string]string{"token": "s3cret", "other": "x", "partner_api_key": partnerKey},
+			settings: map[string]string{"greeting": "hi", "extra": "x"}},
 		telemetry: &fakeTelemetry{},
+		outbound:  &fakeOutbound{},
 	}
 }
 
 func (f *fakes) providers() Providers {
-	return Providers{Files: f.files, Mail: f.mail, Secrets: f.secrets, Telemetry: f.telemetry}
+	return Providers{Files: f.files, Mail: f.mail, Secrets: f.secrets, Telemetry: f.telemetry, Outbound: f.outbound}
 }
 
 // shortDir returns a new folder whose socket paths fit a Unix socket address.
@@ -88,6 +93,7 @@ type clients struct {
 	rpc     runnerv1connect.RpcServiceClient
 	files   runnerv1connect.FilesServiceClient
 	mail    runnerv1connect.MailServiceClient
+	out     runnerv1connect.OutboundServiceClient
 }
 
 func dial(dir string) clients {
@@ -100,6 +106,7 @@ func dial(dir string) clients {
 		rpc:     runnerv1connect.NewRpcServiceClient(hc, socket.BaseURL, o),
 		files:   runnerv1connect.NewFilesServiceClient(hc, socket.BaseURL, o),
 		mail:    runnerv1connect.NewMailServiceClient(hc, socket.BaseURL, o),
+		out:     runnerv1connect.NewOutboundServiceClient(hc, socket.BaseURL, o),
 	}
 }
 
@@ -317,7 +324,15 @@ func (f *fakeSecrets) Secret(_ context.Context, name string) (string, error) {
 	if err := f.record("secret", name); err != nil {
 		return "", err
 	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	return f.values[name], nil
+}
+
+func (f *fakeSecrets) set(name, value string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.values[name] = value
 }
 
 func (f *fakeSecrets) Settings() map[string]string { return f.settings }

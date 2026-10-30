@@ -63,7 +63,11 @@ func TestNewRefuses(t *testing.T) {
 		"stores without Files":      func(o *Options) { o.Providers.Files = nil },
 		"email without Mail":        func(o *Options) { o.Providers.Mail = nil },
 		"secrets without Secrets":   func(o *Options) { o.Manifest.Settings = nil; o.Providers.Secrets = nil },
-		"settings without Secrets":  func(o *Options) { o.Manifest.Secrets = nil; o.Providers.Secrets = nil },
+		"settings without Secrets":  func(o *Options) { o.Manifest.Secrets, o.Manifest.Egress, o.Providers.Secrets = nil, nil, nil },
+		"egress without Outbound":   func(o *Options) { o.Providers.Outbound = nil },
+		"Egress beyond the list":    func(o *Options) { o.Egress = []manifest.Egress{{Host: "evil.example"}} },
+		"Egress with another key":   func(o *Options) { o.Egress = []manifest.Egress{{Host: partner.Host, Secret: "token", Header: "X-Key"}} },
+		"a key not in secrets":      func(o *Options) { o.Manifest.Secrets = []string{"token"} },
 		"a socket path that is bad": func(o *Options) { o.Dir = filepath.Join(o.Dir, "missing") },
 	} {
 		opts := options(t, newFakes())
@@ -88,6 +92,8 @@ func TestNewWithoutProvidersTheAppDoesNotNeed(t *testing.T) {
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err))
 	_, err = c.tel.Export(t.Context(), connect.NewRequest(&runnerv1.ExportRequest{Spans: []*runnerv1.Span{{Name: "a"}}}))
 	require.NoError(t, err, "spans without Telemetry are dropped")
+	_, err = c.out.Do(t.Context(), connect.NewRequest(get("https://api.partner.example/")))
+	assert.Equal(t, "E-OUT-001", coded(t, err).Code)
 }
 
 func TestHello(t *testing.T) {
@@ -109,12 +115,29 @@ func TestHello(t *testing.T) {
 		assert.False(t, h.GetAppSocketOpen())
 	}
 
-	c, _ := serve(t)
-	for _, v := range []uint32{2, 99} {
+}
+
+func TestHelloVersions(t *testing.T) {
+	sayHello := func(c clients, v uint32) error {
 		_, err := c.life.Hello(t.Context(), connect.NewRequest(&runnerv1.HelloRequest{ProtocolVersion: v}))
-		assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err))
-		require.ErrorContains(t, err, "E-RUN-002")
+		return err
 	}
+	bare, _ := serveWith(t, func(o *Options) { o.Manifest.Egress = nil })
+	for _, v := range []uint32{runnerproto.MinProtocolVersion, runnerproto.ProtocolVersion} {
+		require.NoError(t, sayHello(bare, v), v)
+	}
+	for _, v := range []uint32{runnerproto.MinProtocolVersion - 1, runnerproto.ProtocolVersion + 1, 99} {
+		err := sayHello(bare, v)
+		assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err))
+		assert.Equal(t, "E-RUN-002", coded(t, err).Code, v)
+	}
+
+	c, _ := serve(t)
+	require.NoError(t, sayHello(c, 4))
+	err := sayHello(c, 3)
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err))
+	assert.Equal(t, "E-RUN-014", coded(t, err).Code, "protocol 3 has no outbound")
+	assert.Equal(t, "update aicoded.dev/framework to v0.10.0 or newer", coded(t, err).Fix)
 }
 
 func TestReady(t *testing.T) {
@@ -244,6 +267,22 @@ func TestSecrets(t *testing.T) {
 	_, err = c.secrets.GetSecret(t.Context(), connect.NewRequest(&runnerv1.GetSecretRequest{Name: "token"}))
 	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(err), "a connect error passes as it is")
 	require.ErrorContains(t, err, "has no value")
+}
+
+func TestSecretsRefusesABoundKey(t *testing.T) {
+	for name, change := range map[string]func(*Options){
+		"production":                 func(*Options) {},
+		"a preview without the host": func(o *Options) { o.Env = EnvPreview; o.Egress = []manifest.Egress{} },
+	} {
+		c, f := serveWith(t, change)
+		_, err := c.secrets.GetSecret(t.Context(), connect.NewRequest(&runnerv1.GetSecretRequest{Name: "partner_api_key"}))
+		e := coded(t, err)
+		assert.Equal(t, "E-RUN-015", e.Code, name)
+		assert.Equal(t, "the runner adds it to every request to api.partner.example: call the service with outbound.Client() and do not read the secret", e.Fix, name)
+		assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err), name)
+		assert.NotContains(t, err.Error(), partnerKey, name)
+		assert.Empty(t, f.secrets.seen(), "the key is never read for the app")
+	}
 }
 
 func TestOversizedMessagesAreRefused(t *testing.T) {

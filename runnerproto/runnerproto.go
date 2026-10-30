@@ -5,7 +5,11 @@ package runnerproto
 import "time"
 
 // ProtocolVersion is the version of the app–runner protocol this framework speaks.
-const ProtocolVersion uint32 = 3
+const ProtocolVersion uint32 = 4
+
+// MinProtocolVersion is the oldest version of the protocol a runner of this framework serves:
+// protocol 3 lacks only outbound.
+const MinProtocolVersion uint32 = 3
 
 // MaxMessageBytes bounds one message on the runner socket: a runner refuses a larger request and
 // an app a larger response.
@@ -29,6 +33,16 @@ const (
 	DefaultCallDeadline = 10 * time.Second
 	// MaxCallDeadline caps the deadline of every call.
 	MaxCallDeadline = 30 * time.Second
+)
+
+// Bounds of the requests an app sends to outside services through the runner.
+const (
+	// MaxOutboundBody bounds the body of a request and of its response, in bytes.
+	MaxOutboundBody = 10 << 20
+	// MaxOutboundRequests bounds the requests one instance of an app has under way at once.
+	MaxOutboundRequests = 16
+	// OutboundDeadline bounds a whole request, from the dial to the end of the response body.
+	OutboundDeadline = 30 * time.Second
 )
 
 // MaxForwardedTokenAge is how long after issuing a viewer token the runner still accepts it

@@ -42,6 +42,10 @@ type Options struct {
 	Dir string
 	// Manifest is the app's permission list.
 	Manifest manifest.Manifest
+	// Egress, when not nil, replaces the manifest's egress for the app's requests to outside
+	// services: a preview reaches only the entries it shares with the app's live release. It may
+	// hold only entries of the manifest's egress.
+	Egress []manifest.Egress
 	// Env is the environment the app runs in: EnvDev, EnvPreview or EnvProduction.
 	Env string
 	// Version is the version of the release that Hello reports.
@@ -81,6 +85,7 @@ type Server struct {
 	share     bool
 	providers Providers
 	onReady   func()
+	outbound  *outboundService
 
 	ready     chan struct{}
 	readyOnce sync.Once
@@ -109,6 +114,11 @@ func New(ctx context.Context, opts Options) (*Server, error) {
 	for _, k := range opts.ViewerKeys {
 		s.viewers = append(s.viewers, bytes.Clone(k))
 	}
+	egress := opts.Manifest.Egress
+	if opts.Egress != nil {
+		egress = slices.Clone(opts.Egress)
+	}
+	s.outbound = newOutboundService(s, egress)
 	if opts.Adopted {
 		s.markReady()
 	}
@@ -145,6 +155,12 @@ func check(opts Options) error {
 		return errors.New("server: the app declares email, and Providers.Mail is nil")
 	case len(m.Secrets)+len(m.Settings) > 0 && p.Secrets == nil:
 		return errors.New("server: the app declares secrets or settings, and Providers.Secrets is nil")
+	case len(m.Egress) > 0 && p.Outbound == nil:
+		return errors.New("server: the app declares egress, and Providers.Outbound is nil")
+	case slices.ContainsFunc(opts.Egress, func(e manifest.Egress) bool { return !slices.Contains(m.Egress, e) }):
+		return errors.New("server: Options.Egress holds an entry that is not in the manifest's egress")
+	case slices.ContainsFunc(m.Egress, func(e manifest.Egress) bool { return e.Bound() && !slices.Contains(m.Secrets, e.Secret) }):
+		return errors.New("server: the manifest's egress binds a secret it does not declare")
 	}
 	return nil
 }
@@ -236,18 +252,25 @@ func (s *Server) handler() http.Handler {
 	mux.Handle(runnerv1connect.NewRpcServiceHandler(rpcService{s}, limit))
 	mux.Handle(runnerv1connect.NewFilesServiceHandler(&fileService{stores: s.m.Stores(), files: s.providers.Files}, limit))
 	mux.Handle(runnerv1connect.NewMailServiceHandler(&mailService{email: s.m.Email, mail: s.providers.Mail}, limit))
+	mux.Handle(runnerv1connect.NewOutboundServiceHandler(s.outbound, limit))
 	return mux
 }
 
 type lifecycleService struct{ s *Server }
 
 func (l lifecycleService) Hello(_ context.Context, req *connect.Request[runnerv1.HelloRequest]) (*connect.Response[runnerv1.HelloResponse], error) {
-	if v := req.Msg.GetProtocolVersion(); v != runnerproto.ProtocolVersion {
+	s := l.s
+	v := req.Msg.GetProtocolVersion()
+	if v < runnerproto.MinProtocolVersion || v > runnerproto.ProtocolVersion {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errs.New("E-RUN-002",
-			fmt.Sprintf("the app speaks runner protocol %d, this runner speaks %d", v, runnerproto.ProtocolVersion),
+			fmt.Sprintf("the app speaks runner protocol %d, this runner speaks %d to %d", v, runnerproto.MinProtocolVersion, runnerproto.ProtocolVersion),
 			"build the app with the framework version that matches the runner: update aicoded.dev/framework in go.mod, or update aicoded"))
 	}
-	s := l.s
+	if v < outboundProtocol && len(s.m.Egress) > 0 {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errs.New("E-RUN-014",
+			fmt.Sprintf("the app speaks runner protocol %d, which has no outbound, and its permission list declares egress", v),
+			"update aicoded.dev/framework to v0.10.0 or newer"))
+	}
 	return connect.NewResponse(&runnerv1.HelloResponse{
 		App:           s.m.App,
 		Env:           s.env,
@@ -287,6 +310,11 @@ func (ss secretsService) GetSecret(ctx context.Context, req *connect.Request[run
 	name := req.Msg.GetName()
 	if !slices.Contains(ss.s.m.Secrets, name) {
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("secret %s is not declared", quote(name)))
+	}
+	if b, ok := ss.s.m.BoundSecret(name); ok {
+		return nil, connect.NewError(connect.CodePermissionDenied, errs.New("E-RUN-015",
+			fmt.Sprintf("the secret %s is a key that egress in aicoded.yaml binds to %s", quote(name), b.Host),
+			"the runner adds it to every request to "+b.Host+": call the service with outbound.Client() and do not read the secret"))
 	}
 	v, err := ss.s.providers.Secrets.Secret(ctx, name)
 	if err != nil {

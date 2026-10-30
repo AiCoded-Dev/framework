@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package aicoded.runner.v1;
+
+import "aicoded/runner/v1/mail.proto";
+
+option go_package = "aicoded.dev/framework/runnerproto/runnerv1;runnerv1";
+
+// OutboundService sends the app's requests to the outside services that egress in aicoded.yaml
+// names: HTTPS to port 443 only, with the key egress binds to the host in its header. Redirects
+// are not followed. A refusal is an error whose message is a coded error, E-OUT-NNN.
+service OutboundService {
+  rpc Do(DoRequest) returns (DoResponse);
+}
+
+// DoRequest is one HTTP request. Headers keep their order, and a name may repeat.
+message DoRequest {
+  string method = 1;
+  string url = 2;
+  repeated Header headers = 3;
+  bytes body = 4;
+}
+
+// DoResponse is the service's answer, without the hop-by-hop headers.
+message DoResponse {
+  int32 status = 1;
+  repeated Header headers = 2;
+  bytes body = 3;
+}

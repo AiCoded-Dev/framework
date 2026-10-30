@@ -4,6 +4,21 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- Runner protocol 4 adds requests to outside services: `OutboundService.Do` on `runner.sock`
+  takes a method, a URL, headers in order and a body, and answers with the status, headers and
+  body. The runner sends only `https` to port 443 of a host that `egress` lists (E-OUT-001,
+  E-OUT-002), never to the platform's own hosts (E-OUT-003), with a body up to 10 MiB each way
+  (E-OUT-004, E-OUT-005), 30 s for the whole request (E-OUT-006) and 16 requests under way at
+  once per instance (E-OUT-007). It drops the hop-by-hop headers and `Host`, refuses a header
+  name that is not a token or a value with a line break (E-OUT-009), follows no redirect, and puts
+  a key that `egress` binds to the host in its header in place of the app's. A service it cannot
+  reach is E-OUT-008. `secrets.Get` of a bound key is E-RUN-015. A runner of this framework still
+  serves protocol 3, apps of v0.7.0 to v0.9.0, unless their permission list declares `egress`
+  (E-RUN-014); any other version is E-RUN-002. `runnerproto` adds `MinProtocolVersion` (3),
+  `MaxOutboundBody` (10 MiB), `MaxOutboundRequests` (16) and `OutboundDeadline` (30 s);
+  `runnerproto/server` adds `Providers.Outbound`, the `Outbound` provider, and `Options.Egress`,
+  which replaces the manifest's `egress` for a preview.
+
 - An `egress` entry is a host alone, as before, or a mapping that binds a key to the host:
   `{host: api.partner.example, secret: partner_api_key, header: Authorization, prefix: "Bearer "}`.
   The runner adds the secret's value, after the prefix, in the header of every request to the

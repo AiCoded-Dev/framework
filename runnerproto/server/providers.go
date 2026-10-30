@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"io"
+	"net/http"
 	"time"
 
 	"connectrpc.com/connect"
@@ -40,6 +41,9 @@ type Providers struct {
 	// Calls carries the app's calls to other apps, as Router does. With nil, every call fails
 	// with E-RPC-011.
 	Calls Calls
+	// Outbound sends the app's requests to outside services. It must be set when the app
+	// declares egress.
+	Outbound Outbound
 }
 
 // FileInfo describes a file or a folder in a store.
@@ -123,6 +127,20 @@ type Telemetry interface {
 type Calls interface {
 	// Call checks req, a call made by the app of caller, and forwards it with traceparent.
 	Call(ctx context.Context, caller manifest.Manifest, req *runnerv1.CallRequest, traceparent string) (*runnerv1.CallResponse, error)
+}
+
+// Outbound sends an app's requests to outside services. The server hands it only a request it
+// checked against egress: https to port 443 of a host egress lists, by its canonical name, with
+// the key egress binds to the host in its header, no hop-by-hop or Host header and a body of at
+// most runnerproto.MaxOutboundBody bytes.
+//
+// Do resolves and dials the host, follows no redirect and bounds the response body to
+// runnerproto.MaxOutboundBody bytes and the whole request to runnerproto.OutboundDeadline,
+// until the body is closed. A refusal or failure meant for the app is an *errs.Error of the
+// framework's error catalogue, returned by Do or by a read of the body; it reaches the app by its
+// code and message. Any other error reaches the app as E-OUT-008, without its text.
+type Outbound interface {
+	Do(ctx context.Context, req *http.Request) (*http.Response, error)
 }
 
 // Minter signs the tokens the runner hands apps.
