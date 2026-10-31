@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,20 +28,28 @@ import (
 	"aicoded.dev/framework/runnerproto/socket"
 )
 
-// fake is an OutboundService that records each request and answers with resp, or with err.
+// fake is an OutboundService that records each request and answers with resp, or with err,
+// after delay. With hang set, it answers only when the request's context ends.
 type fake struct {
 	mu          sync.Mutex
 	got         []*runnerv1.DoRequest
 	traceparent string
 	resp        *runnerv1.DoResponse
 	err         error
+	delay       time.Duration
+	hang        bool
 }
 
-func (f *fake) Do(_ context.Context, r *connect.Request[runnerv1.DoRequest]) (*connect.Response[runnerv1.DoResponse], error) {
+func (f *fake) Do(ctx context.Context, r *connect.Request[runnerv1.DoRequest]) (*connect.Response[runnerv1.DoResponse], error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.got = append(f.got, r.Msg)
 	f.traceparent = r.Header().Get("traceparent")
+	f.mu.Unlock()
+	if f.hang {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
+	time.Sleep(f.delay)
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -53,7 +62,8 @@ func (f *fake) requests() []*runnerv1.DoRequest {
 	return f.got
 }
 
-// fakeRunner returns a context whose session talks to f over a Unix socket.
+// fakeRunner returns a context whose session talks to f over a Unix socket. The socket lies in a
+// short folder of its own, since t.TempDir can be too long for a Unix socket address.
 func fakeRunner(t *testing.T, f *fake) context.Context {
 	dir, err := os.MkdirTemp("", "aicoded-")
 	require.NoError(t, err)
@@ -134,7 +144,7 @@ func TestRedirectIsNotFollowed(t *testing.T) {
 
 func TestClient(t *testing.T) {
 	c := outbound.Client()
-	assert.Equal(t, 30*time.Second, c.Timeout)
+	assert.Equal(t, 35*time.Second, c.Timeout, "5 s after the runner's own 30 s, so that the runner's E-OUT-006 comes first")
 	require.ErrorIs(t, c.CheckRedirect(nil, nil), http.ErrUseLastResponse)
 	assert.NotSame(t, c, outbound.Client(), "each caller gets its own client")
 }
@@ -146,6 +156,24 @@ func TestRefusal(t *testing.T) {
 	var e *errs.Error
 	require.ErrorAs(t, err, &e)
 	assert.Equal(t, refusal, e)
+}
+
+func TestRunnerDeadlineReachesTheApp(t *testing.T) {
+	outbound.ShortenTimes(t, 200*time.Millisecond, 500*time.Millisecond)
+	slow := errs.New("E-OUT-006", `the request to "api.partner.example" took over 30 s`, "ask the service for less, or try again later")
+	f := &fake{err: connect.NewError(connect.CodeDeadlineExceeded, slow), delay: 250 * time.Millisecond}
+	err := sendFailing(t, fakeRunner(t, f), http.MethodGet, "https://api.partner.example/", http.NoBody)
+	var e *errs.Error
+	require.ErrorAs(t, err, &e, "the runner answers after its deadline, and the client still waits for it")
+	assert.Equal(t, slow, e)
+}
+
+func TestHungRunner(t *testing.T) {
+	outbound.ShortenTimes(t, 100*time.Millisecond, 100*time.Millisecond)
+	err := sendFailing(t, fakeRunner(t, &fake{hang: true}), http.MethodGet, "https://api.partner.example/", http.NoBody)
+	var ne net.Error
+	require.ErrorAs(t, err, &ne)
+	assert.True(t, ne.Timeout(), "the client gives up on a runner that never answers")
 }
 
 func TestNoRunner(t *testing.T) {

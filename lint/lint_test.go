@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -362,7 +363,10 @@ func goEnv(t *testing.T, name string) string {
 
 func TestNames(t *testing.T) {
 	const typeParamConversion = "app code may not convert to or from a type parameter that could be a pointer, or a pointer to a type parameter: use the concrete types"
-	const ownClient = "app code may not make or hold an http.Client of its own: use the *http.Client that outbound.Client() returns"
+	const (
+		makeClient = "app code may not make an http.Client of its own: use the *http.Client that outbound.Client() returns"
+		holdClient = "app code may not hold an http.Client by value: hold the *http.Client that outbound.Client() returns"
+	)
 	assert.Equal(t, []string{
 		`bad/bad.go:32: E-LINT-005: only generated code may call rpc.Call`,
 		`bad/bad.go:33: E-LINT-005: only generated code may call web.Request.CSRFToken`,
@@ -391,15 +395,15 @@ func TestNames(t *testing.T) {
 		`bad/bad.go:113: E-LINT-009: app code may not convert a pointer to slog.Logger to another pointer type`,
 		`bad/bad.go:114: E-LINT-009: app code may not change a time.Time through a pointer`,
 		`bad/bad.go:119: E-LINT-009: app code may not change a value through a pointer to a type parameter, which could point at a value of the standard library or the framework`,
-		`bad/client.go:13: E-LINT-009: ` + ownClient,
-		`bad/client.go:17: E-LINT-009: ` + ownClient,
-		`bad/client.go:18: E-LINT-009: ` + ownClient,
-		`bad/client.go:23: E-LINT-009: ` + ownClient,
-		`bad/client.go:24: E-LINT-009: ` + ownClient,
-		`bad/client.go:25: E-LINT-009: ` + ownClient,
-		`bad/client.go:26: E-LINT-009: ` + ownClient,
-		`bad/client.go:27: E-LINT-009: ` + ownClient,
-		`bad/client.go:28: E-LINT-009: ` + ownClient,
+		`bad/client.go:13: E-LINT-009: ` + holdClient,
+		`bad/client.go:17: E-LINT-009: ` + holdClient,
+		`bad/client.go:18: E-LINT-009: ` + holdClient,
+		`bad/client.go:23: E-LINT-009: ` + makeClient,
+		`bad/client.go:24: E-LINT-009: ` + makeClient,
+		`bad/client.go:25: E-LINT-009: ` + makeClient,
+		`bad/client.go:26: E-LINT-009: ` + holdClient,
+		`bad/client.go:27: E-LINT-009: ` + makeClient,
+		`bad/client.go:28: E-LINT-009: ` + makeClient,
 		`bad/client.go:29: E-LINT-009: app code may not use http.Transport`,
 		`bad/client.go:30: E-LINT-009: app code may not use http.Transport`,
 		`bad/client.go:31: E-LINT-009: app code may not use http.DefaultClient`,
@@ -438,20 +442,31 @@ func TestNames(t *testing.T) {
 }
 
 func TestClientFix(t *testing.T) {
-	const outboundFix = "call outside services with outbound.Client(), which goes through the runner"
+	const (
+		outboundFix = "call outside services with outbound.Client(), which goes through the runner"
+		asIsFix     = "use the client from outbound.Client() as it is: build requests with http.NewRequestWithContext and send them with its Do method"
+	)
 	r, err := lint.Run(t.Context(), filepath.Join("testdata", "names"), lint.Config{Generated: []string{"pages/route_gen.go"}, FrameworkDir: checkout(t)})
 	require.NoError(t, err)
-	var client []string
+	fixes := map[string][]string{}
 	for _, p := range r.Problems {
-		if p.Fix == outboundFix {
-			client = append(client, p.Pos)
-		}
-		if strings.HasPrefix(p.Pos, "bad/client.go:") {
-			assert.Equal(t, outboundFix, p.Fix, p.Error())
+		if p.Fix == outboundFix || p.Fix == asIsFix {
+			fixes[p.Fix] = append(fixes[p.Fix], p.Pos)
+		} else {
+			assert.False(t, strings.HasPrefix(p.Pos, "bad/client.go:"), p.Error())
 		}
 	}
-	assert.Contains(t, client, "bad/bad.go:40", "http.Get")
-	assert.NotContains(t, client, "bad/bad.go:43", "slog.SetDefault keeps the rule's fix")
+	lines := func(file string, ns ...int) []string {
+		var out []string
+		for _, n := range ns {
+			out = append(out, file+":"+strconv.Itoa(n))
+		}
+		return out
+	}
+	assert.Equal(t, append(lines("bad/bad.go", 40), lines("bad/client.go", 23, 24, 25, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36)...),
+		fixes[outboundFix], "a client the app makes, and the client names of net/http")
+	assert.Equal(t, lines("bad/client.go", 13, 17, 18, 26, 38, 39, 40, 41, 42, 43, 44, 45, 46, 58, 60, 61, 63, 64, 66),
+		fixes[asIsFix], "a client held by value, and what is done to the one outbound.Client returns")
 }
 
 func TestBanned(t *testing.T) {

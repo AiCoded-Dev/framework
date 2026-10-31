@@ -145,7 +145,7 @@ func methodsOf(pkgs []*packages.Package, members []string) map[string][]*types.F
 func (a *app) names(p *analysis.Pass) {
 	for _, f := range p.Files {
 		generated := a.isGenerated(p, f)
-		star := starred(f)
+		uses := clientUsesOf(f)
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch n := n.(type) {
 			case *ast.Ident:
@@ -153,7 +153,7 @@ func (a *app) names(p *analysis.Pass) {
 			case *ast.CallExpr:
 				a.pointerConversion(p, n)
 			}
-			a.clients(p, n, star)
+			a.clients(p, n, uses)
 			for _, x := range targets(n) {
 				a.change(p, x)
 			}
@@ -434,6 +434,8 @@ func (a *app) refuse(p *analysis.Pass, id *ast.Ident, code, name string) {
 	switch {
 	case code == "E-LINT-005":
 		diagnose(p, id.Pos(), code, "only generated code may call "+display(name))
+	case clientMember(name):
+		diagnoseFix(p, id.Pos(), code, "app code may not use "+display(name), asIsFix)
 	case clientName(name):
 		diagnoseFix(p, id.Pos(), code, "app code may not use "+display(name), outboundFix)
 	default:
@@ -473,8 +475,8 @@ func (a *app) change(p *analysis.Pass, x ast.Expr) {
 			return false
 		}
 		if named, ok := a.restrictedPointee(et); ok {
-			if msg := "app code may not change a " + display(named) + " through a pointer"; clientName(named) {
-				diagnoseFix(p, e.Pos(), "E-LINT-009", msg, outboundFix)
+			if msg := "app code may not change a " + display(named) + " through a pointer"; named == "net/http.Client" {
+				diagnoseFix(p, e.Pos(), "E-LINT-009", msg, asIsFix)
 			} else {
 				diagnose(p, e.Pos(), "E-LINT-009", msg)
 			}

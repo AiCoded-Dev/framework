@@ -14,9 +14,9 @@
 //     serves; a request without the app's context is E-RUN-004.
 //   - Only https to port 443 (E-OUT-002) of a host that egress lists (E-OUT-001). The platform's
 //     own hosts and private networks are never reachable (E-OUT-003).
-//   - A request body and a response body are at most 10 MiB each (E-OUT-004, E-OUT-005), and a
-//     whole request takes at most 30 s (E-OUT-006). An instance runs at most 16 requests at once
-//     (E-OUT-007).
+//   - A request body and a response body are at most 10 MiB each (E-OUT-004, E-OUT-005). The
+//     runner ends a request after 30 s with E-OUT-006; the client itself gives up 5 s later, only
+//     when the runner does not answer. An instance runs at most 16 requests at once (E-OUT-007).
 //   - Redirects are not followed: a 3xx response comes back with its Location.
 //   - Any other HTTP client, such as http.Get or an http.Client of the app's own, is E-LINT-009.
 //

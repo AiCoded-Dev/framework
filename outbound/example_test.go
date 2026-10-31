@@ -11,7 +11,8 @@ import (
 )
 
 // Call an outside service that egress in the permission list names, here in a page's Data, with
-// the context Data receives. The runner adds the key that egress binds to the host.
+// the context Data receives. The runner adds the key that egress binds to the host. The example
+// only compiles: it needs the runner of a running app.
 func ExampleClient() {
 	data := func(ctx context.Context, city string) error {
 		u := "https://api.weather.example/v1/today?city=" + url.QueryEscape(city)

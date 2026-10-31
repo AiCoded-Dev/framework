@@ -8,6 +8,7 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -18,14 +19,22 @@ import (
 	"aicoded.dev/framework/runnerproto/runnerv1"
 )
 
+// deadline is the runner's bound on a whole request, and backstop how much longer the client
+// waits for the runner's answer, so that it gives up only on a runner that hangs.
+var (
+	deadline = runnerproto.OutboundDeadline
+	backstop = 5 * time.Second
+)
+
 // Client returns a client whose requests go to the runner, which sends them to the outside
 // service. Each request must carry the context of the request or job it serves, as
 // http.NewRequestWithContext gives it. The client follows no redirect: a 3xx response comes back
-// with its Location. A whole request may take 30 s.
+// with its Location. The runner ends a request after 30 s with E-OUT-006; the client gives up
+// 5 s later, on a runner that does not answer.
 func Client() *http.Client {
 	return &http.Client{
 		Transport:     transport{},
-		Timeout:       runnerproto.OutboundDeadline,
+		Timeout:       deadline + backstop,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 }

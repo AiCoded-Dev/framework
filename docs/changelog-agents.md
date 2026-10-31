@@ -27,15 +27,18 @@ Changes to the API that AI assistants build apps with. Newest first.
   `*http.Client` whose requests go to the runner over runner protocol 4. Build each request with
   `http.NewRequestWithContext` and the context of the request or job it serves (E-RUN-004
   without it); a request body over 10 MiB is refused before it is sent (E-OUT-004), the client
-  follows no redirect and gives up after 30 s, and a runner's refusal comes back as its coded
-  error. E-LINT-009 now lets app code use `http.Client` as `*http.Client`, `NewRequest`,
-  `NewRequestWithContext`, `NoBody` and `Response`, and refuses, with the fix "call outside services
-  with outbound.Client(), which goes through the runner", every client of the app's own: the
-  client names of `net/http` (`Get`, `Post`, `Head`, `PostForm`, `DefaultClient`,
-  `DefaultTransport`, `Transport`), an `http.Client` made or held by value, the client's fields and
-  its `Get`, `Head`, `Post` and `PostForm` methods, a `*http.Client` written through `*`, turned
-  into an interface value or passed as a type argument. A declared module still may not use
-  `http.Client` and the other names (E-LINT-003).
+  follows no redirect, and a runner's refusal comes back as its coded error, E-OUT-006 for a
+  request over 30 s among them. The client's own `Timeout` is 35 s, for a runner that does not
+  answer. E-LINT-009 now lets app code use `http.Client` as `*http.Client`, `NewRequest`,
+  `NewRequestWithContext`, `NoBody` and `Response`. It refuses, with the fix "call outside
+  services with outbound.Client(), which goes through the runner", a client the app makes
+  (`http.Client{}`, `new(http.Client)`, `[]*http.Client{{}}`) and the client names of `net/http`
+  (`Get`, `Post`, `Head`, `PostForm`, `DefaultClient`, `DefaultTransport`, `Transport`). It
+  refuses, with the fix "use the client from outbound.Client() as it is: build requests with
+  http.NewRequestWithContext and send them with its Do method", an `http.Client` held by value and
+  anything done to the client `outbound.Client()` returns: its fields, its `Get`, `Head`, `Post`
+  and `PostForm` methods, `*c = ...`, turning it into an interface value or passing it as a type
+  argument. A declared module still may not use `http.Client` and the other names (E-LINT-003).
 
 - An `egress` entry is a host alone, as before, or a mapping that binds a key to the host:
   `{host: api.partner.example, secret: partner_api_key, header: Authorization, prefix: "Bearer "}`.

@@ -76,7 +76,7 @@ var rules = []Rule{
 		Dont:  "Use the parts of net/http and database/sql that serve, make an HTTP client of the app's own or change one, read files or reach the driver, turn an HTTP client into an interface value, use reflect through a value, replace the default logger, change a variable of the standard library or the framework, or a value of their types or of a type parameter through a pointer, or convert to or from a type parameter that could be a pointer.",
 		Do:    "Use the types and constants of net/http and database/sql around the building blocks, call outside services with the client that outbound.Client() returns, log with log/slog as the framework sets it up, and keep your own variables.",
 		Fix:   "use only the names that aicoded explain E-LINT-009 lists; return a value instead of writing it through a pointer to a standard-library or framework type, and keep values in variables of your own",
-		Also:  []string{outboundFix},
+		Also:  []string{outboundFix, asIsFix},
 	},
 	{
 		Code:  "E-LINT-010",
@@ -111,6 +111,10 @@ var rules = []Rule{
 
 // outboundFix is the fix of E-LINT-009 for an HTTP client of the app's own.
 const outboundFix = "call outside services with outbound.Client(), which goes through the runner"
+
+// asIsFix is the fix of E-LINT-009 for a change to the client that outbound.Client returns, or a
+// client held by value.
+const asIsFix = "use the client from outbound.Client() as it is: build requests with http.NewRequestWithContext and send them with its Do method"
 
 // journalFix is the fix of E-LINT-013 for SQL that names the journal of migrations.
 const journalFix = "do not read or write aicoded_migrations; schema changes go in .aicoded/migration.sql"
