@@ -3,6 +3,9 @@ package lint_test
 import (
 	"archive/zip"
 	"bytes"
+	"go/importer"
+	"go/token"
+	"go/types"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -517,6 +520,19 @@ func TestBanned(t *testing.T) {
 	} {
 		assert.Equal(t, c.code, lint.Banned(c.path, c.name), "%s %s", c.path, c.name)
 	}
+}
+
+func TestNetHTTPFunctionsAnAppMayCall(t *testing.T) {
+	pkg, err := importer.Default().Import("net/http")
+	require.NoError(t, err)
+	var allowed []string
+	for _, name := range pkg.Scope().Names() {
+		if _, ok := pkg.Scope().Lookup(name).(*types.Func); ok && token.IsExported(name) && lint.Banned("net/http", name) == "" {
+			allowed = append(allowed, name)
+		}
+	}
+	assert.Equal(t, []string{"CanonicalHeaderKey", "DetectContentType", "NewRequest", "NewRequestWithContext", "StatusText"}, allowed,
+		"the capabilities step of the platform's worker passes over NETWORK through these functions; check a new one there first")
 }
 
 func TestModules(t *testing.T) {
