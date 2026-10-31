@@ -4,6 +4,10 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- In a preview, E-OUT-001 has the fix "release the app with this host first: a preview reaches
+  only the hosts the app's live release reaches; the app type decides whether that needs
+  approval"; outside a preview its fix stays "add the host to egress in aicoded.yaml".
+
 - E-REL-017 refuses `egress` only for an app built with a framework older than v0.10.0, with the
   fix "update aicoded.dev/framework to v0.10.0 or newer and publish again"; the platform releases
   outside services of v0.10.0 and newer. It still refuses `schedule`. A preview reaches only the

@@ -12,3 +12,6 @@ the preview's publish adds, or binds another way, waits for the release.
 A new host is a change of the permission list: one the app type does not allow needs approval.
 
 **Fix:** add the host to egress in aicoded.yaml; a host the app type does not allow needs approval
+
+**Fix in a preview:** release the app with this host first: a preview reaches only the hosts the
+app's live release reaches; the app type decides whether that needs approval

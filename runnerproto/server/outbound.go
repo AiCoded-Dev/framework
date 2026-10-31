@@ -224,11 +224,11 @@ func canonicalHost(host string) (string, bool) {
 
 // notListed refuses a request to host, which egress does not list, with more said after.
 func (o *outboundService) notListed(host, more string) error {
-	msg := quote(host) + " is not in egress in aicoded.yaml"
 	if o.replaced {
-		msg = quote(host) + " is not a host of the app's live release: a preview reaches only the hosts of the app's live release"
+		return errs.New("E-OUT-001", quote(host)+" is not a host of the app's live release: a preview reaches only the hosts of the app's live release"+more,
+			"release the app with this host first: a preview reaches only the hosts the app's live release reaches; the app type decides whether that needs approval")
 	}
-	return errs.New("E-OUT-001", msg+more, "add the host to egress in aicoded.yaml; a host the app type does not allow needs approval")
+	return errs.New("E-OUT-001", quote(host)+" is not in egress in aicoded.yaml"+more, "add the host to egress in aicoded.yaml; a host the app type does not allow needs approval")
 }
 
 func badURL(msg string) error {

@@ -246,12 +246,17 @@ func TestOutboundInAPreview(t *testing.T) {
 func TestOutboundNamesTheLiveReleaseOnlyForAReplacedList(t *testing.T) {
 	c, _ := serveWith(t, func(o *Options) { o.Env = EnvPreview })
 	_, err := do(t, c, get("https://evil.example/"))
-	assert.Equal(t, `"evil.example" is not in egress in aicoded.yaml`, coded(t, err).Msg, "the manifest's list")
+	e := coded(t, err)
+	assert.Equal(t, `"evil.example" is not in egress in aicoded.yaml`, e.Msg, "the manifest's list")
+	assert.Equal(t, "add the host to egress in aicoded.yaml; a host the app type does not allow needs approval", e.Fix, "the manifest's list")
 
 	c, _ = serveWith(t, func(o *Options) { o.Egress = []manifest.Egress{} })
 	_, err = do(t, c, get("https://evil.example/"))
+	e = coded(t, err)
 	assert.Equal(t, `"evil.example" is not a host of the app's live release: a preview reaches only the hosts of the app's live release`,
-		coded(t, err).Msg, "a replaced list")
+		e.Msg, "a replaced list")
+	assert.Equal(t, "release the app with this host first: a preview reaches only the hosts the app's live release reaches; the app type decides whether that needs approval",
+		e.Fix, "a replaced list")
 }
 
 func TestOutboundSendsOnlyTheRequestMethods(t *testing.T) {
