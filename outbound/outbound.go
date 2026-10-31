@@ -72,6 +72,10 @@ func (transport) RoundTrip(req *http.Request) (*http.Response, error) {
 				return nil, e
 			}
 		}
+		// The context's own error reports Timeout, which the client's error then reports too.
+		if cerr := req.Context().Err(); cerr != nil {
+			return nil, cerr
+		}
 		return nil, fmt.Errorf("outbound: %w", err)
 	}
 	return response(req, resp.Msg), nil
