@@ -6,7 +6,11 @@ app sends to that host with `outbound.Client()`, so the key never reaches the ap
 logs or its pages. Reading it is refused, and nothing was read.
 
 ```go
-resp, err := outbound.Client().Get("https://api.partner.example/v1/items")
+req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.partner.example/v1/items", http.NoBody)
+if err != nil {
+	return err
+}
+resp, err := outbound.Client().Do(req)
 ```
 
 **Fix:** the runner adds it to every request to `<host>`: call the service with `outbound.Client()` and do not read the secret

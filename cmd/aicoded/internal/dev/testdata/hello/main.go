@@ -25,6 +25,8 @@ func main() {
 	mux.HandleFunc("GET /exit", func(http.ResponseWriter, *http.Request) { os.Exit(3) })
 	mux.HandleFunc("GET /leak", leak)
 	mux.HandleFunc("GET /hold", hold)
+	mux.HandleFunc("GET /call", call)
+	mux.HandleFunc("GET /bound", bound)
 	app.Main(app.Options{Handler: mux})
 }
 

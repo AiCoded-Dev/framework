@@ -98,6 +98,7 @@ or left empty, is not stated.
   `Connection` or `Transfer-Encoding`; its `prefix`, which may be left out, is at most 64
   printable ASCII characters (E-MAN-025). One secret may go to several hosts. The app never reads
   a key it binds: it calls the service with `outbound.Client()`, and the runner adds the key.
+  See [outside services](outbound.md).
 - `email` has `from`, one plain lower-case address, and `to_domains`, the lower-case domains the
   app may send to, with no wildcards and no non-ASCII names (E-MAN-009). See [mail](mail.md).
 - `schedule` lists the app's scheduled jobs, each as `{cron: "<expression>", job: <name>}`

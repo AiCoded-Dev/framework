@@ -2,9 +2,13 @@ package dev
 
 import (
 	"bytes"
+	"context"
 	"crypto/ed25519"
+	"crypto/x509"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +21,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
+	"aicoded.dev/framework/runnerproto/egress"
 	"aicoded.dev/framework/runnerproto/server"
 	"aicoded.dev/framework/runnerproto/socket"
 )
@@ -56,6 +61,11 @@ func shortDir(t *testing.T) string {
 // of st, the values v and the calls of router, which may be nil. It returns a client of
 // runner.sock and the server.
 func serveDev(t *testing.T, m manifest.Manifest, v devconfig.AppValues, st *store, router *server.Router) (*http.Client, *server.Server, string) {
+	return serveDevEgress(t, m, v, st, router, egress.Options{})
+}
+
+// serveDevEgress is serveDev with an egress client of o.
+func serveDevEgress(t *testing.T, m manifest.Manifest, v devconfig.AppValues, st *store, router *server.Router, o egress.Options) (*http.Client, *server.Server, string) {
 	dir := shortDir(t)
 	filesDir := filepath.Join(dir, "files")
 	files, err := newFileStore(filesDir, m.Stores())
@@ -63,7 +73,7 @@ func serveDev(t *testing.T, m manifest.Manifest, v devconfig.AppValues, st *stor
 	t.Cleanup(files.close)
 	srv, err := server.New(t.Context(), server.Options{Dir: dir, Manifest: m, Env: server.EnvPreview,
 		ViewerKeys: []ed25519.PublicKey{make([]byte, ed25519.PublicKeySize)}, CSRFKey: newCSRFKey(),
-		Providers: providers(m, files, st, v, router)})
+		Providers: providers(m, files, st, v, router, egress.New(o))})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = srv.Close() })
 	return socket.Client(filepath.Join(dir, runnerproto.RunnerSocket)), srv, filesDir
@@ -144,4 +154,27 @@ func requireClosed(t *testing.T, closed <-chan struct{}, msg string) {
 	case <-time.After(5 * time.Second):
 		t.Fatal(msg)
 	}
+}
+
+// fakeService serves h over TLS as https://api.example.com and returns options of the egress
+// client under which the host resolves to addr and every dial reaches h.
+func fakeService(t *testing.T, addr string, h http.HandlerFunc) egress.Options {
+	srv := httptest.NewTLSServer(h)
+	t.Cleanup(srv.Close)
+	roots := x509.NewCertPool()
+	roots.AddCert(srv.Certificate())
+	return egress.Options{
+		Resolver: answer(addr),
+		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, network, srv.Listener.Addr().String())
+		},
+		RootCAs: roots,
+	}
+}
+
+// answer is a resolver that resolves every host to itself.
+type answer string
+
+func (a answer) LookupNetIP(context.Context, string, string) ([]netip.Addr, error) {
+	return []netip.Addr{netip.MustParseAddr(string(a))}, nil
 }

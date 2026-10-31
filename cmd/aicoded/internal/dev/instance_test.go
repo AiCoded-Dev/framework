@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -117,4 +118,36 @@ func TestRunDirTooLong(t *testing.T) {
 	entries, err := os.ReadDir(base)
 	require.NoError(t, err)
 	assert.Empty(t, entries)
+}
+
+func TestStartCallsOutsideServices(t *testing.T) {
+	requireGo(t)
+	signer, err := NewSigner()
+	require.NoError(t, err)
+	got := make(chan http.Header, 1)
+	opts := fakeService(t, "93.184.216.34", func(w http.ResponseWriter, r *http.Request) {
+		got <- r.Header.Clone()
+		_, _ = w.Write([]byte("hello from the service"))
+	})
+	m := helloManifest(t)
+	m.Secrets = append(m.Secrets, "partner_key")
+	m.Egress = []manifest.Egress{{Host: "api.example.com", Secret: "partner_key", Header: "Authorization", Prefix: "Bearer "}}
+	values := devconfig.AppValues{Settings: helloValues.Settings, Secrets: map[string]string{"token": "abc", "partner_key": "p4rtner-key"}}
+	var out syncBuffer
+	inst, err := Start(t.Context(), helloDir(t), m, values, Services{StateDir: t.TempDir(), egress: opts}, signer, &out)
+	require.NoError(t, err)
+
+	assert.Equal(t, "200 hello from the service", getApp(t, inst, signer, "/call"))
+	assert.Equal(t, "Bearer p4rtner-key", (<-got).Get("Authorization"), "the runner adds the bound key")
+	assert.Contains(t, getApp(t, inst, signer, "/bound"), "E-RUN-015", "the app never reads a bound key")
+
+	inst.Stop()
+	i := slices.IndexFunc(inst.store.spans.All(), func(s devapi.Span) bool { return s.Name == "outbound" })
+	require.GreaterOrEqual(t, i, 0, "the request's span is kept")
+	sp := inst.store.spans.All()[i]
+	assert.Equal(t, "hello", sp.App)
+	assert.Equal(t, "api.example.com", sp.Attrs["server.address"])
+	assert.Equal(t, "200", sp.Attrs["http.response.status_code"])
+	assert.NotContains(t, fmt.Sprint(inst.store.spans.All(), inst.store.logs.All()), "p4rtner-key")
+	assert.NotContains(t, out.String(), "p4rtner-key")
 }

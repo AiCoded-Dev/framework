@@ -24,6 +24,7 @@ import (
 	"aicoded.dev/framework/internal/errs"
 	"aicoded.dev/framework/manifest"
 	"aicoded.dev/framework/runnerproto"
+	"aicoded.dev/framework/runnerproto/egress"
 	"aicoded.dev/framework/runnerproto/mysqlproxy"
 	"aicoded.dev/framework/runnerproto/server"
 )
@@ -51,6 +52,9 @@ type Services struct {
 	// Platform gives the migrations each app published; with nil, they come from the app's
 	// cache, .aicoded/migrations.json.
 	Platform migrations.Platform
+
+	// egress configures the client of the app's requests to outside services. Only tests set it.
+	egress egress.Options
 }
 
 // env returns the environment of svc, devconfig.EnvDev when it names none.
@@ -68,6 +72,7 @@ type Instance struct {
 	draft  string
 	srv    *server.Server
 	files  *fileStore
+	egress *egress.Client
 	store  *store
 	runDir string
 	cmd    *exec.Cmd
@@ -206,6 +211,7 @@ func (i *Instance) serve(ctx context.Context, svc Services, signer *Signer) erro
 		return err
 	}
 	i.files = files
+	i.egress = egress.New(svc.egress)
 	i.store.mail.setEmail(m.Email)
 	opts := server.Options{
 		Dir:        i.runDir,
@@ -214,7 +220,7 @@ func (i *Instance) serve(ctx context.Context, svc Services, signer *Signer) erro
 		Version:    "dev",
 		ViewerKeys: []ed25519.PublicKey{signer.Public()},
 		CSRFKey:    newCSRFKey(),
-		Providers:  providers(m, files, i.store, i.values, svc.Router),
+		Providers:  providers(m, files, i.store, i.values, svc.Router, i.egress),
 	}
 	if database != nil {
 		opts.Database = database
@@ -279,6 +285,9 @@ func (i *Instance) Stop() {
 	}
 	if i.files != nil {
 		i.files.close()
+	}
+	if i.egress != nil {
+		i.egress.CloseIdleConnections()
 	}
 	if i.byHand {
 		close(i.exited)

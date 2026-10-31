@@ -1,9 +1,9 @@
 # aicoded dev: run apps on your computer
 
 `aicoded dev` is the runner on your computer. It generates, builds and starts every app in a
-folder, signs viewers in as test personas, gives the apps their database, file stores and caught
-mail, rebuilds an app when its files change, and serves a dev UI with the apps' logs, traces and
-mail.
+folder, signs viewers in as test personas, gives the apps their database, file stores, caught
+mail and outside services, rebuilds an app when its files change, and serves a dev UI with the
+apps' logs, traces and mail.
 
 ## Running it
 
@@ -95,6 +95,11 @@ list is the one a new browser gets.
   `~/.local/state/aicoded/<hash>/files/<app>/<store>` (E-DEV-009).
 - Mail is caught instead of sent. It is still checked against the mail rules and the permission
   list. See [mail](mail.md).
+- Requests to outside services go out to the real service, with the checks and limits of the
+  platform, and the key that `egress` binds to a host from the secret's value here. A service on
+  this computer or its network is unreachable (E-OUT-003), and so is a host that `egress` does
+  not list (E-OUT-001). The Traces page shows a span `outbound` for each request. See
+  [outside services](outbound.md).
 
 ## Migrations
 

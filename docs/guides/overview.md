@@ -16,12 +16,13 @@ notes/
   rpc/             optional: the functions other apps may call
 ```
 
-- The app holds no database password and no DSN. It reaches its database, files, mail and other
-  apps only through its runner, which gives it only what its permission list declares. On your
-  computer, `aicoded dev` is that runner, with test personas in place of the company login.
+- The app holds no database password, DSN or key. It reaches its database, files, mail, other
+  apps and outside services only through its runner, which gives it only what its permission
+  list declares. On your computer, `aicoded dev` is that runner, with test personas in place of
+  the company login.
 - The building blocks are packages of the framework: `auth` (who is viewing), `config`
   (settings), `secrets`, `sqldb` (the app's own MySQL database), `filestore`, `mailer`,
-  `telemetry` and `rpc` (calls between apps).
+  `outbound` (outside services), `telemetry` and `rpc` (calls between apps).
 - You or your AI assistant write `aicoded.yaml`, except its `access` and `services` sections,
   which `aicoded generate` writes.
 
@@ -151,6 +152,8 @@ live values or page calls also opens one live connection. It runs the same acces
   the platform applies it.
 - [File stores](file-stores.md): reading and writing the app's files.
 - [Mail](mail.md): sending mail with an idempotency key, and reading the mailbox.
+- [Outside services](outbound.md): calling services on the internet, with keys the app never
+  reads.
 - [Settings and secrets](settings-and-secrets.md): configured values and values nobody may see.
 - [Telemetry](telemetry.md): logs and trace spans, with no personal data.
 - [Calls between apps](calls-between-apps.md): serving and calling functions of other apps.
@@ -189,3 +192,5 @@ Recipes for common changes, with the code of the example apps:
 - [Take a file upload](../tasks/upload-a-file.md): file fields, their checks and a file store.
 - [Call another app](../tasks/call-another-app.md): a function in `rpc/`, `aicoded rpc add` and
   the call.
+- [Call an outside service](../tasks/call-an-outside-service.md): a host and its key in
+  `egress`, and the client of `outbound.Client()`.

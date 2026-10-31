@@ -7,7 +7,7 @@ not for changing the framework itself. Follow them in every change.
 
 - An app is a Go module with a permission list, `aicoded.yaml`, and a `main.go` that calls
   `app.Main`. The permission list names the app and everything it reaches: its SQL database,
-  file stores, mail, settings, secrets and the apps it calls. The runner holds the app to it.
+  file stores, mail, settings, secrets, outside services and other apps. The runner enforces it.
 - Pages are folders under `pages/`, each with an `index.html` template and a `dataprovider.go`
   whose hooks fill it: `pages/notes/n_id/` is `/notes/42`. `aicoded generate` makes them Go code.
 - App code imports the framework's packages `app`, `auth`, `config`, `filestore`, `mailer`,
@@ -40,7 +40,7 @@ not for changing the framework itself. Follow them in every change.
 - Give every mail an `IdempotencyKey` that names what it is about, such as `invoice-42-reminder`:
   a retry within 24 hours sends nothing again. Send it after the data it reports is committed.
 - Declare in `aicoded.yaml` who uses the app (`audience`) and every data source, mail address,
-  setting, secret and third-party module it uses.
+  setting, secret, outside service (`egress`) and third-party module it uses.
 - Open the database and file stores once, in `OnStart`. Use the context of the request or call
   being served for everything else.
 - Schema changes go in `.aicoded/migration.sql`; never commit it; `aicoded publish` sends it.
@@ -56,14 +56,16 @@ not for changing the framework itself. Follow them in every change.
 
 - Never write a password, key, token or DSN into code, `aicoded.yaml`, tests or docs. Read
   settings with `config.String` and secrets with `secrets.Get`; call `Reveal()` only where used.
+  Bind an outside service's key to its host in `egress`; the runner adds it to each request.
 - Never import `os`, `os/exec`, `net`, `syscall`, `reflect`, `unsafe` or `log`, a cloud SDK or
   a database driver: the building blocks reach everything through the runner, and `log/slog`
   logs. App code imports only its own packages, the building blocks, the standard packages that
   `aicoded explain E-LINT-001` lists, and the modules that `modules:` in `aicoded.yaml` declares.
   Tests open the test database with `sqltest.Open(t)` of `aicoded.dev/framework/sqldb/sqltest`.
 - Never call `sql.Open`, `sql.OpenDB`, `rpc.Call`, `web.New`, `http.Get`, `http.Post`,
-  `http.ListenAndServe` or `http.NewServeMux`: get the database from `sqldb.Open`, call another
-  app through its generated client in `services/<app>/`, and call `app.Main` with an
+  `http.ListenAndServe` or `http.NewServeMux`, or make an HTTP client: get the database from
+  `sqldb.Open`, call another app through its generated client in `services/<app>/`, call outside
+  services with `outbound.Client()` kept in an unexported field, and call `app.Main` with an
   `app.Options` literal written in the call, whose `Handler` and `RPC` are only
   `pages.NewHandler(...)` and `rpc.Server()`, which `aicoded generate` writes.
 - Never edit generated files: `*_gen.go`, `*_gen.ts`, `pages/assets_gen/`, `.aicoded/` but
@@ -100,9 +102,8 @@ not for changing the framework itself. Follow them in every change.
 3. `aicoded dev` prints a login link to its dev UI at `http://localhost:8080`. The dev UI shows
    each app's state and problems, its logs, traces and caught mail: mail is caught, never sent.
 4. `aicoded check` generates, builds, vets, lints and tests every app, and lists each problem with
-   its code, `file:line` and fix. Lint applies the rules for app code that `guides/rules` lists
-   (E-LINT codes). `aicoded check --frozen` writes nothing and reports every generated file that
-   is out of date: run it before you commit.
+   its code, `file:line` and fix. `aicoded check --frozen` writes nothing and reports every
+   generated file that is out of date: run it before you commit.
 5. `aicoded explain <topic>` prints a page of the docs, such as `guides/forms` or an error code.
 
 Local values live outside the repository, in the developer's `dev.yaml`: the values of settings
@@ -142,9 +143,8 @@ The docs are built into `aicoded`. `aicoded explain <topic>` prints a page, and 
 - The task recipes take their code from the framework's example apps: `tasks/new-app`,
   `tasks/add-page`, `tasks/add-form`, `tasks/add-live-value`, `tasks/list-from-database`,
   `tasks/list-by-role`, `tasks/ownership-check`, `tasks/email-after-a-write`,
-  `tasks/upload-a-file` and `tasks/call-another-app`.
+  `tasks/upload-a-file`, `tasks/call-another-app` and `tasks/call-an-outside-service`.
 - `changelog` lists what changed in the framework; an error code, such as `E-DEV-003`, its error.
-- `aicoded describe` summarises the apps: pages, access rules, functions served and called, data,
-  mail, settings, secret names, modules, SQL writes, surface and stale generated files.
+- `aicoded describe` summarises what each app serves, calls and reaches, and its generated files.
 - `go doc aicoded.dev/framework/<package>` prints a package's overview and rules; its examples
   are in `example_test.go` in the folder `go list -m -f '{{.Dir}}' aicoded.dev/framework` prints.

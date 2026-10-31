@@ -274,7 +274,7 @@ passed
   app has since taken its place.
 - `Release failed:` and why: the release did not go live where the app runs.
 - `Not released:` and why: a newer publish of the app came after it, or the platform refused the
-  release, such as one with outside services (E-REL-017).
+  release, such as one with scheduled jobs (E-REL-017).
 
 `aicoded status --json` and the `release_status` tool give the same in `release`: its `tier`
 (`R1` for *Pre-approved*, `R2` for *Needs approval*), its `app_type`, its `reasons`, its `state`

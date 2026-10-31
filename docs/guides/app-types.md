@@ -61,7 +61,7 @@ line:
   (E-MAN-024), and the source registry can mark a source so (E-REL-021).
 
 A publish that passes but is not released says `Not released:` and why, such as a newer publish
-of the app that came after it, or what the platform does not run yet, such as outside services
+of the app that came after it, or what the platform does not run yet, such as scheduled jobs
 (E-REL-017). One whose release did not go live where the app runs says `Release failed:` and why.
 
 ### What always needs approval
@@ -75,6 +75,8 @@ Whatever the app type allows, a release needs approval when:
   did not have (E-GATE-045, E-DATA-001);
 - a page is open to more people than in the live version (E-GATE-046): its roles are not among
   those it had, it loses its `Guard`, or it becomes `shared`. A new page is not;
+- a key that `egress` binds to an outside service is new, or goes to its host in another way than
+  in the live version (E-GATE-048): the approval card shows which key goes to which service;
 - a function of `rpc/` is open to more callers than in the live version (E-GATE-047): a new app
   in `caller=`, a first `role=` or `apps=true`, or a `role=` that admits more viewers. A new
   function is not. For now no app that serves calls is released (E-REL-007).

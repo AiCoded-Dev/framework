@@ -11,6 +11,7 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/devapi"
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/manifest"
+	"aicoded.dev/framework/runnerproto/egress"
 	"aicoded.dev/framework/runnerproto/mysqlproxy"
 	"aicoded.dev/framework/runnerproto/server"
 )
@@ -47,11 +48,13 @@ type RunnerOptions struct {
 
 // Runner serves the runner protocol to one app that another program starts, through the runner
 // server with the providers of aicoded dev. Its mail is caught and never sent, as under aicoded
-// dev, it calls no other app, and it logs nothing.
+// dev, it calls no other app, it sends requests to outside services as aicoded dev does, and it
+// logs nothing.
 type Runner struct {
-	srv   *server.Server
-	files *fileStore
-	store *store
+	srv    *server.Server
+	files  *fileStore
+	egress *egress.Client
+	store  *store
 }
 
 // NewRunner starts serving the runner protocol to the app of m as opts say. A fresh form key
@@ -67,6 +70,7 @@ func NewRunner(ctx context.Context, m manifest.Manifest, opts RunnerOptions) (*R
 	if err != nil {
 		return nil, err
 	}
+	out := egress.New(egress.Options{})
 	srv, err := server.New(ctx, server.Options{
 		Dir:             opts.Dir,
 		Manifest:        m,
@@ -77,13 +81,13 @@ func NewRunner(ctx context.Context, m manifest.Manifest, opts RunnerOptions) (*R
 		ShareAppSocket:  opts.Share,
 		Database:        opts.Database,
 		OnDatabaseError: opts.OnDatabaseError,
-		Providers:       providers(m, files, st, opts.Values, nil),
+		Providers:       providers(m, files, st, opts.Values, nil, out),
 	})
 	if err != nil {
 		files.close()
 		return nil, err
 	}
-	return &Runner{srv: srv, files: files, store: st}, nil
+	return &Runner{srv: srv, files: files, egress: out, store: st}, nil
 }
 
 // checkRunner refuses opts that do not fit the app of m.
@@ -117,4 +121,5 @@ func (r *Runner) Spans() ([]devapi.Span, uint64) {
 func (r *Runner) Close() {
 	_ = r.srv.Close()
 	r.files.close()
+	r.egress.CloseIdleConnections()
 }

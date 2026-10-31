@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -166,4 +167,15 @@ func TestCallOnTheRunnerSocket(t *testing.T) {
 	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
 	require.ErrorContains(t, err, "E-RPC-008", "the caller is the app on the socket, whatever the request says")
 	assert.Equal(t, runnerproto.OriginRunner, origin(err), "the runner's mark reaches the app")
+}
+
+func TestOutboundDialsOnlyCheckedAddresses(t *testing.T) {
+	var reached atomic.Bool
+	opts := fakeService(t, "10.0.0.7", func(http.ResponseWriter, *http.Request) { reached.Store(true) })
+	m := manifest.Manifest{App: "rooms", Egress: []manifest.Egress{{Host: "api.example.com"}}}
+	hc, _, _ := serveDevEgress(t, m, devconfig.AppValues{}, newStore("rooms", io.Discard), nil, opts)
+	c := runnerv1connect.NewOutboundServiceClient(hc, socket.BaseURL, connect.WithGRPC())
+	_, err := c.Do(t.Context(), connect.NewRequest(&runnerv1.DoRequest{Method: http.MethodGet, Url: "https://api.example.com/"}))
+	require.ErrorContains(t, err, "E-OUT-003", "a host that resolves to a private address")
+	assert.False(t, reached.Load())
 }

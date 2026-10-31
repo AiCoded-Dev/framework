@@ -176,13 +176,13 @@ func TestCheckLint(t *testing.T) {
 	assert.Equal(t, []brief{
 		{"hello", "E-LINT-001", "main.go:9"},
 		{"hello", "E-LINT-009", "main.go:20"},
-		{"hello", "E-LINT-004", "main.go:28"},
-		{"hello", "E-LINT-009", "main.go:35"},
-		{"hello", "E-LINT-009", "main.go:45"},
-		{"hello", "E-LINT-009", "main.go:51"},
-		{"hello", "E-LINT-009", "main.go:64"},
-		{"hello", "E-LINT-008", "main.go:68"},
+		{"hello", "E-LINT-004", "main.go:30"},
+		{"hello", "E-LINT-009", "main.go:37"},
+		{"hello", "E-LINT-009", "main.go:47"},
+		{"hello", "E-LINT-009", "main.go:53"},
+		{"hello", "E-LINT-009", "main.go:66"},
 		{"hello", "E-LINT-008", "main.go:70"},
+		{"hello", "E-LINT-008", "main.go:72"},
 	}, briefs(r.Apps[0].Problems), "os, a raw mux as the handler, the parts of net/http that serve, and the secret it leaks")
 	assert.Equal(t, `app code may not import "os"`, r.Apps[0].Problems[0].Message)
 	assert.Equal(t, "app code may not use http.NewServeMux", r.Apps[0].Problems[1].Message)

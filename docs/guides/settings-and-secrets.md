@@ -44,6 +44,23 @@ mac := hmac.New(sha256.New, []byte(key.Reveal()))
 Both need the context of the app: a request's, a hook's or the one `OnStart` gets. A context
 made with `context.Background()` carries no runner and fails with E-RUN-004.
 
+## Keys of outside services
+
+A key that an outside service needs is a secret that `egress` binds to the service's host:
+
+```yaml
+egress:
+  - {host: api.weather.example, secret: weather_api_key, header: Authorization, prefix: "Bearer "}
+secrets: [weather_api_key]
+```
+
+The runner adds such a key to every request the app sends to that host with
+`outbound.Client()`, so the app never reads it: `secrets.Get` of a bound secret fails with
+E-RUN-015. Its value is set like any other secret's, in `dev.yaml` on your computer and in the
+console on the platform, and a preview uses the preview's value. The runner keeps a value it read
+for up to a minute, so a changed key takes effect within a minute. See
+[outside services](outbound.md).
+
 ## Local values
 
 On your computer, the values come from `dev.yaml`, outside the repository, under the app's name
