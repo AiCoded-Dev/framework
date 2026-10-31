@@ -53,10 +53,11 @@ func (r *resolver) LookupNetIP(_ context.Context, _, _ string) ([]netip.Addr, er
 	return r.answers[min(r.calls, len(r.answers)-1)], nil
 }
 
-// dials records the addresses a client dials.
+// dials records the addresses a client dials; a dial of refuse fails.
 type dials struct {
-	mu    sync.Mutex
-	addrs []string
+	mu     sync.Mutex
+	addrs  []string
+	refuse string
 }
 
 func (d *dials) list() []string {
@@ -65,19 +66,29 @@ func (d *dials) list() []string {
 	return d.addrs
 }
 
-// service starts a TLS service for h and returns a client of o whose every dial reaches it.
-// The service's certificate is valid for example.com and its subdomains.
+// service starts a TLS service for h, over HTTP/2, and returns a client of o whose every dial
+// reaches it. The service's certificate is valid for example.com and its subdomains.
 func service(t *testing.T, h http.HandlerFunc, o egress.Options) (*egress.Client, *dials) {
 	t.Helper()
+	return serve(t, h, o, true)
+}
+
+// serve is service over HTTP/2 when h2 is true, and over HTTP/1.1 otherwise.
+func serve(t *testing.T, h http.HandlerFunc, o egress.Options, h2 bool) (*egress.Client, *dials) {
+	t.Helper()
 	srv := httptest.NewUnstartedServer(h)
-	srv.EnableHTTP2 = true
+	srv.EnableHTTP2 = h2
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
 	d := &dials{}
 	o.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		d.mu.Lock()
 		d.addrs = append(d.addrs, address)
+		refuse := d.refuse == address
 		d.mu.Unlock()
+		if refuse {
+			return nil, errors.New("connection refused")
+		}
 		return (&net.Dialer{}).DialContext(ctx, network, srv.Listener.Addr().String())
 	}
 	o.RootCAs = x509.NewCertPool()
@@ -122,6 +133,7 @@ func TestDenied(t *testing.T) {
 		"64:ff9b::7f00:1", "64:ff9b:1::1", "100::1", "2001::1", "2001:0:ffff::1", "2001:db8::1",
 		"2001:db8::1%eth0", "2002:7f00:1::1", "fc00::1", "fd00:ec2::254", "fdff::1",
 		"::ffff:127.0.0.1", "::ffff:10.0.0.5", "::ffff:169.254.169.254", "::ffff:100.64.1.1",
+		"::127.0.0.1", "::a00:5", "::8.8.8.8", "::ffff:0:7f00:1", "::ffff:0:a00:5", "::ffff:0:808:808",
 	} {
 		assert.True(t, egress.Denied(netip.MustParseAddr(a)), a)
 	}
@@ -226,19 +238,21 @@ func TestRefusesOtherSchemesAndPorts(t *testing.T) {
 }
 
 func TestResponseBodyLimit(t *testing.T) {
-	for size, code := range map[int]string{runnerproto.MaxOutboundBody: "", runnerproto.MaxOutboundBody + 1: "E-OUT-005"} {
-		c, _ := service(t, func(w http.ResponseWriter, _ *http.Request) {
-			_, _ = w.Write(bytes.Repeat([]byte("a"), size))
-		}, egress.Options{Resolver: answer("93.184.216.34")})
-		resp, err := get(t, c, "https://api.example.com/")
-		require.NoError(t, err)
-		defer resp.Body.Close()
-		body, err := io.ReadAll(resp.Body)
-		if code == "" {
+	for _, h2 := range []bool{true, false} {
+		for size, code := range map[int]string{runnerproto.MaxOutboundBody: "", runnerproto.MaxOutboundBody + 1: "E-OUT-005"} {
+			c, _ := serve(t, func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write(bytes.Repeat([]byte("a"), size))
+			}, egress.Options{Resolver: answer("93.184.216.34")}, h2)
+			resp, err := get(t, c, "https://api.example.com/")
 			require.NoError(t, err)
-			assert.Len(t, body, size)
-		} else {
-			requireCode(t, code, err)
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			if code == "" {
+				require.NoError(t, err)
+				assert.Len(t, body, size)
+			} else {
+				requireCode(t, code, err)
+			}
 		}
 	}
 }
@@ -251,30 +265,110 @@ func stall(r *http.Request) {
 	}
 }
 
+// stallInBody sends the start of a body, then stalls.
+func stallInBody(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte("part"))
+	w.(http.Flusher).Flush()
+	stall(r)
+}
+
+// readAll returns the error of a GET of url with c under ctx, from Do or from reading the body.
+func readAll(t *testing.T, ctx context.Context, c *egress.Client, url string) error {
+	t.Helper()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := c.Do(ctx, req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, err = io.ReadAll(resp.Body)
+	return err
+}
+
 func TestDeadline(t *testing.T) {
 	assert.Equal(t, runnerproto.OutboundDeadline, egress.Deadline(egress.New(egress.Options{})))
 	assert.Equal(t, 5*time.Second, egress.DNSTimeout)
 
-	c, _ := service(t, func(_ http.ResponseWriter, r *http.Request) { stall(r) }, egress.Options{Resolver: answer("93.184.216.34")})
+	for _, h2 := range []bool{true, false} {
+		for _, h := range []http.HandlerFunc{func(_ http.ResponseWriter, r *http.Request) { stall(r) }, stallInBody} {
+			c, _ := serve(t, h, egress.Options{Resolver: answer("93.184.216.34")}, h2)
+			egress.SetDeadline(c, 200*time.Millisecond)
+			start := time.Now()
+			err := readAll(t, context.Background(), c, "https://api.example.com/")
+			requireCode(t, "E-OUT-006", err)
+			assert.Contains(t, err.Error(), "took over 200ms")
+			assert.Less(t, time.Since(start), 3*time.Second)
+		}
+	}
+}
+
+func TestDeadlineCutsTheConnect(t *testing.T) {
+	c := egress.New(egress.Options{Resolver: answer("93.184.216.34"),
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(5 * time.Second):
+				return nil, errors.New("connect timed out")
+			}
+		}})
 	egress.SetDeadline(c, 200*time.Millisecond)
 	start := time.Now()
-	err := refusal(t, c, "https://api.example.com/")
-	requireCode(t, "E-OUT-006", err)
+	requireCode(t, "E-OUT-006", refusal(t, c, "https://api.example.com/"))
 	assert.Less(t, time.Since(start), 3*time.Second)
+}
 
-	c, _ = service(t, func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("part"))
-		w.(http.Flusher).Flush()
-		stall(r)
-	}, egress.Options{Resolver: answer("93.184.216.34")})
-	egress.SetDeadline(c, 200*time.Millisecond)
-	start = time.Now()
+func TestCallerContext(t *testing.T) {
+	for _, h := range []http.HandlerFunc{func(_ http.ResponseWriter, r *http.Request) { stall(r) }, stallInBody} {
+		c, _ := service(t, h, egress.Options{Resolver: answer("93.184.216.34")})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		err := readAll(t, ctx, c, "https://api.example.com/")
+		cancel()
+		requireCode(t, "E-OUT-006", err)
+		assert.NotContains(t, err.Error(), "30s")
+
+		ctx, cancel = context.WithCancel(context.Background())
+		time.AfterFunc(200*time.Millisecond, cancel)
+		err = readAll(t, ctx, c, "https://api.example.com/")
+		requireCode(t, "E-OUT-008", err)
+		assert.Contains(t, err.Error(), "cancelled")
+	}
+}
+
+func TestDialsTheNextCheckedAddress(t *testing.T) {
+	c, d := service(t, ok, egress.Options{Resolver: answer("93.184.216.35", "93.184.216.34")})
+	d.refuse = "93.184.216.35:443"
 	resp, err := get(t, c, "https://api.example.com/")
 	require.NoError(t, err)
 	defer resp.Body.Close()
-	_, err = io.ReadAll(resp.Body)
-	requireCode(t, "E-OUT-006", err)
-	assert.Less(t, time.Since(start), 3*time.Second)
+	assert.Equal(t, []string{"93.184.216.35:443", "93.184.216.34:443"}, d.list())
+}
+
+func TestDialsIPv6(t *testing.T) {
+	c, d := service(t, ok, egress.Options{Resolver: answer("2606:4700::1111")})
+	resp, err := get(t, c, "https://api.example.com/")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, []string{"[2606:4700::1111]:443"}, d.list())
+}
+
+func TestCloseIdleConnections(t *testing.T) {
+	c, d := serve(t, ok, egress.Options{Resolver: answer("93.184.216.34")}, false)
+	assert.Equal(t, runnerproto.MaxOutboundRequests, egress.Transport(c).MaxIdleConnsPerHost)
+	for range 2 {
+		resp, err := get(t, c, "https://api.example.com/")
+		require.NoError(t, err)
+		_, _ = io.Copy(io.Discard, resp.Body)
+		require.NoError(t, resp.Body.Close())
+	}
+	assert.Len(t, d.list(), 1)
+	c.CloseIdleConnections()
+	resp, err := get(t, c, "https://api.example.com/")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Len(t, d.list(), 2)
 }
 
 func TestUnreachable(t *testing.T) {

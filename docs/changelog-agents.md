@@ -20,7 +20,8 @@ Changes to the API that AI assistants build apps with. Newest first.
   which replaces the manifest's `egress` for a preview. `runnerproto/egress` is the client behind a
   runner's `Outbound` provider: it resolves the host for each connection, refuses the request when
   any address of the answer is denied (`egress.Denied`, the base list, plus `Options.Deny`), dials
-  only an address it checked and follows no redirect.
+  only an address it checked and follows no redirect; `CloseIdleConnections` makes the next
+  request to each host resolve and check it again.
 
 - An `egress` entry is a host alone, as before, or a mapping that binds a key to the host:
   `{host: api.partner.example, secret: partner_api_key, header: Authorization, prefix: "Bearer "}`.

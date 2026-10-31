@@ -34,7 +34,9 @@ type Resolver interface {
 // Options configure a Client.
 type Options struct {
 	// Deny reports more addresses no app may reach, beyond those Denied reports. It gets an
-	// IPv4-mapped IPv6 address as its IPv4 address.
+	// IPv4-mapped IPv6 address as its IPv4 address, and an address without its zone. It is
+	// asked when a connection is made: a connection already open keeps the peer it was checked
+	// for, so a caller that changes what Deny refuses calls Client.CloseIdleConnections.
 	Deny func(netip.Addr) bool
 	// Resolver resolves hosts; nil is net.DefaultResolver.
 	Resolver Resolver
@@ -73,6 +75,7 @@ func New(o Options) *Client {
 		DisableCompression:     true,
 		MaxResponseHeaderBytes: 1 << 20,
 		MaxIdleConns:           100,
+		MaxIdleConnsPerHost:    runnerproto.MaxOutboundRequests,
 		IdleConnTimeout:        90 * time.Second,
 		TLSHandshakeTimeout:    runnerproto.OutboundDeadline,
 	}
@@ -92,23 +95,36 @@ func (c *Client) Do(ctx context.Context, req *http.Request) (*http.Response, err
 		return nil, errs.New("E-OUT-002", "the request to "+strconv.Quote(host)+" is not https to port 443",
 			"call the service over https on port 443")
 	}
-	ctx, cancel := context.WithTimeout(ctx, c.deadline)
-	resp, err := c.transport.RoundTrip(req.WithContext(ctx))
+	reqCtx, cancel := context.WithTimeout(ctx, c.deadline)
+	resp, err := c.transport.RoundTrip(req.WithContext(reqCtx))
 	if err != nil {
-		err = c.failure(ctx, host, err)
+		err = c.failure(ctx, reqCtx, host, err)
 		cancel()
 		return nil, err
 	}
-	resp.Body = &body{rc: resp.Body, ctx: ctx, cancel: cancel, c: c, host: host}
+	resp.Body = &body{rc: resp.Body, parent: ctx, ctx: reqCtx, cancel: cancel, c: c, host: host}
 	return resp, nil
 }
 
-// failure returns the error the app gets for err, of a request to host under ctx.
-func (c *Client) failure(ctx context.Context, host string, err error) error {
+// CloseIdleConnections closes the connections c keeps open for later requests, so that the
+// next request to each host resolves and checks it again.
+func (c *Client) CloseIdleConnections() {
+	c.transport.CloseIdleConnections()
+}
+
+// failure returns the error the app gets for err, of a request to host under ctx, which Do
+// derived from the caller's parent.
+func (c *Client) failure(parent, ctx context.Context, host string, err error) error {
 	var e *errs.Error
 	switch {
 	case errors.As(err, &e):
 		return e
+	case errors.Is(parent.Err(), context.DeadlineExceeded):
+		return errs.New("E-OUT-006", "the request to "+strconv.Quote(host)+" ran out of the time its caller gave it",
+			"ask the service for less, or try again later")
+	case parent.Err() != nil:
+		return errs.New("E-OUT-008", "the request to "+strconv.Quote(host)+" was cancelled by its caller",
+			"check the host name, or try again later")
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		return errs.New("E-OUT-006", "the request to "+strconv.Quote(host)+" took over "+c.deadline.String(),
 			"ask the service for less, or try again later")
@@ -141,6 +157,9 @@ func (c *Client) dialChecked(ctx context.Context, network, address string) (net.
 	rctx, cancel := context.WithTimeout(ctx, dnsTimeout)
 	addrs, err := c.resolver.LookupNetIP(rctx, "ip", host)
 	cancel()
+	if err != nil && ctx.Err() != nil {
+		return nil, err
+	}
 	if err != nil || len(addrs) == 0 {
 		return nil, unreachable(host)
 	}
@@ -160,7 +179,7 @@ func (c *Client) dialChecked(ctx context.Context, network, address string) (net.
 			err = e
 		}
 		if ctx.Err() != nil {
-			break
+			return nil, derr
 		}
 	}
 	return nil, err
@@ -180,6 +199,7 @@ func (c *Client) control(_, address string, _ syscall.RawConn) error {
 // request's deadline when closed.
 type body struct {
 	rc     io.ReadCloser
+	parent context.Context
 	ctx    context.Context
 	cancel context.CancelFunc
 	c      *Client
@@ -203,7 +223,7 @@ func (b *body) Read(p []byte) (int, error) {
 		return n - int(b.n-runnerproto.MaxOutboundBody), b.err
 	}
 	if err != nil && !errors.Is(err, io.EOF) {
-		b.err = b.c.failure(b.ctx, b.host, err)
+		b.err = b.c.failure(b.parent, b.ctx, b.host, err)
 		return n, b.err
 	}
 	return n, err
