@@ -142,12 +142,15 @@ func TestStartCallsOutsideServices(t *testing.T) {
 	assert.Contains(t, getApp(t, inst, signer, "/bound"), "E-RUN-015", "the app never reads a bound key")
 
 	inst.Stop()
-	i := slices.IndexFunc(inst.store.spans.All(), func(s devapi.Span) bool { return s.Name == "outbound" })
+	spans := inst.store.spans.All()
+	i := slices.IndexFunc(spans, func(s devapi.Span) bool { return s.Name == "outbound" })
 	require.GreaterOrEqual(t, i, 0, "the request's span is kept")
-	sp := inst.store.spans.All()[i]
-	assert.Equal(t, "hello", sp.App)
-	assert.Equal(t, "api.example.com", sp.Attrs["server.address"])
-	assert.Equal(t, "200", sp.Attrs["http.response.status_code"])
-	assert.NotContains(t, fmt.Sprint(inst.store.spans.All(), inst.store.logs.All()), "p4rtner-key")
-	assert.NotContains(t, out.String(), "p4rtner-key")
+	assert.Equal(t, "hello", spans[i].App)
+	assert.Equal(t, "api.example.com", spans[i].Attrs["server.address"])
+	assert.Equal(t, "200", spans[i].Attrs["http.response.status_code"])
+	// The store hides a secret's value as [secret <name>], so neither may show: the runner never
+	// emitted the key.
+	kept := fmt.Sprint(spans, inst.store.logs.All()) + out.String()
+	assert.NotContains(t, kept, "p4rtner-key")
+	assert.NotContains(t, kept, "[secret partner_key]")
 }

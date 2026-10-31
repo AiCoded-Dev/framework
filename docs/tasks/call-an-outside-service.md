@@ -74,7 +74,7 @@ it. The example asks a weather service for a city's weather, from a method of th
    - The request sets no `Authorization` header: the runner adds it, and replaces one the app
      sets. `secrets.Get(ctx, "weather_api_key")` fails with E-RUN-015.
    - A page calls it from `Data` with the context `Data` gets, as `p.d.Today(ctx, city)`, and
-     returns its error.
+     returns its error. A call when the app starts uses the context `OnStart` gets.
    - Escape every value that goes in the URL, as `url.QueryEscape` does here.
 
 ## Check it

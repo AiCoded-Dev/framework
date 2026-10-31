@@ -469,6 +469,13 @@ func TestClientFix(t *testing.T) {
 		fixes[asIsFix], "a client held by value, and what is done to the one outbound.Client returns")
 }
 
+func TestClientInDeps(t *testing.T) {
+	assert.Equal(t, []string{
+		"pages/handler_gen.go:18: E-LINT-009: app code may not turn a *exposed.DP into an interface value, through which other code could change the client it holds",
+	}, run(t, "clients", "pages/handler_gen.go", "pages/route_gen.go", "pages/exposed/route_gen.go"),
+		"a client in an exported field of Deps that a page's DP reaches, not one in an unexported field")
+}
+
 func TestBanned(t *testing.T) {
 	for _, c := range []struct{ path, name, code string }{
 		{"os", "", "E-LINT-001"},

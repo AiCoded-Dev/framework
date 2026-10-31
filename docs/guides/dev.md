@@ -95,10 +95,12 @@ list is the one a new browser gets.
   `~/.local/state/aicoded/<hash>/files/<app>/<store>` (E-DEV-009).
 - Mail is caught instead of sent. It is still checked against the mail rules and the permission
   list. See [mail](mail.md).
-- Requests to outside services go out to the real service, with the checks and limits of the
-  platform, and the key that `egress` binds to a host from the secret's value here. A service on
-  this computer or its network is unreachable (E-OUT-003), and so is a host that `egress` does
-  not list (E-OUT-001). The Traces page shows a span `outbound` for each request. See
+- Requests to outside services go out to the real service, with the platform's checks of the
+  permission list and its limits, and the key that `egress` binds to a host from the secret's
+  value here. A host that `egress` does not list is refused (E-OUT-001), and so is one that
+  resolves to a private or local address, such as loopback, a private network, link-local or
+  cloud metadata (E-OUT-003). Unlike the platform's runner, `aicoded dev` does not refuse your
+  computer's public addresses. The Traces page shows a span `outbound` for each request. See
   [outside services](outbound.md).
 
 ## Migrations

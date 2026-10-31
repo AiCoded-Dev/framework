@@ -157,7 +157,8 @@ func requireClosed(t *testing.T, closed <-chan struct{}, msg string) {
 }
 
 // fakeService serves h over TLS as https://api.example.com and returns options of the egress
-// client under which the host resolves to addr and every dial reaches h.
+// client under which the host resolves to addr. Its dial hook ignores the checked address it gets
+// and always reaches h.
 func fakeService(t *testing.T, addr string, h http.HandlerFunc) egress.Options {
 	srv := httptest.NewTLSServer(h)
 	t.Cleanup(srv.Close)

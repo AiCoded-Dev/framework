@@ -24,6 +24,9 @@ when the app did not start. The app runs on its own, and nothing serves it to pe
   the environment `preview`;
 - it gets a new, empty database when the permission list declares `sqldb`, and empty file stores;
 - its mail is caught and never sent;
+- every request it sends to an outside service is refused with E-OUT-008, whose message says
+  that simulated attacks never call outside services: a page that shows an outside service's
+  answer gets the error instead;
 - each setting is `l7-` and its name, such as `l7-report_day`, and each secret a random value,
   new for each publish. An `OnStart` that refuses such a value stops the app (E-GATE-036): keep
   the value `OnStart` reads, and check it where the app uses it.

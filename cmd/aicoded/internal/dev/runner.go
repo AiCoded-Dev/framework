@@ -12,7 +12,6 @@ import (
 
 	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/manifest"
-	"aicoded.dev/framework/runnerproto/egress"
 	"aicoded.dev/framework/runnerproto/server"
 )
 
@@ -28,8 +27,8 @@ func newCSRFKey() []byte {
 
 // providers returns what the local runner gives the app of m through a server: the file stores
 // in files, the mail catcher and the spans of st, the values of dev.yaml, the calls of router,
-// which may be nil, and the requests to outside services through out.
-func providers(m manifest.Manifest, files *fileStore, st *store, v devconfig.AppValues, router *server.Router, out *egress.Client) server.Providers {
+// which may be nil, and the requests to outside services of out.
+func providers(m manifest.Manifest, files *fileStore, st *store, v devconfig.AppValues, router *server.Router, out server.Outbound) server.Providers {
 	p := server.Providers{Files: files, Mail: st.mail, Secrets: devValues{m: m, v: v}, Telemetry: st, Outbound: out}
 	if router != nil {
 		p.Calls = router

@@ -4,10 +4,13 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
-- `aicoded dev` sends an app's requests to outside services to the real service, with the checks
-  and limits of the platform: a host that resolves to an address of this computer or a private
-  network is E-OUT-003, and the key that `egress` binds to a host comes from the secret's value in
-  `dev.yaml`. The Traces page shows a span `outbound` for each request, with the host, the method,
+- `aicoded dev` sends an app's requests to outside services to the real service, with the
+  platform's checks of the permission list and its limits: a host that resolves to a private or
+  local address, such as loopback, a private network, link-local or cloud metadata, is E-OUT-003,
+  and the key that `egress` binds to a host comes from the secret's value in `dev.yaml`. The
+  platform's runner also refuses its server's own and the platform's addresses; `aicoded dev`
+  does not refuse the computer's public addresses. During the delivery pipeline's simulated
+  attacks, every request to an outside service is E-OUT-008: they never call outside services. The Traces page shows a span `outbound` for each request, with the host, the method,
   the status and the bytes, never the path, the headers or the key. The guide `guides/outbound`
   and the recipe `tasks/call-an-outside-service` describe the block; keep the client of
   `outbound.Client()` in an unexported field of `Deps`, which AGENTS.md now says too.

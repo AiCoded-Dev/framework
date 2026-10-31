@@ -76,9 +76,10 @@ func (d *Deps) Today(ctx context.Context, city string) (string, error) {
 }
 ```
 
-- Build each request with `http.NewRequestWithContext` and send it with the client's `Do`. A
-  request without the app's context, such as one made with `context.Background()`, fails with
-  E-RUN-004.
+- Build each request with `http.NewRequestWithContext` and send it with the client's `Do`, with
+  the context of what the call serves: a page's `Data` or another hook's, or the one `OnStart`
+  gets for a call when the app starts. A request without the app's context, such as one made
+  with `context.Background()`, fails with E-RUN-004.
 - Use the client as `outbound.Client()` returns it. `aicoded check` refuses any other HTTP client,
   such as `http.Get`, `http.DefaultClient` or an `http.Client{}` of the app's own, and any change
   to this one: its fields, its `Get`, `Head`, `Post` and `PostForm` methods, which send without
@@ -107,17 +108,18 @@ func (d *Deps) Today(ctx context.Context, city string) (string, error) {
 |---|---|---|
 | Scheme and port | `https` to port 443; no user name or password in the URL | E-OUT-002 |
 | Host | one that `egress` lists, by its lower-case name, never an IP address | E-OUT-001 |
-| Address | public only: the platform's own hosts, private networks, this computer and cloud metadata are never reachable, whatever the host resolves to | E-OUT-003 |
+| Address | public only: the platform's own hosts, private networks, loopback, link-local and cloud metadata addresses are never reachable, whatever the host resolves to; on the platform, neither are the server's own addresses and the platform's other addresses | E-OUT-003 |
 | Request body | 10 MiB | E-OUT-004 |
 | Response body | 10 MiB | E-OUT-005 |
 | Time | 30 s for the whole request, connecting and reading the body included | E-OUT-006 |
 | At once | 16 requests under way per instance of the app; the 17th is refused at once | E-OUT-007 |
-| Headers | names of letters, digits and `-` and the other token characters; values without line breaks | E-OUT-009 |
+| Headers | names of letters, digits and `-` and the other token characters; values without line breaks or other control characters | E-OUT-009 |
 
 - The runner resolves the host each time it connects, and refuses the request when any address
   of the answer is one no app may reach.
-- It sends `Host`, `Content-Length` and the connection's own headers, such as `Connection` and
-  `Transfer-Encoding`, itself, and drops those the app set.
+- It drops the `Host` header and the connection's own headers, such as `Connection` and
+  `Transfer-Encoding`, that the app set: the request goes to the URL's host, and the runner
+  writes those headers itself.
 - It follows no redirect: a 3xx response comes back with its `Location`. Send a new request to it
   when its host is in `egress`.
 - A service it cannot reach, by name, connection or TLS certificate, is E-OUT-008. The reason is
@@ -133,10 +135,13 @@ the query, the headers or the bodies, which can hold personal data or keys.
 
 ## In aicoded dev
 
-`aicoded dev` sends the requests to the real service on the internet, with the same checks as the
-platform. A bound secret's value comes from `dev.yaml`, as for any secret: use a test key, never a
-production one. A service on your computer or your network is unreachable here too (E-OUT-003).
-The dev UI's Traces page shows each `outbound` span. See [aicoded dev](dev.md).
+`aicoded dev` sends the requests to the real service on the internet, with the platform's checks
+of the permission list, the limits and the base list of addresses no app may reach. A bound
+secret's value comes from `dev.yaml`, as for any secret: use a test key, never a production one.
+A service on a private or local address, such as loopback, a private network, link-local or
+cloud metadata, is unreachable (E-OUT-003). The platform's runner also refuses the addresses of
+its own server and of the platform; `aicoded dev` does not refuse your computer's public
+addresses. The dev UI's Traces page shows each `outbound` span. See [aicoded dev](dev.md).
 
 ## On the platform
 

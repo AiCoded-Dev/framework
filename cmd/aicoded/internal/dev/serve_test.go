@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -137,4 +138,17 @@ func TestNewRunnerRefuses(t *testing.T) {
 		require.Error(t, err, name)
 		assert.NoFileExists(t, filepath.Join(opts.Dir, runnerproto.RunnerSocket), name)
 	}
+}
+
+func TestRunnerSendsNoOutboundRequest(t *testing.T) {
+	opts := runnerOptions(t, false)
+	m := notesManifest
+	m.Egress = []manifest.Egress{{Host: "api.example.com"}}
+	r, err := NewRunner(t.Context(), m, opts)
+	require.NoError(t, err)
+	t.Cleanup(r.Close)
+	c := runnerv1connect.NewOutboundServiceClient(socket.Client(filepath.Join(opts.Dir, runnerproto.RunnerSocket)), socket.BaseURL, connect.WithGRPC())
+	_, err = c.Do(t.Context(), connect.NewRequest(&runnerv1.DoRequest{Method: http.MethodGet, Url: "https://api.example.com/"}))
+	assert.Equal(t, connect.CodeUnavailable, connect.CodeOf(err))
+	require.ErrorContains(t, err, "E-OUT-008: simulated attacks never call outside services")
 }
