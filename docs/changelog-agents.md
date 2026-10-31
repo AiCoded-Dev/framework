@@ -7,8 +7,8 @@ Changes to the API that AI assistants build apps with. Newest first.
 - E-GATE-048 is a note of the step `decision`, a reason a release *Needs approval* whatever the
   app type allows: a key that `egress` binds to an outside service is new, or its secret, header
   or prefix differs from the live version's. The approval card says
-  `the key <secret> goes to <host> in <header>`. A host beyond the app type is still E-GATE-042,
-  alone or with a key.
+  `the key <secret> goes to <host> in <header>`, then `after "<prefix>"` when the binding has a
+  prefix. A host beyond the app type is still E-GATE-042, alone or with a key.
 
 - `aicoded dev` sends an app's requests to outside services to the real service, with the
   platform's checks of the permission list and its limits: a host that resolves to a private or
