@@ -98,6 +98,10 @@ func (c *Client) Do(ctx context.Context, req *http.Request) (*http.Response, err
 	}
 	reqCtx, cancel := context.WithTimeout(ctx, c.deadline)
 	resp, err := c.transport.RoundTrip(req.WithContext(reqCtx))
+	if err == nil && reqCtx.Err() != nil {
+		_ = resp.Body.Close()
+		err = reqCtx.Err()
+	}
 	if err != nil {
 		err = c.failure(ctx, reqCtx, host, err)
 		cancel()
@@ -205,8 +209,9 @@ func (c *Client) control(_, address string, _ syscall.RawConn) error {
 	return nil
 }
 
-// body is a response body that yields at most runnerproto.MaxOutboundBody bytes and ends its
-// request's deadline when closed.
+// body is a response body that yields at most runnerproto.MaxOutboundBody bytes, fails every
+// read once its request's deadline has passed, even one that would end the body, and ends that
+// deadline when closed.
 type body struct {
 	rc     io.ReadCloser
 	parent context.Context
@@ -222,6 +227,10 @@ func (b *body) Read(p []byte) (int, error) {
 	if b.err != nil {
 		return 0, b.err
 	}
+	if err := b.ctx.Err(); err != nil {
+		b.err = b.c.failure(b.parent, b.ctx, b.host, err)
+		return 0, b.err
+	}
 	if left := runnerproto.MaxOutboundBody + 1 - b.n; int64(len(p)) > left {
 		p = p[:left]
 	}
@@ -232,7 +241,7 @@ func (b *body) Read(p []byte) (int, error) {
 			"ask the service for less, such as one page at a time")
 		return n - int(b.n-runnerproto.MaxOutboundBody), b.err
 	}
-	if err != nil && !errors.Is(err, io.EOF) {
+	if err != nil && (!errors.Is(err, io.EOF) || b.ctx.Err() != nil) {
 		b.err = b.c.failure(b.parent, b.ctx, b.host, err)
 		return n, b.err
 	}

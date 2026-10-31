@@ -317,6 +317,20 @@ func TestDeadline(t *testing.T) {
 	}
 }
 
+func TestDeadlineCoversASentBody(t *testing.T) {
+	for _, h2 := range []bool{true, false} {
+		c, _ := serve(t, ok, egress.Options{Resolver: answer("93.184.216.34")}, h2)
+		egress.SetDeadline(c, 200*time.Millisecond)
+		resp, err := get(t, c, "https://api.example.com/")
+		require.NoError(t, err)
+		time.Sleep(300 * time.Millisecond)
+		_, err = io.ReadAll(resp.Body)
+		requireCode(t, "E-OUT-006", err)
+		assert.Contains(t, err.Error(), "took over 200ms")
+		require.NoError(t, resp.Body.Close())
+	}
+}
+
 func TestDeadlineCutsTheConnect(t *testing.T) {
 	c := egress.New(egress.Options{Resolver: answer("93.184.216.34"),
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
