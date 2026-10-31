@@ -100,11 +100,11 @@ Publishing uses these codes:
   the checks read.
 - E-GATE-038 is a note, which does not stop a publish: a page the simulated attacks did not
   reach.
-- E-GATE-039 to E-GATE-047 are notes, which do not stop a publish, that say why its release
+- E-GATE-039 to E-GATE-048 are notes, which do not stop a publish, that say why its release
   *Needs approval*: an audience group, a data class, a mail domain or an outside service that the
   app type does not allow, people outside the company, a destructive schema change, data that
-  reaches mail in a new way, a page open to more people than before, and a function of `rpc/`
-  open to more callers than before.
+  reaches mail in a new way, a page open to more people than before, a function of `rpc/` open
+  to more callers than before, and a key bound to an outside service that is new or changed.
 
 Schema changes use these codes:
 

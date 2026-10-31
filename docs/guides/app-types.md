@@ -137,7 +137,7 @@ Declare the classes your data really has, so the decision matches what security 
 
 - E-REL-019, E-REL-020 and E-REL-021: a publish that fails when it is decided, and a release
   that is refused for the same reason.
-- E-GATE-039 to E-GATE-047: the reasons a release needs approval, as notes, which do not stop a
+- E-GATE-039 to E-GATE-048: the reasons a release needs approval, as notes, which do not stop a
   publish.
 - E-MAN-024: what is *Not allowed* in any permission list.
 - E-RUN-006: the page of a viewer outside the app's audience.
