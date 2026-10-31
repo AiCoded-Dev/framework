@@ -17,7 +17,7 @@ var (
 )
 
 // platformDomains are the domains of the platform, which no app may reach.
-var platformDomains = []string{"aicoded.cloud", "aicoded.dev", "qsoa.cloud"}
+var platformDomains = []string{"aicoded.cloud", "aicoded.dev"}
 
 // reservedHeaders are the headers, in lower case, that may not carry a key: the hop-by-hop ones,
 // Host, Content-Length, Content-Type and Cookie.

@@ -48,10 +48,10 @@ func TestEgress(t *testing.T) {
 }
 
 func TestPlatformHost(t *testing.T) {
-	for _, host := range []string{"aicoded.cloud", "api.aicoded.cloud", "aicoded.dev", "docs.aicoded.dev", "qsoa.cloud", "x.qsoa.cloud", "QSOA.cloud", "a.b.aicoded.cloud."} {
+	for _, host := range []string{"aicoded.cloud", "api.aicoded.cloud", "aicoded.dev", "docs.aicoded.dev", "API.AICODED.cloud", "a.b.aicoded.cloud."} {
 		assert.True(t, manifest.PlatformHost(host), host)
 	}
-	for _, host := range []string{"aicoded.cloud.example", "notaicoded.cloud", "xqsoa.cloud", "aicoded.devs", "api.partner.example"} {
+	for _, host := range []string{"aicoded.cloud.example", "notaicoded.cloud", "xaicoded.dev", "aicoded.devs", "api.partner.example"} {
 		assert.False(t, manifest.PlatformHost(host), host)
 	}
 }
@@ -65,10 +65,9 @@ func TestEgressErrors(t *testing.T) {
 	for src, want := range map[string]struct{ pos, code, msg, fix string }{
 		"egress: [api.aicoded.cloud]": {"2", "E-MAN-018", `egress entry "api.aicoded.cloud" is a host of the platform, which an app may not reach`, fixHost},
 		"egress: [aicoded.dev]":       {"2", "E-MAN-018", `egress entry "aicoded.dev" is a host of the platform, which an app may not reach`, fixHost},
-		"egress: [x.qsoa.cloud]":      {"2", "E-MAN-018", `egress entry "x.qsoa.cloud" is a host of the platform, which an app may not reach`, fixHost},
-		"egress: [QSOA.cloud]":        {"2", "E-MAN-018", `egress entry "QSOA.cloud" is a host of the platform, which an app may not reach`, fixHost},
-		"egress:\n  - {host: x.qsoa.cloud, secret: k, header: Authorization}\nsecrets: [k]": {"3", "E-MAN-018",
-			`egress entry "x.qsoa.cloud" is a host of the platform, which an app may not reach`, fixHost},
+		"egress: [AICODED.dev]":       {"2", "E-MAN-018", `egress entry "AICODED.dev" is a host of the platform, which an app may not reach`, fixHost},
+		"egress:\n  - {host: x.aicoded.cloud, secret: k, header: Authorization}\nsecrets: [k]": {"3", "E-MAN-018",
+			`egress entry "x.aicoded.cloud" is a host of the platform, which an app may not reach`, fixHost},
 		"egress:\n  - {host: 'https://a.example', secret: k, header: Authorization}\nsecrets: [k]": {"3", "E-MAN-018",
 			`egress entry "https://a.example" is not a host name`, fixHost},
 		"egress:\n  - a.example\n  - {host: a.example, secret: k, header: Authorization}\nsecrets: [k]": {"4", "E-MAN-018",
