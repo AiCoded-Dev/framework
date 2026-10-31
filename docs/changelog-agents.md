@@ -4,6 +4,11 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- E-REL-017 refuses `egress` only for an app built with a framework older than v0.10.0, with the
+  fix "update aicoded.dev/framework to v0.10.0 or newer and publish again"; the platform releases
+  outside services of v0.10.0 and newer. It still refuses `schedule`. A preview reaches only the
+  hosts of the app's live release, each with the same key bound the same way (E-OUT-001).
+
 - E-GATE-048 is a note of the step `decision`, a reason a release *Needs approval* whatever the
   app type allows: a key that `egress` binds to an outside service is new, or its secret, header
   or prefix differs from the live version's. The approval card says

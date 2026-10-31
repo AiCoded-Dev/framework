@@ -1,8 +1,10 @@
-# E-REL-017: outside services and schedules not run yet
+# E-REL-017: outside services of an old framework, or schedules
 
-The platform does not run an app's outside services or its schedule yet: no outbound call leaves
-its server and no scheduled job fires. Rather than release an app whose outbound calls would fail
-and whose jobs would never run, it refuses one whose permission list declares `egress` hosts or
-`schedule` jobs, and the runner refuses to start one too. Nothing was released.
+The platform calls an app's outside services only for an app built with framework v0.10.0 or
+newer, whose `outbound.Client()` sends each request through the runner. It refuses to release or
+preview an app whose permission list declares `egress` hosts and that was built with an older
+framework: its runner would refuse to start it (E-RUN-014). The platform does not run schedules
+yet either, so it refuses an app whose permission list declares `schedule` jobs, whatever its
+framework, and the runner refuses to start one too. Nothing was released.
 
-**Fix:** remove `egress` and `schedule` from aicoded.yaml until the platform runs them, and the code that uses them, run aicoded check, commit, and publish again
+**Fix:** for `egress`, update aicoded.dev/framework to v0.10.0 or newer and publish again; for `schedule`, remove it from aicoded.yaml and the code that uses it until the platform runs schedules, run aicoded check, commit, and publish again

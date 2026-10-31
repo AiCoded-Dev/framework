@@ -140,7 +140,8 @@ Releasing uses these codes, each a release that the platform refuses before anyt
 - E-REL-002: an organisation that the platform's operator has not placed on a server.
 - E-REL-003: an app built with a framework older than v0.6.0.
 - E-REL-004, E-REL-007 and E-REL-017: what the platform does not run yet: people outside the
-  company, calls between apps, and outside services and schedules.
+  company, calls between apps, schedules, and outside services of an app built with a framework
+  older than v0.10.0.
 - E-REL-005: secrets where the target of the organisation's server does not keep them.
 - E-REL-006, E-REL-008 and E-REL-013: an `email.from` address in a domain that the organisation
   has not verified, that another app of the organisation has, or of which the hosting makes no
