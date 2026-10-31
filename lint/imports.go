@@ -13,7 +13,7 @@ const Framework = "aicoded.dev/framework"
 
 // blocks are the framework's packages for apps, the building blocks, by path in the framework.
 var blocks = []string{
-	"app", "auth", "config", "filestore", "mailer", "rpc", "secrets", "sqldb", "telemetry",
+	"app", "auth", "config", "filestore", "mailer", "outbound", "rpc", "secrets", "sqldb", "telemetry",
 	"web", "web/form", "web/reactive",
 }
 

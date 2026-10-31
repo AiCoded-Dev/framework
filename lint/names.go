@@ -37,6 +37,14 @@ var refused = func() map[string]string {
 		"log/slog.NewLogLogger":            "E-LINT-009",
 		"log/slog.SetDefault":              "E-LINT-009",
 		"log/slog.SetLogLoggerLevel":       "E-LINT-009",
+		"net/http.Client.CheckRedirect":    "E-LINT-009",
+		"net/http.Client.Get":              "E-LINT-009",
+		"net/http.Client.Head":             "E-LINT-009",
+		"net/http.Client.Jar":              "E-LINT-009",
+		"net/http.Client.Post":             "E-LINT-009",
+		"net/http.Client.PostForm":         "E-LINT-009",
+		"net/http.Client.Timeout":          "E-LINT-009",
+		"net/http.Client.Transport":        "E-LINT-009",
 	}
 	for _, name := range forGeneratedCode {
 		m[Framework+"/"+name] = "E-LINT-005"
@@ -53,10 +61,10 @@ var restricted = map[string][]string{
 		"NullInt64", "NullString", "NullTime", "Out", "RawBytes", "Result", "Row", "Rows", "Scanner", "Stmt",
 		"Tx", "TxOptions",
 	},
-	"net/http": {
+	"net/http": append([]string{
 		"CanonicalHeaderKey", "Cookie", "DetectContentType", "ErrNoCookie", "Handler", "Header", "Method*",
 		"Request", "ResponseWriter", "SameSite*", "Status*", "TimeFormat",
-	},
+	}, outboundNames...),
 }
 
 // Banned returns the code of the rule that refuses, in a hand-written file of an app that
@@ -64,7 +72,7 @@ var restricted = map[string][]string{
 // its member name: a function, variable, constant or type, or a method or field written
 // Type.Name, which is refused also when its type is. It returns "" when no rule refuses it.
 // Banned("os", "") is "E-LINT-001", Banned("database/sql", "Open") is "E-LINT-006",
-// Banned("net/http", "Request") is "" and Banned("net/http", "Client.Do") is "E-LINT-009".
+// Banned("net/http", "Request") is "" and Banned("net/http", "Transport.RoundTrip") is "E-LINT-009".
 //
 // Banned answers for the packages of the standard library and the framework: a path whose first
 // element has no dot names one of them, and any other path is E-LINT-002, a module that is not
@@ -137,6 +145,7 @@ func methodsOf(pkgs []*packages.Package, members []string) map[string][]*types.F
 func (a *app) names(p *analysis.Pass) {
 	for _, f := range p.Files {
 		generated := a.isGenerated(p, f)
+		star := starred(f)
 		ast.Inspect(f, func(n ast.Node) bool {
 			switch n := n.(type) {
 			case *ast.Ident:
@@ -144,6 +153,7 @@ func (a *app) names(p *analysis.Pass) {
 			case *ast.CallExpr:
 				a.pointerConversion(p, n)
 			}
+			a.clients(p, n, star)
 			for _, x := range targets(n) {
 				a.change(p, x)
 			}
@@ -265,7 +275,7 @@ func (a *app) use(p *analysis.Pass, id *ast.Ident, generated bool) {
 	}
 	pkg := obj.Pkg().Path()
 	if names, ok := restricted[pkg]; ok && obj.Parent() == obj.Pkg().Scope() && !listed(names, obj.Name()) {
-		diagnose(p, id.Pos(), "E-LINT-009", "app code may not use "+display(pkg+"."+obj.Name()))
+		a.refuse(p, id, "E-LINT-009", pkg+"."+obj.Name())
 		return
 	}
 	if pkg == "reflect" {
@@ -285,6 +295,9 @@ func (a *app) refusedAs(obj types.Object) string {
 	name := member(obj)
 	if refused[name] != "" {
 		return name
+	}
+	if f := clientField(obj); f != "" {
+		return f
 	}
 	if m := standsFor(obj, a.methods); m != nil {
 		return member(m)
@@ -418,9 +431,12 @@ func anyTypeParam(list *types.TypeList) bool {
 
 // refuse reports the use at id of the member name, which the rule code refuses.
 func (a *app) refuse(p *analysis.Pass, id *ast.Ident, code, name string) {
-	if code == "E-LINT-005" {
+	switch {
+	case code == "E-LINT-005":
 		diagnose(p, id.Pos(), code, "only generated code may call "+display(name))
-	} else {
+	case clientName(name):
+		diagnoseFix(p, id.Pos(), code, "app code may not use "+display(name), outboundFix)
+	default:
 		diagnose(p, id.Pos(), code, "app code may not use "+display(name))
 	}
 }
@@ -457,7 +473,11 @@ func (a *app) change(p *analysis.Pass, x ast.Expr) {
 			return false
 		}
 		if named, ok := a.restrictedPointee(et); ok {
-			diagnose(p, e.Pos(), "E-LINT-009", "app code may not change a "+display(named)+" through a pointer")
+			if msg := "app code may not change a " + display(named) + " through a pointer"; clientName(named) {
+				diagnoseFix(p, e.Pos(), "E-LINT-009", msg, outboundFix)
+			} else {
+				diagnose(p, e.Pos(), "E-LINT-009", msg)
+			}
 			return false
 		}
 		return true

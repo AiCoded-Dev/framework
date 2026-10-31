@@ -13,3 +13,6 @@ const Name = "run"
 func Start(name string) error { return exec.Command(name).Run() }
 
 var fetch = http.Get
+
+// Client makes a client of its own.
+func Client() *http.Client { return &http.Client{} }

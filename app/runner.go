@@ -69,6 +69,7 @@ func connectRunner(ctx context.Context, dir string) (*conn, error) {
 		Files:    runnerv1connect.NewFilesServiceClient(hc, socket.BaseURL, opts...),
 		Mail:     runnerv1connect.NewMailServiceClient(hc, socket.BaseURL, opts...),
 		Rpc:      runnerv1connect.NewRpcServiceClient(hc, socket.BaseURL, opts...),
+		Outbound: runnerv1connect.NewOutboundServiceClient(hc, socket.BaseURL, opts...),
 	}
 	c.shareSocket = h.GetAppSocketOpen()
 	return c, nil

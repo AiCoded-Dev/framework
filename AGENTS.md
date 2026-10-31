@@ -11,7 +11,7 @@ not for changing the framework itself. Follow them in every change.
 - Pages are folders under `pages/`, each with an `index.html` template and a `dataprovider.go`
   whose hooks fill it: `pages/notes/n_id/` is `/notes/42`. `aicoded generate` makes them Go code.
 - App code imports the framework's packages `app`, `auth`, `config`, `filestore`, `mailer`,
-  `rpc`, `secrets`, `sqldb`, `telemetry`, `web`, `web/form` and `web/reactive`: each is
+  `outbound`, `rpc`, `secrets`, `sqldb`, `telemetry`, `web`, `web/form` and `web/reactive`: each is
   `aicoded.dev/framework/<name>`, so the types of form fields, such as
   `form.SelectOption`, come from `aicoded.dev/framework/web/form`.
 - What every page shares, such as the database, is `type Deps` in `deps/`. Its `Start` method

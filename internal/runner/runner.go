@@ -15,12 +15,13 @@ type Session struct {
 	Settings          map[string]string
 	CSRFKey           []byte
 	// Dir is the runner's folder of sockets.
-	Dir     string
-	Secrets runnerv1connect.SecretsServiceClient
-	Files   runnerv1connect.FilesServiceClient
-	Mail    runnerv1connect.MailServiceClient
-	Rpc     runnerv1connect.RpcServiceClient
-	Export  func(*runnerv1.Span) // never blocks
+	Dir      string
+	Secrets  runnerv1connect.SecretsServiceClient
+	Files    runnerv1connect.FilesServiceClient
+	Mail     runnerv1connect.MailServiceClient
+	Rpc      runnerv1connect.RpcServiceClient
+	Outbound runnerv1connect.OutboundServiceClient
+	Export   func(*runnerv1.Span) // never blocks
 }
 
 // ErrNoRunner is returned by building blocks called with a context that does not come from the app.

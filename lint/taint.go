@@ -207,6 +207,7 @@ func (a *app) taint(ctx context.Context, pkgs []*packages.Package) error {
 		return fmt.Errorf("lint cannot trace outside data (E-LINT-008): package %s cannot be built", pkgs[i].PkgPath)
 	}
 	prog.Build()
+	a.clientInterfaces(prog)
 	t := &taint{
 		a: a, prog: prog, sums: map[*ssa.Function]*summary{}, places: map[place]labels{}, found: map[sink]labels{},
 		rpc: rpc, methods: methodsOf(pkgs, tableMethods()), byID: map[string][]*ssa.Function{},

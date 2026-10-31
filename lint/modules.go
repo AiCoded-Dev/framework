@@ -268,7 +268,8 @@ func (a *app) declaredPackage(p *packages.Package) {
 				at(id.Pos(), "runs SQL with "+display(m))
 			} else if a.unmatchedSQL(obj) {
 				at(id.Pos(), "calls "+id.Name+", which has type parameters in its signature, so lint cannot tell whether it takes SQL")
-			} else if obj.Pkg().Path() == "net/http" && obj.Parent() == obj.Pkg().Scope() && !listed(restricted["net/http"], obj.Name()) {
+			} else if obj.Pkg().Path() == "net/http" && obj.Parent() == obj.Pkg().Scope() &&
+				(!listed(restricted["net/http"], obj.Name()) || slices.Contains(outboundNames, obj.Name())) {
 				at(id.Pos(), "uses "+display("net/http."+obj.Name()))
 			} else if name := member(obj); process(name) || slices.Contains(reflection, name) || driverMethod(name) {
 				at(id.Pos(), "uses "+display(name))

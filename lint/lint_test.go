@@ -362,6 +362,7 @@ func goEnv(t *testing.T, name string) string {
 
 func TestNames(t *testing.T) {
 	const typeParamConversion = "app code may not convert to or from a type parameter that could be a pointer, or a pointer to a type parameter: use the concrete types"
+	const ownClient = "app code may not make or hold an http.Client of its own: use the *http.Client that outbound.Client() returns"
 	assert.Equal(t, []string{
 		`bad/bad.go:32: E-LINT-005: only generated code may call rpc.Call`,
 		`bad/bad.go:33: E-LINT-005: only generated code may call web.Request.CSRFToken`,
@@ -390,6 +391,38 @@ func TestNames(t *testing.T) {
 		`bad/bad.go:113: E-LINT-009: app code may not convert a pointer to slog.Logger to another pointer type`,
 		`bad/bad.go:114: E-LINT-009: app code may not change a time.Time through a pointer`,
 		`bad/bad.go:119: E-LINT-009: app code may not change a value through a pointer to a type parameter, which could point at a value of the standard library or the framework`,
+		`bad/client.go:13: E-LINT-009: ` + ownClient,
+		`bad/client.go:17: E-LINT-009: ` + ownClient,
+		`bad/client.go:18: E-LINT-009: ` + ownClient,
+		`bad/client.go:23: E-LINT-009: ` + ownClient,
+		`bad/client.go:24: E-LINT-009: ` + ownClient,
+		`bad/client.go:25: E-LINT-009: ` + ownClient,
+		`bad/client.go:26: E-LINT-009: ` + ownClient,
+		`bad/client.go:27: E-LINT-009: ` + ownClient,
+		`bad/client.go:28: E-LINT-009: ` + ownClient,
+		`bad/client.go:29: E-LINT-009: app code may not use http.Transport`,
+		`bad/client.go:30: E-LINT-009: app code may not use http.Transport`,
+		`bad/client.go:31: E-LINT-009: app code may not use http.DefaultClient`,
+		`bad/client.go:32: E-LINT-009: app code may not use http.DefaultTransport`,
+		`bad/client.go:33: E-LINT-009: app code may not use http.Get`,
+		`bad/client.go:34: E-LINT-009: app code may not use http.Post`,
+		`bad/client.go:35: E-LINT-009: app code may not use http.Head`,
+		`bad/client.go:36: E-LINT-009: app code may not use http.PostForm`,
+		`bad/client.go:38: E-LINT-009: app code may not use http.Client.Transport`,
+		`bad/client.go:39: E-LINT-009: app code may not use http.Client.CheckRedirect`,
+		`bad/client.go:40: E-LINT-009: app code may not use http.Client.Jar`,
+		`bad/client.go:41: E-LINT-009: app code may not use http.Client.Timeout`,
+		`bad/client.go:42: E-LINT-009: app code may not change a http.Client through a pointer`,
+		`bad/client.go:43: E-LINT-009: app code may not use http.Client.Get`,
+		`bad/client.go:44: E-LINT-009: app code may not turn a *http.Client into an interface value, through which other code could change the client`,
+		`bad/client.go:45: E-LINT-009: app code may not turn a bad.holder into an interface value, through which other code could change the client it holds`,
+		`bad/client.go:46: E-LINT-009: app code may not instantiate zeroOf with a type that holds an http.Client`,
+		`bad/client.go:58: E-LINT-009: app code may not turn a *http.Client into an interface value in Reach, through which other code could change the client`,
+		`bad/client.go:60: E-LINT-009: app code may not use http.Client.Transport`,
+		`bad/client.go:61: E-LINT-009: app code may not use http.Client.Head`,
+		`bad/client.go:63: E-LINT-009: app code may not turn a **http.Client into an interface value, through which other code could change the client it holds`,
+		`bad/client.go:64: E-LINT-009: app code may not instantiate pass with a type that holds an http.Client`,
+		`bad/client.go:66: E-LINT-009: app code may not turn a bad.wrapped into an interface value, through which other code could change the client it holds`,
 		`bad2/bad2.go:10: E-LINT-009: ` + typeParamConversion,
 		`bad2/bad2.go:13: E-LINT-009: ` + typeParamConversion,
 		`bad3/bad3.go:16: E-LINT-009: ` + typeParamConversion,
@@ -402,6 +435,23 @@ func TestNames(t *testing.T) {
 		`pages/key.go:5: E-LINT-005: only generated code may use state, which pages/route_gen.go declares`,
 		`pages/key.go:5: E-LINT-005: only generated code may use conn, which pages/route_gen.go declares`,
 	}, run(t, "names", "pages/route_gen.go"), "Keep, Count, Bypass, Sum, Show, Any and the generated file use only what they may")
+}
+
+func TestClientFix(t *testing.T) {
+	const outboundFix = "call outside services with outbound.Client(), which goes through the runner"
+	r, err := lint.Run(t.Context(), filepath.Join("testdata", "names"), lint.Config{Generated: []string{"pages/route_gen.go"}, FrameworkDir: checkout(t)})
+	require.NoError(t, err)
+	var client []string
+	for _, p := range r.Problems {
+		if p.Fix == outboundFix {
+			client = append(client, p.Pos)
+		}
+		if strings.HasPrefix(p.Pos, "bad/client.go:") {
+			assert.Equal(t, outboundFix, p.Fix, p.Error())
+		}
+	}
+	assert.Contains(t, client, "bad/bad.go:40", "http.Get")
+	assert.NotContains(t, client, "bad/bad.go:43", "slog.SetDefault keeps the rule's fix")
 }
 
 func TestBanned(t *testing.T) {
@@ -422,8 +472,18 @@ func TestBanned(t *testing.T) {
 		{"database/sql", "Conn.Raw", "E-LINT-009"},
 		{"database/sql", "ColumnType.ScanType", "E-LINT-009"},
 		{"database/sql", "ColumnType.Name", ""},
-		{"net/http", "Client.Do", "E-LINT-009"},
+		{"net/http", "Client", ""},
+		{"net/http", "Client.Do", ""},
+		{"net/http", "Client.Get", "E-LINT-009"},
+		{"net/http", "Client.Transport", "E-LINT-009"},
+		{"net/http", "NewRequestWithContext", ""},
+		{"net/http", "NoBody", ""},
+		{"net/http", "Response", ""},
+		{"net/http", "DefaultClient", "E-LINT-009"},
+		{"net/http", "DefaultTransport", "E-LINT-009"},
+		{"net/http", "Transport", "E-LINT-009"},
 		{"net/http", "Transport.RoundTrip", "E-LINT-009"},
+		{"aicoded.dev/framework/outbound", "Client", ""},
 		{"database/sql", "Named", ""},
 		{"database/sql", "ErrConnDone", ""},
 		{"database/sql", "Drivers", "E-LINT-009"},
@@ -497,6 +557,8 @@ func TestModules(t *testing.T) {
 		`example.com/caps@v0.1.0/run/raw.go:34: E-LINT-003: declared module example.com/caps uses driver.StmtQueryContext.QueryContext`,
 		`example.com/caps@v0.1.0/run/run.go:6: E-LINT-003: declared module example.com/caps imports "os/exec"`,
 		`example.com/caps@v0.1.0/run/run.go:15: E-LINT-003: declared module example.com/caps uses http.Get`,
+		`example.com/caps@v0.1.0/run/run.go:18: E-LINT-003: declared module example.com/caps uses http.Client`,
+		`example.com/caps@v0.1.0/run/run.go:18: E-LINT-003: declared module example.com/caps uses http.Client`,
 		`example.com/caps@v0.1.0/run/run_plan9.go:3: E-LINT-003: declared module example.com/caps imports "syscall"`,
 		`example.com/caps@v0.1.0/run/stub.s:1: E-LINT-003: declared module example.com/caps holds stub.s, which is not Go source`,
 		`example.com/link@v0.1.0/clock/clock.go:4: E-LINT-003: declared module example.com/link imports "unsafe"`,
