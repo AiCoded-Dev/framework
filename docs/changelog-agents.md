@@ -31,10 +31,12 @@ Changes to the API that AI assistants build apps with. Newest first.
   body. The runner sends only `https` to port 443 of a host that `egress` lists (E-OUT-001,
   E-OUT-002), never to the platform's own hosts (E-OUT-003), with a body up to 10 MiB each way
   (E-OUT-004, E-OUT-005), 30 s for the whole request (E-OUT-006) and 16 requests under way at
-  once per instance (E-OUT-007). It drops the hop-by-hop headers and `Host`, refuses a header
-  name that is not a token or a value with a line break (E-OUT-009), follows no redirect, and puts
-  a key that `egress` binds to the host in its header in place of the app's. A service it cannot
-  reach is E-OUT-008. `secrets.Get` of a bound key is E-RUN-015. A runner of this framework still
+  once per instance (E-OUT-007). It sends only GET, HEAD, POST, PUT, PATCH, DELETE and OPTIONS
+  (E-OUT-002). It drops the hop-by-hop headers, `Host` and `Content-Length`, refuses a header name
+  that is not a token or a value with a control character such as CR, LF or NUL (E-OUT-009),
+  passes the response headers on sorted by name, follows no redirect, and puts a key that
+  `egress` binds to the host in its header in place of the app's. A service it cannot reach is
+  E-OUT-008. `secrets.Get` of a bound key is E-RUN-015. A runner of this framework still
   serves protocol 3, apps of v0.7.0 to v0.9.0, unless their permission list declares `egress`
   (E-RUN-014); any other version is E-RUN-002. `runnerproto` adds `MinProtocolVersion` (3),
   `MaxOutboundBody` (10 MiB), `MaxOutboundRequests` (16) and `OutboundDeadline` (30 s);

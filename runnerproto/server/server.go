@@ -118,7 +118,7 @@ func New(ctx context.Context, opts Options) (*Server, error) {
 	if opts.Egress != nil {
 		egress = slices.Clone(opts.Egress)
 	}
-	s.outbound = newOutboundService(s, egress)
+	s.outbound = newOutboundService(s, egress, opts.Egress != nil)
 	if opts.Adopted {
 		s.markReady()
 	}

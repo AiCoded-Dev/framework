@@ -208,7 +208,9 @@ func TestOutboundRefusesHeaders(t *testing.T) {
 	} {
 		_, err := do(t, c, req)
 		require.Error(t, err, name)
-		assert.Equal(t, "E-OUT-009", coded(t, err).Code, name)
+		e := coded(t, err)
+		assert.Equal(t, "E-OUT-009", e.Code, name)
+		assert.Equal(t, "use header names made of letters, digits and dashes, and values without control characters such as CR, LF or NUL", e.Fix, name)
 	}
 	assert.Empty(t, f.outbound.got())
 }
@@ -239,6 +241,40 @@ func TestOutboundInAPreview(t *testing.T) {
 	_, err = do(t, c, get("https://status.partner.example/"))
 	assert.Equal(t, "E-OUT-001", coded(t, err).Code, "an empty list reaches no host")
 	assert.Empty(t, f.outbound.got())
+}
+
+func TestOutboundNamesTheLiveReleaseOnlyForAReplacedList(t *testing.T) {
+	c, _ := serveWith(t, func(o *Options) { o.Env = EnvPreview })
+	_, err := do(t, c, get("https://evil.example/"))
+	assert.Equal(t, `"evil.example" is not in egress in aicoded.yaml`, coded(t, err).Msg, "the manifest's list")
+
+	c, _ = serveWith(t, func(o *Options) { o.Egress = []manifest.Egress{} })
+	_, err = do(t, c, get("https://evil.example/"))
+	assert.Equal(t, `"evil.example" is not a host of the app's live release: a preview reaches only the hosts of the app's live release`,
+		coded(t, err).Msg, "a replaced list")
+}
+
+func TestOutboundSendsOnlyTheRequestMethods(t *testing.T) {
+	c, f := serve(t)
+	for _, m := range []string{"CONNECT", "TRACE", "PRI", "get", "PROPFIND"} {
+		_, err := do(t, c, &runnerv1.DoRequest{Method: m, Url: "https://status.partner.example/"})
+		e := coded(t, err)
+		assert.Equal(t, "E-OUT-002", e.Code, m)
+		assert.Equal(t, "the runner sends only GET, HEAD, POST, PUT, PATCH, DELETE and OPTIONS", e.Msg, m)
+		assert.Equal(t, "send the request with GET, HEAD, POST, PUT, PATCH, DELETE or OPTIONS", e.Fix, m)
+	}
+	assert.Empty(t, f.outbound.got(), "the provider never sees a refused method")
+
+	methods := []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions}
+	for _, m := range methods {
+		_, err := do(t, c, &runnerv1.DoRequest{Method: m, Url: "https://status.partner.example/"})
+		require.NoError(t, err, m)
+	}
+	var sentMethods []string
+	for _, s := range f.outbound.got() {
+		sentMethods = append(sentMethods, s.method)
+	}
+	assert.Equal(t, methods, sentMethods)
 }
 
 func TestOutboundUsesTheBindingOfOptionsEgress(t *testing.T) {

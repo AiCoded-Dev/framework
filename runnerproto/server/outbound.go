@@ -35,6 +35,9 @@ var hopByHop = []string{"Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy
 // Content-Length, which follow from the URL and the body.
 var dropped = append(slices.Clip(hopByHop), "Host", "Content-Length")
 
+// methods are the request methods the runner sends.
+var methods = []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions}
+
 // outboundCodes are the connect codes of the outbound refusals.
 var outboundCodes = map[string]connect.Code{
 	"E-OUT-001": connect.CodePermissionDenied,
@@ -54,14 +57,17 @@ type outboundService struct {
 	s *Server
 	// egress holds the entries that apply: the manifest's, or Options.Egress.
 	egress manifest.Manifest
+	// replaced is whether egress holds Options.Egress, the entries a preview shares with the
+	// app's live release.
+	replaced bool
 	// slots holds a token for each request under way.
 	slots chan struct{}
 	// keys keeps the values of the bound keys.
 	keys *keyCache
 }
 
-func newOutboundService(s *Server, egress []manifest.Egress) *outboundService {
-	return &outboundService{s: s, egress: manifest.Manifest{Egress: egress},
+func newOutboundService(s *Server, egress []manifest.Egress, replaced bool) *outboundService {
+	return &outboundService{s: s, egress: manifest.Manifest{Egress: egress}, replaced: replaced,
 		slots: make(chan struct{}, runnerproto.MaxOutboundRequests), keys: newKeyCache()}
 }
 
@@ -118,6 +124,10 @@ func (o *outboundService) do(ctx context.Context, msg *runnerv1.DoRequest, call 
 	}
 	if !token(call.method) {
 		return nil, badHeader("the method is not an HTTP token")
+	}
+	if !slices.Contains(methods, call.method) {
+		return nil, errs.New("E-OUT-002", "the runner sends only GET, HEAD, POST, PUT, PATCH, DELETE and OPTIONS",
+			"send the request with GET, HEAD, POST, PUT, PATCH, DELETE or OPTIONS")
 	}
 	h, err := requestHeader(msg.GetHeaders())
 	if err != nil {
@@ -215,7 +225,7 @@ func canonicalHost(host string) (string, bool) {
 // notListed refuses a request to host, which egress does not list, with more said after.
 func (o *outboundService) notListed(host, more string) error {
 	msg := quote(host) + " is not in egress in aicoded.yaml"
-	if o.s.env == EnvPreview {
+	if o.replaced {
 		msg = quote(host) + " is not a host of the app's live release: a preview reaches only the hosts of the app's live release"
 	}
 	return errs.New("E-OUT-001", msg+more, "add the host to egress in aicoded.yaml; a host the app type does not allow needs approval")
@@ -226,7 +236,7 @@ func badURL(msg string) error {
 }
 
 func badHeader(msg string) error {
-	return errs.New("E-OUT-009", msg, "use header names made of letters, digits and dashes, and values without line breaks")
+	return errs.New("E-OUT-009", msg, "use header names made of letters, digits and dashes, and values without control characters such as CR, LF or NUL")
 }
 
 // unreachable returns what the app gets for err, an error of Outbound for a request to host

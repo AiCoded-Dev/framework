@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -155,7 +156,7 @@ func (c *Client) dialChecked(ctx context.Context, network, address string) (net.
 		return nil, errs.New("E-OUT-002", "the request is not https to port 443", "call the service over https on port 443")
 	}
 	rctx, cancel := context.WithTimeout(ctx, dnsTimeout)
-	addrs, err := c.resolver.LookupNetIP(rctx, "ip", host)
+	addrs, err := c.resolver.LookupNetIP(rctx, "ip", absolute(host))
 	cancel()
 	if err != nil && ctx.Err() != nil {
 		return nil, err
@@ -183,6 +184,15 @@ func (c *Client) dialChecked(ctx context.Context, network, address string) (net.
 		}
 	}
 	return nil, err
+}
+
+// absolute returns host as an absolute name, with a dot at its end, so that a resolver never
+// tries it under a search domain. An IP address stays as it is.
+func absolute(host string) string {
+	if _, err := netip.ParseAddr(host); err == nil || strings.HasSuffix(host, ".") {
+		return host
+	}
+	return host + "."
 }
 
 // control is the default dialer's last check of address, an "ip:port", before it connects.

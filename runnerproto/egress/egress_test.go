@@ -33,6 +33,7 @@ type resolver struct {
 	answers [][]netip.Addr
 	err     error
 	calls   int
+	names   []string
 }
 
 func answer(addrs ...string) *resolver {
@@ -43,10 +44,11 @@ func answer(addrs ...string) *resolver {
 	return r
 }
 
-func (r *resolver) LookupNetIP(_ context.Context, _, _ string) ([]netip.Addr, error) {
+func (r *resolver) LookupNetIP(_ context.Context, _, host string) ([]netip.Addr, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	defer func() { r.calls++ }()
+	r.names = append(r.names, host)
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -144,6 +146,18 @@ func TestDenied(t *testing.T) {
 	} {
 		assert.False(t, egress.Denied(netip.MustParseAddr(a)), a)
 	}
+}
+
+func TestDoLooksUpTheHostAsAnAbsoluteName(t *testing.T) {
+	r := answer("93.184.216.34")
+	c, _ := service(t, ok, egress.Options{Resolver: r})
+	for _, url := range []string{"https://api.example.com/", "https://www.example.com./"} {
+		resp, err := get(t, c, url)
+		require.NoError(t, err, "the certificate is checked for the name without the dot: %s", url)
+		require.NoError(t, resp.Body.Close())
+		c.CloseIdleConnections()
+	}
+	assert.Equal(t, []string{"api.example.com.", "www.example.com."}, r.names, "no search domain expands it")
 }
 
 func TestDo(t *testing.T) {

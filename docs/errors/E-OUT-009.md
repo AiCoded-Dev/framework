@@ -4,7 +4,7 @@ The app sent a request with `outbound.Client()` whose method or header name is n
 (letters, digits and ``!#$%&'*+-.^_`|~``), or a header value with a line break or another control
 character. A key that `egress` binds to the host may not hold one either. Nothing was sent.
 
-The runner drops the headers of the connection itself and `Host`, and replaces every header of a
-bound key's name that the app set.
+The runner drops the headers of the connection itself, `Host` and `Content-Length`, and replaces
+every header of a bound key's name that the app set.
 
-**Fix:** use header names made of letters, digits and dashes, and values without line breaks
+**Fix:** use header names made of letters, digits and dashes, and values without control characters such as CR, LF or NUL

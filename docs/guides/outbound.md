@@ -107,6 +107,7 @@ func (d *Deps) Today(ctx context.Context, city string) (string, error) {
 | What | Limit | Code |
 |---|---|---|
 | Scheme and port | `https` to port 443; no user name or password in the URL | E-OUT-002 |
+| Method | GET, HEAD, POST, PUT, PATCH, DELETE or OPTIONS | E-OUT-002 |
 | Host | one that `egress` lists, by its lower-case name, never an IP address | E-OUT-001 |
 | Address | public only: the platform's own hosts, private networks, loopback, link-local and cloud metadata addresses are never reachable, whatever the host resolves to; on the platform, neither are the server's own addresses and the platform's other addresses | E-OUT-003 |
 | Request body | 10 MiB | E-OUT-004 |
@@ -117,9 +118,11 @@ func (d *Deps) Today(ctx context.Context, city string) (string, error) {
 
 - The runner resolves the host each time it connects, and refuses the request when any address
   of the answer is one no app may reach.
-- It drops the `Host` header and the connection's own headers, such as `Connection` and
-  `Transfer-Encoding`, that the app set: the request goes to the URL's host, and the runner
-  writes those headers itself.
+- It drops the `Host` and `Content-Length` headers and the connection's own (hop-by-hop) headers,
+  such as `Connection` and `Transfer-Encoding`, that the app set: the request goes to the URL's
+  host, and the runner writes those headers itself.
+- The response headers reach the app sorted by name, each name's values in the order the service
+  sent them, without the connection's own headers.
 - It follows no redirect: a 3xx response comes back with its `Location`. Send a new request to it
   when its host is in `egress`.
 - A service it cannot reach, by name, connection or TLS certificate, is E-OUT-008. The reason is
