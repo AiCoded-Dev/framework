@@ -2,6 +2,8 @@ module aicoded.dev/framework
 
 go 1.26.0
 
+toolchain go1.26.11
+
 require (
 	connectrpc.com/connect v1.21.0
 	github.com/coder/websocket v1.8.15

@@ -21,7 +21,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | MIG | schema changes: the draft `.aicoded/migration.sql` in `aicoded check`, `aicoded dev` and the delivery pipeline, and the migrations applied to a database |
 | SQL | the app's database connection (mysql.sock) |
 | FILE | file stores |
-| MAIL | mail rules, the mailbox where a target keeps none, the messages a runner takes at once, a preview's messages, and the operator's mail domains |
+| MAIL | mail rules, the mailbox where a target keeps none, the messages a runner takes at once, a preview's messages, received messages and folders a runner cannot read, a company mail relay a runner cannot sign in to, and the operator's mail domains |
 | OUT | the requests an app sends to outside services with `outbound.Client()`, which the runner checks against `egress` |
 | LOGIN | company login, which signs people in to the apps of their organisation |
 
@@ -144,11 +144,15 @@ Releasing uses these codes, each a release that the platform refuses before anyt
   older than v0.10.0.
 - E-REL-005: secrets where the target of the organisation's server does not keep them.
 - E-REL-006, E-REL-008 and E-REL-013: an `email.from` address in a domain that the organisation
-  has not verified, that another app of the organisation has, or of which the hosting makes no
-  mailbox.
+  has not verified, or, In your own cloud, whose records SES has not found yet, that another app of
+  the organisation has, or of which the hosting makes no mailbox.
 - E-REL-014: an `email.from` other than the address the app sends from already.
 - E-REL-010: an app that has a release pending already.
-- E-REL-011: a building block that the target of the organisation's server does not offer.
+- E-REL-011: a building block that the target of the organisation's server does not offer, or,
+  In your own cloud, more file stores or mail domains than one app's role there holds.
+- E-REL-033 to E-REL-036: a target In your own cloud that the platform cannot sign in to, whose
+  guest zone is not installed as the platform needs it, whose database provisioner refused, or
+  where a mail domain has another MAIL FROM domain than `bounce.<domain>`.
 - E-REL-018: an app whose resources were made at another target than the one of its organisation's
   server.
 - E-REL-012: an app whose name, or whose organisation's slug, cannot be a label of its host.
@@ -179,6 +183,9 @@ start that the platform refuses, so that a preview that runs keeps its version:
 
 E-REL-031 refuses the app's owner a sixth person to see the app's preview, in the console.
 
+E-REL-032 refuses a release or a preview that the platform could not sign, so that nothing is
+released.
+
 E-REL-009 refuses the operator's purge of a publish that a live or pending release, or the app's
 running preview, runs.
 
@@ -188,15 +195,32 @@ pending: such an app keeps its name and stays active until releases can be stopp
 E-REL-028 refuses the operator's setting or deleting a secret of an app of another organisation:
 the app's owner or a security admin sets it in the console.
 
+E-FILE-003 refuses an app's list, or removal, of a folder of a file store that holds more than the
+runner lists of files and folders directly in it: 10 000 entries In your own cloud, a listing of
+4 MiB Hosted by us.
+
 E-MAIL-009 refuses the operator's adding or verifying a mail domain of an organisation that has no
 target to register it at: one placed on no server, or whose server's target the platform cannot
 reach.
 
 E-MAIL-010 refuses, on the platform, a message with a new idempotency key while 10 000 of the app's
-messages are being sent.
+messages are being sent, and, In your own cloud, a read of a message that waited until its call's
+deadline while two of the mailbox's messages were being read.
 
 E-MAIL-011 refuses, in a preview on the platform, a message over 1 MiB: a preview sends no mail,
 and keeps each message for the app's owner to read in the console.
+
+E-MAIL-012 refuses, In your own cloud, an app's read of a received message the runner cannot hand
+it: one over 10 MiB, or one that is not a message it can read. The message stays in the mailbox,
+listed with its id and size, so the app can move or delete it.
+
+E-MAIL-013 refuses, In your own cloud, an app's list of a mail folder of more than 20 000 messages:
+the runner lists the newest 10 000 of a folder, and reads at most 20 000 to find them.
+
+E-MAIL-014 refuses, In your own cloud, an app's message while the runner cannot read the sign-in of
+the company's mail relay, which then sends every app's mail, or for a few seconds after the relay
+refused it or refused AUTH PLAIN: nothing was sent, and the message can be sent again later with the
+same idempotency key.
 
 E-RUN-005 refuses an app's call to a building block the runner does not provide; none on the
 platform today.
@@ -216,12 +240,18 @@ E-RUN-012 refuses, on the platform, an app's read of a secret past the runner's 
 E-RUN-014 refuses the start of an app built with a framework older than v0.10.0 whose permission
 list declares `egress`, and E-RUN-015 an app's read of a secret that `egress` binds to a host.
 
+E-RUN-016 and E-RUN-017 are the reasons a runner reports for a release or a preview it refuses to
+start: one with no signature of the platform, or one that does not match it, and one signed
+earlier than the newest this server has served for the app in that environment.
+
 E-RUN-013 is the page a runner shows, with status 503, for an app whose new version did not start
 after a destructive schema change, which the earlier version cannot run on.
 
 E-RUN-007, E-RUN-008 and E-RUN-010 are what the platform answers a server's runner that enrols or
 connects: a refused enrolment token or certificate request, a runner certificate that is missing,
 expired, revoked or of another server, and a runner of another protocol version.
+E-RUN-018 is what it answers the runner of a server In your own cloud that enrols with its EC2
+instance's role, and is refused.
 
 E-LOGIN-001 refuses to sign a person in to an app when the sign-in provider gives them an issuer or
 a subject of more than 255 characters, or an identity of more than 512 bytes joined.

@@ -2,7 +2,7 @@ module aicoded.dev/framework/cmd/aicoded
 
 go 1.26.0
 
-toolchain go1.26.9
+toolchain go1.26.11
 
 require (
 	aicoded.dev/framework v0.0.0-00010101000000-000000000000

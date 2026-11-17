@@ -4,6 +4,14 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- On the platform, In your own cloud and Hosted by us alike, `ReadDir` of a folder of a file store
+  with more entries than the runner lists is E-FILE-003; the bound differs by where the app runs.
+  Where the runner lists a folder to remove it, `Remove` of such a folder is E-FILE-003 too. Keep
+  fewer files and folders directly in one folder: spread them over folders below it.
+
+- A `mailer.Get` can be refused with E-MAIL-010 while other reads of the mailbox are under way:
+  read the message again.
+
 - In a preview, E-OUT-001 has the fix "release the app with this host first: a preview reaches
   only the hosts the app's live release reaches; the app type decides whether that needs
   approval"; outside a preview its fix stays "add the host to egress in aicoded.yaml".

@@ -81,7 +81,8 @@ The app has one mailbox, the `email.from` address, with the folders `mailer.Inbo
 | `mailer.Move(ctx, id, folder)` | moves a message to another folder |
 | `mailer.Delete(ctx, id)` | removes a message |
 
-An unknown id is `mailer.ErrNotFound`.
+An unknown id is `mailer.ErrNotFound`. A `mailer.Get` can be refused with E-MAIL-010 while other
+reads of the mailbox are under way: read the message again.
 
 ```go
 mail, total, err := mailer.List(ctx, mailer.Inbox, 0, 50)

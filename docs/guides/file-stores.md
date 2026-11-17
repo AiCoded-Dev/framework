@@ -35,7 +35,10 @@ data, err := p.d.Photos.ReadFile("alice/portrait.png")
 entries, err := p.d.Photos.ReadDir("alice")
 ```
 
-A missing file is an error that `errors.Is(err, fs.ErrNotExist)` matches.
+A missing file is an error that `errors.Is(err, fs.ErrNotExist)` matches. The platform's
+runner lists at most a bounded folder, so there `ReadDir` of a folder with too many entries, some
+thousands, is refused with E-FILE-003: spread many files over folders below it, such as one for
+each year.
 
 ## Writing
 

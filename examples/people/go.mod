@@ -2,6 +2,8 @@ module people
 
 go 1.26.0
 
+toolchain go1.26.11
+
 require (
 	aicoded.dev/framework v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.12.1
