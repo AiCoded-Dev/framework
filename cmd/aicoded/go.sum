@@ -1,3 +1,5 @@
+aicoded.dev/framework v0.11.0 h1:OeoS2FGYXEcV8ehNQbe8T1iNSn8H1UJmBsQoncYvwKs=
+aicoded.dev/framework v0.11.0/go.mod h1:TlkljxY7RF4TXScOmOv/LTH8EsMUbRFEv/4PpKZqeug=
 connectrpc.com/connect v1.21.0 h1:LhqSJt7jHf5NJBo9Jq/t/9FjcYAideif0mg+qe2jCUs=
 connectrpc.com/connect v1.21.0/go.mod h1:A2ygJrukXwWy32vkCAAHNVguZrqZ+jeZ9rGRnGR4dN4=
 filippo.io/edwards25519 v1.2.0 h1:crnVqOiS4jqYleHd9vaKZ+HKtHfllngJIiOpNpoJsjo=
