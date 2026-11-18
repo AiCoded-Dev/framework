@@ -4,6 +4,10 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- `go install aicoded.dev/framework/cmd/aicoded@latest` installs the released `aicoded`, from
+  v0.11.0 on; `aicoded init` of a released `aicoded` writes its framework version into `go.mod`
+  with no `replace` line, so the app publishes as it is created.
+
 - On the platform, In your own cloud and Hosted by us alike, `ReadDir` of a folder of a file store
   with more entries than the runner lists is E-FILE-003; the bound differs by where the app runs.
   Where the runner lists a folder to remove it, `Remove` of such a folder is E-FILE-003 too. Keep

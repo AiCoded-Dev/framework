@@ -352,8 +352,10 @@ E-DEV-013. A file there that is not a socket (E-DEV-016), or a path too long for
 
 ## Installing aicoded
 
-`make install`, in a framework checkout, installs `aicoded` from it, with the path of the
-checkout built in for `aicoded init`.
+`go install aicoded.dev/framework/cmd/aicoded@latest` installs the released `aicoded`, or
+`@<version>` that version, from v0.11.0 on; `aicoded init` writes that framework version into a
+new app's `go.mod`. `make install`, in a framework checkout, installs `aicoded` from it, with the
+path of the checkout built in for `aicoded init`.
 
 ## See also
 

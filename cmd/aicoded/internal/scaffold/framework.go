@@ -48,5 +48,5 @@ func released(info *debug.BuildInfo) string {
 
 func noFramework() error {
 	return errs.New("E-CLI-003", "this aicoded knows no framework version to create apps with",
-		"install a released aicoded, or run make install in the framework checkout")
+		"install a released aicoded with go install aicoded.dev/framework/cmd/aicoded@latest, or run make install in the framework checkout")
 }

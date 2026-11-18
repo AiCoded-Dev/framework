@@ -13,13 +13,13 @@ Module: `aicoded.dev/framework`
 
 ## Quick start
 
-You need Go 1.26 or later and Chrome. `make install` puts `aicoded` in `$(go env GOPATH)/bin`,
+You need Go 1.26 or later and Chrome. `go install` puts `aicoded` in `$(go env GOPATH)/bin`,
 which must be on your `PATH`. `aicoded` from v0.3.0 on, and every app, need Go 1.26: with the
 default `GOTOOLCHAIN=auto` an older go command downloads it, and with `GOTOOLCHAIN=local` it
-refuses. In a checkout of this repository:
+refuses.
 
 ```sh
-make install          # installs aicoded from this checkout
+go install aicoded.dev/framework/cmd/aicoded@latest   # the released aicoded
 aicoded init hello    # creates the app hello in a new folder
 cd hello
 aicoded dev           # runs it on your computer
@@ -28,6 +28,17 @@ aicoded dev           # runs it on your computer
 Open `http://hello.localhost:8080/` and switch test personas at
 `http://hello.localhost:8080/_aicoded/persona`. `aicoded dev` also prints a login link to its dev
 UI, where you start and stop the apps and read their logs, traces and caught mail.
+
+To work on the framework itself, run `make install` in a checkout of this repository instead: its
+`aicoded` creates apps on that checkout through a `replace` line, which the delivery pipeline
+refuses.
+
+## Releasing
+
+Tag the framework `v<x.y.z>` and push the tag. Then `scripts/release-cli.sh v<x.y.z>` tags
+`cmd/aicoded/v<x.y.z>`: a commit on top of that tag whose `cmd/aicoded/go.mod` requires the
+released framework with no `replace`. Push that tag too, and
+`go install aicoded.dev/framework/cmd/aicoded@v<x.y.z>` installs the released `aicoded`.
 
 The [quick start guide](docs/guides/quickstart.md) goes on from there: what the new app holds,
 how to change its page and how to check it.

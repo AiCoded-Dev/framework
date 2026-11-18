@@ -14,16 +14,17 @@ change the page. You need Go and Chrome; there is no Node.js or npm to install.
 
 ## Install aicoded
 
-In a checkout of the framework, run:
-
 ```sh
-make install
+go install aicoded.dev/framework/cmd/aicoded@latest
 ```
 
-It installs `aicoded` into Go's bin folder. An app this `aicoded` creates uses the checkout
-through a `replace` line in its `go.mod`, which `aicoded check` accepts only from this `aicoded`
-(E-LINT-011). The delivery pipeline refuses a `replace` line (E-GATE-001), so require a released
-framework version before you publish.
+It installs the released `aicoded` into Go's bin folder; `@v0.11.0` or a later version installs
+that one. An app this `aicoded` creates requires the framework version it was released with.
+
+`make install` in a checkout of the framework installs an `aicoded` that creates apps on that
+checkout instead, through a `replace` line in their `go.mod`, which `aicoded check` accepts only
+from this `aicoded` (E-LINT-011). The delivery pipeline refuses a `replace` line (E-GATE-001), so
+such an app requires a released framework version before you publish.
 
 ## Create an app
 
