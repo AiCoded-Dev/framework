@@ -24,6 +24,7 @@ Every error the framework, the generator, the CLI or a runner reports on purpose
 | MAIL | mail rules, the mailbox where a target keeps none, the messages a runner takes at once, a preview's messages, received messages and folders a runner cannot read, a company mail relay a runner cannot sign in to, and the operator's mail domains |
 | OUT | the requests an app sends to outside services with `outbound.Client()`, which the runner checks against `egress` |
 | LOGIN | company login, which signs people in to the apps of their organisation |
+| ORG | the platform operator's deletion of an organisation |
 
 Calls between apps use these codes:
 
@@ -194,6 +195,15 @@ pending: such an app keeps its name and stays active until releases can be stopp
 
 E-REL-028 refuses the operator's setting or deleting a secret of an app of another organisation:
 the app's owner or a security admin sets it in the console.
+
+The operator's deletion of an organisation with `admin orgs delete` uses these codes:
+
+- E-ORG-001 to E-ORG-004 and E-ORG-006: a deletion refused before anything changed: the
+  operator's own organisation, an organisation In your own cloud, a confirmation that is not the
+  slug, an organisation whose release, preview change or other deletion is under way, and a slug
+  that no organisation has.
+- E-ORG-005: a step that failed after the organisation was closed; it stays closed, and the same
+  command run again resumes the deletion.
 
 E-FILE-003 refuses an app's list, or removal, of a folder of a file store that holds more than the
 runner lists of files and folders directly in it: 10 000 entries In your own cloud, a listing of

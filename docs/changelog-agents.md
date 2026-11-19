@@ -4,6 +4,10 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- E-ORG-001 to E-ORG-006: the deletion of an organisation by the platform's operator, with
+  `admin orgs delete`. Apps and builders do not meet them: an organisation being deleted refuses
+  every sign-in, publish and preview, and its apps stop.
+
 - `go install aicoded.dev/framework/cmd/aicoded@latest` installs the released `aicoded`, from
   v0.11.0 on; `aicoded init` of a released `aicoded` writes its framework version into `go.mod`
   with no `replace` line, so the app publishes as it is created.
