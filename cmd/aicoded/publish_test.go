@@ -436,6 +436,31 @@ func TestStatusDeclined(t *testing.T) {
 	assert.Equal(t, 0, code, errOut, "a publish without declined is not declined")
 }
 
+func TestStatusLive(t *testing.T) {
+	p, aicoded := signedIn(t)
+	dir := gittest.NewApp(t, "demo")
+	live := platformtest.Passed()
+	live.Release = platformtest.Live("demo")
+	p.Answers(live)
+	const want = "  Pre-approved by app type internal-tool: live.\n  Live at https://demo.acme.apps.aicoded.cloud/\npassed\n"
+
+	code, out, errOut := aicoded("publish", dir)
+	assert.Equal(t, 0, code, errOut)
+	assert.True(t, strings.HasSuffix(out, want), out)
+
+	id := publishID(t, out)
+	code, out, errOut = aicoded("status", id)
+	assert.Equal(t, 0, code, errOut)
+	assert.True(t, strings.HasSuffix(out, want), out)
+
+	code, out, _ = aicoded("status", "--json", id)
+	assert.Equal(t, 0, code)
+	var got platform.Publish
+	require.NoError(t, json.Unmarshal([]byte(out), &got))
+	require.NotNil(t, got.Release)
+	assert.Equal(t, "https://demo.acme.apps.aicoded.cloud/", got.Release.URL)
+}
+
 func TestRunStatusUsage(t *testing.T) {
 	p, aicoded := signedIn(t)
 	for _, args := range [][]string{

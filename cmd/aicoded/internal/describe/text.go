@@ -6,6 +6,8 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // WriteText writes the summary as aicoded describe prints it: a compact block per app, with no
@@ -83,9 +85,65 @@ func (s Summary) WriteText(w io.Writer) error {
 		for _, f := range a.Findings {
 			fmt.Fprintf(&b, "  finding: %s\n", strings.ReplaceAll(f.String(), "\n", "\n  "))
 		}
+		writeLocal(&b, a.Local)
 	}
 	_, err := io.WriteString(w, b.String())
 	return err
+}
+
+// writeLocal writes the local setup l: the workspace in dev.yaml or the note that there is none,
+// or the problem that stops aicoded dev from reading it; then the MySQL server, the personas and
+// whether each value is set.
+func writeLocal(b *strings.Builder, l Local) {
+	switch {
+	case l.Problem != nil:
+		fmt.Fprintf(b, "  local problem: %s\n", strings.ReplaceAll(l.Problem.String(), "\n", "\n  "))
+		return
+	case l.Workspace != "":
+		fmt.Fprintf(b, "  local workspace %s\n", printable(l.Workspace))
+	case l.Note != "":
+		fmt.Fprintf(b, "  local note: %s\n", printable(l.Note))
+	}
+	if l.MySQL != nil {
+		fmt.Fprintf(b, "  local mysql %s\n", set(*l.MySQL))
+	}
+	for _, p := range l.Personas {
+		fmt.Fprintf(b, "  local persona %s", printable(p.Name))
+		if len(p.Roles) > 0 {
+			fmt.Fprintf(b, "  roles %s", printable(join(p.Roles)))
+		}
+		if len(p.Groups) > 0 {
+			fmt.Fprintf(b, "  groups %s", printable(join(p.Groups)))
+		}
+		b.WriteString("\n")
+	}
+	if len(l.Personas) == 0 && l.Workspace != "" {
+		b.WriteString("  local personas none: aicoded dev signs in as all-roles or no-roles\n")
+	}
+	for _, v := range l.Settings {
+		fmt.Fprintf(b, "  local setting %s %s\n", v.Name, set(v.Set))
+	}
+	for _, v := range l.Secrets {
+		fmt.Fprintf(b, "  local secret %s %s\n", v.Name, set(v.Set))
+	}
+}
+
+// printable returns s, from dev.yaml, with each control or format character, and each byte that
+// is not UTF-8, as "?", so that it cannot change the terminal or start a line of its own.
+func printable(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == utf8.RuneError {
+			return '?'
+		}
+		return r
+	}, s)
+}
+
+func set(ok bool) string {
+	if ok {
+		return "set"
+	}
+	return "not set"
 }
 
 // line writes "  <label> <items>" when there are items.

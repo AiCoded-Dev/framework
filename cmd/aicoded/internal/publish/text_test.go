@@ -34,9 +34,11 @@ func TestWriteTextDecision(t *testing.T) {
 		release *platform.Release
 		want    string
 	}{
-		"none":       {nil, ""},
-		"R1 due":     {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "due"}, "  Pre-approved by app type internal-tool: going live.\n"},
-		"R1 live":    {&platform.Release{Tier: "R1", AppType: "finance@3", State: "released", Live: true}, "  Pre-approved by app type finance: live.\n"},
+		"none":    {nil, ""},
+		"R1 due":  {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "due"}, "  Pre-approved by app type internal-tool: going live.\n"},
+		"R1 live": {&platform.Release{Tier: "R1", AppType: "finance@3", State: "released", Live: true}, "  Pre-approved by app type finance: live.\n"},
+		"R1 at": {&platform.Release{Tier: "R1", AppType: "finance@3", State: "released", Live: true, URL: "https://demo.acme.apps.aicoded.cloud/"},
+			"  Pre-approved by app type finance: live.\n  Live at https://demo.acme.apps.aicoded.cloud/\n"},
 		"R1 pending": {&platform.Release{Tier: "R1", AppType: "finance@3", State: "released"}, "  Pre-approved by app type finance: being released.\n"},
 		"R1 replaced": {&platform.Release{Tier: "R1", AppType: "finance@3", State: "replaced"}, "  Pre-approved by app type finance.\n" +
 			"  Released: replaced by a newer release.\n"},
@@ -47,6 +49,10 @@ func TestWriteTextDecision(t *testing.T) {
 		"R2 live": {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons[:1], State: "released", Live: true}, "  Needs approval:\n" +
 			"    E-GATE-041: mail to partner.example, which the app type internal-tool does not allow\n" +
 			"  Released: live.\n"},
+		"R2 at": {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons[:1], State: "released", Live: true,
+			URL: "https://demo.acme.apps.aicoded.cloud/"}, "  Needs approval:\n" +
+			"    E-GATE-041: mail to partner.example, which the app type internal-tool does not allow\n" +
+			"  Released: live.\n  Live at https://demo.acme.apps.aicoded.cloud/\n"},
 		"R2 replaced": {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons[:1], State: "replaced"}, "  Needs approval:\n" +
 			"    E-GATE-041: mail to partner.example, which the app type internal-tool does not allow\n" +
 			"  Released: replaced by a newer release.\n"},

@@ -190,6 +190,49 @@ func TestPublishIsCleaned(t *testing.T) {
 	assert.True(t, got.Done())
 }
 
+func TestPublishLiveAddress(t *testing.T) {
+	p, c := signedIn(t)
+	created, err := c.CreatePublish(t.Context(), upload(sha))
+	require.NoError(t, err)
+	live := platformtest.Passed()
+	live.Release = platformtest.Live("demo")
+	p.Answers(live)
+	got, err := c.Publish(t.Context(), created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "https://demo.acme.apps.aicoded.cloud/", got.Release.URL)
+
+	live.Release.Live = false
+	p.Answers(live)
+	_, err = c.Publish(t.Context(), created.ID)
+	require.EqualError(t, err, "the platform's answer about the publish "+created.ID+" is not valid", "an address of a release that is not live")
+
+	live.Release.Live, live.Release.URL = true, ""
+	p.Answers(live)
+	got, err = c.Publish(t.Context(), created.ID)
+	require.NoError(t, err, "an older platform sends no address")
+	assert.Empty(t, got.Release.URL)
+
+	for _, url := range []string{
+		"http://demo.acme.apps.aicoded.cloud/",
+		"https://ana:pw@demo.acme.apps.aicoded.cloud/",
+		"https://demo.acme.apps.aicoded.cloud:8443/",
+		"https://demo.acme.apps.aicoded.cloud",
+		"https://demo.acme.apps.aicoded.cloud/admin",
+		"https://demo.acme.apps.aicoded.cloud/?next=evil.example",
+		"https://demo.acme.apps.aicoded.cloud/#x",
+		"https://localhost/",
+		"https://Demo.acme.apps.aicoded.cloud/",
+		"https://demo.acme.apps.aicoded.cloud\x1b[2J/",
+		"javascript:alert(1)//",
+		"https://" + strings.Repeat("a.", 127) + "cloud/",
+	} {
+		live.Release.URL = url
+		p.Answers(live)
+		_, err = c.Publish(t.Context(), created.ID)
+		require.EqualError(t, err, "the platform's answer about the publish "+created.ID+" is not valid", url)
+	}
+}
+
 func TestPublishOfManyProblems(t *testing.T) {
 	p, c := signedIn(t)
 	created, err := c.CreatePublish(t.Context(), upload(sha))

@@ -1,6 +1,7 @@
 // Package describe runs aicoded describe: a compact summary of what each app of a workspace
 // serves, calls and may reach, from its permission list, of its surface, of what is out of date
-// in it, and, in JSON, of its pages and layouts.
+// in it, of its local setup in dev.yaml, never a value of it, and, in JSON, of its pages and
+// layouts.
 package describe
 
 import (
@@ -11,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"aicoded.dev/framework/cmd/aicoded/internal/devconfig"
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/surface"
@@ -57,6 +59,43 @@ type App struct {
 	// Routes lists every page and layout, sorted by path, from the templates as aicoded generate
 	// reads them. The text summary leaves them out.
 	Routes []generate.RouteInfo `json:"routes,omitempty"`
+	// Local is the app's local setup for aicoded dev.
+	Local Local `json:"local"`
+}
+
+// Local is what dev.yaml sets for an app in aicoded dev: names, and whether each value is set,
+// never a value.
+type Local struct {
+	// Workspace is the folder described when dev.yaml holds settings for it, as aicoded dev run
+	// there uses them, or "" when it holds none, and aicoded dev runs with its defaults.
+	Workspace string `json:"workspace"`
+	// Note says what aicoded dev does when dev.yaml holds no settings for the folder, and names
+	// the nearest folder above it that dev.yaml holds settings for.
+	Note string `json:"note,omitempty"`
+	// Problem is why aicoded dev cannot read dev.yaml, or nil.
+	Problem *problem.Problem `json:"problem,omitempty"`
+	// MySQL is whether dev.yaml names a local MySQL server, for an app that declares sqldb.
+	MySQL *bool `json:"mysql,omitempty"`
+	// Personas are the personas dev.yaml names. When it names none, aicoded dev signs in as
+	// all-roles, with every role the apps ask for, or as no-roles.
+	Personas []Persona `json:"personas,omitempty"`
+	// Settings and Secrets are those the permission list declares, each with whether dev.yaml
+	// sets a local value for it.
+	Settings []Value `json:"settings,omitempty"`
+	Secrets  []Value `json:"secrets,omitempty"`
+}
+
+// Persona is a test viewer of aicoded dev: its name, roles and groups.
+type Persona struct {
+	Name   string   `json:"name"`
+	Roles  []string `json:"roles,omitempty"`
+	Groups []string `json:"groups,omitempty"`
+}
+
+// Value is a setting or secret by name, and whether a local value is set for it.
+type Value struct {
+	Name string `json:"name"`
+	Set  bool   `json:"set"`
 }
 
 // Audience is who may use the app: people of the company and outside people.
@@ -120,15 +159,81 @@ func Describe(ctx context.Context, dir, app string) (Summary, error) {
 		return Summary{}, err
 	}
 	names := workspace.Names(all)
+	ws, local := devSetup(root)
 	var s Summary
 	for _, a := range apps {
 		d, err := describeApp(ctx, a, names)
 		if err != nil {
 			return Summary{}, err
 		}
+		d.Local = localSetup(d, ws, local)
 		s.Apps = append(s.Apps, d)
 	}
 	return s, nil
+}
+
+// defaults says what aicoded dev runs a folder with when dev.yaml holds no settings for it.
+const defaults = "aicoded dev runs the apps here with its defaults: no local MySQL server, no local values, " +
+	"and the personas all-roles and no-roles; howto E-DEV-002 shows the format of dev.yaml"
+
+// noWorkspace is the note of a folder that dev.yaml holds no settings for, nor for a folder
+// above it.
+const noWorkspace = "dev.yaml names no workspace at or above this folder, so " + defaults
+
+// aboveWorkspace returns the note of a folder that dev.yaml holds no settings for, but holds
+// them for the folder above it.
+func aboveWorkspace(above string) string {
+	return "dev.yaml names the workspace " + above + ", not this folder; aicoded dev uses its values only when it runs there, so " + defaults
+}
+
+// devSetup returns the settings in dev.yaml that aicoded dev run in root uses, and the part of
+// the local setup that every app shares: the workspace, its personas, or the problem that stops
+// aicoded dev from reading dev.yaml.
+func devSetup(root string) (devconfig.Workspace, Local) {
+	path, err := devconfig.DefaultPath()
+	if err != nil {
+		return devconfig.Workspace{}, Local{Problem: &problem.Problem{Message: "aicoded cannot find its config folder: " + err.Error()}}
+	}
+	ws, found, above, err := devconfig.Find(path, root)
+	if err != nil {
+		ps := problem.From("", err)
+		return devconfig.Workspace{}, Local{Problem: &ps[0]}
+	}
+	var local Local
+	switch {
+	case found:
+		local.Workspace = root
+	case above != "":
+		local.Note = aboveWorkspace(above)
+	default:
+		local.Note = noWorkspace
+	}
+	for _, p := range ws.Personas {
+		local.Personas = append(local.Personas, Persona{Name: p.Name, Roles: p.Roles, Groups: p.Groups})
+	}
+	return ws, local
+}
+
+// localSetup returns the local setup of the app d: the shared part local, and whether ws sets the
+// MySQL server it needs and the values of its settings and secrets.
+func localSetup(d App, ws devconfig.Workspace, local Local) Local {
+	if local.Problem != nil {
+		return local
+	}
+	if d.SQLDB {
+		set := ws.MySQL != ""
+		local.MySQL = &set
+	}
+	values := ws.Apps[d.Name]
+	for _, name := range d.Settings {
+		_, set := values.Settings[name]
+		local.Settings = append(local.Settings, Value{Name: name, Set: set})
+	}
+	for _, name := range d.Secrets {
+		_, set := values.Secrets[name]
+		local.Secrets = append(local.Secrets, Value{Name: name, Set: set})
+	}
+	return local
 }
 
 // describeApp describes the app a of the workspace names.

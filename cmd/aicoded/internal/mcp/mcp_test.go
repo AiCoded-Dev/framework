@@ -315,6 +315,8 @@ func TestInstructionsNameTheOverview(t *testing.T) {
 	assert.Contains(t, cs.InitializeResult().Instructions, "howto guides/overview")
 	assert.Contains(t, cs.InitializeResult().Instructions, "call publish with the app and a summary")
 	assert.Contains(t, cs.InitializeResult().Instructions, "Call release_status with that id")
+	assert.Contains(t, cs.InitializeResult().Instructions, "the address in release.url")
+	assert.Contains(t, cs.InitializeResult().Instructions, "Never open, print or copy dev.yaml")
 	assert.Contains(t, cs.InitializeResult().Instructions, "Invite no one")
 }
 
@@ -516,6 +518,49 @@ func TestDescribeTool(t *testing.T) {
 	assert.JSONEq(t, string(want), string(got))
 }
 
+// describe tells which local values are set, and never a value of dev.yaml.
+func TestDescribeToolLocalSetup(t *testing.T) {
+	requireGo(t)
+	root, _ := helloWorkspace(t)
+	yaml := filepath.Join(root, "hello", "aicoded.yaml")
+	list, err := os.ReadFile(yaml)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(yaml, append(list, "data:\n  - {source: sqldb, classes: [internal]}\n"...), 0o600))
+	testhome.DevYAML(t, os.Getenv("HOME"), "workspaces:\n  "+root+`:
+    mysql: root:pw-SHOULD-NOT-LEAK@unix(/var/run/mysqld/mysqld.sock)/
+    personas: [{name: alice, roles: [editor]}]
+    apps:
+      hello:
+        settings: {greeting: set-SHOULD-NOT-LEAK}
+        secrets: {token: sec-SHOULD-NOT-LEAK}
+`)
+	cs := connect(t, root, io.Discard)
+	res := call(t, cs, "describe", map[string]any{})
+	require.False(t, res.IsError, text(res))
+	got := result[describe.Summary](t, res)
+	yes := true
+	assert.Equal(t, describe.Local{Workspace: root, MySQL: &yes, Personas: []describe.Persona{{Name: "alice", Roles: []string{"editor"}}},
+		Settings: []describe.Value{{Name: "greeting", Set: true}}, Secrets: []describe.Value{{Name: "token", Set: true}}}, got.Apps[0].Local)
+	data, err := json.Marshal(res)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "SHOULD-NOT-LEAK")
+
+	testhome.DevYAML(t, os.Getenv("HOME"), "workspaces:\n  "+root+`:
+    mysql: root:pw-SHOULD-NOT-LEAK@unix(/var/run/mysqld/mysqld.sock)/
+    apps:
+      hello:
+        secrets: {token: [sec-SHOULD-NOT-LEAK}
+`)
+	res = call(t, cs, "describe", map[string]any{})
+	require.False(t, res.IsError, text(res))
+	got = result[describe.Summary](t, res)
+	require.NotNil(t, got.Apps[0].Local.Problem, "a dev.yaml aicoded dev refuses")
+	assert.Equal(t, "E-DEV-002", got.Apps[0].Local.Problem.Code)
+	data, err = json.Marshal(res)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "SHOULD-NOT-LEAK")
+}
+
 func TestMailReceiveAndList(t *testing.T) {
 	requireGo(t)
 	root, _ := helloWorkspace(t)
@@ -553,6 +598,7 @@ func TestPublishTools(t *testing.T) {
 	assert.Equal(t, publishOut{ID: out.ID, App: "demo", SHA: gittest.Head(t, dir), CreatedApp: true, Next: out.Next,
 		draftState: draftState{Draft: "none"}}, out)
 	assert.Contains(t, out.Next, `call release_status with id "`+out.ID+`"`)
+	assert.Contains(t, out.Next, "release.url")
 	require.Len(t, p.Uploads(), 1)
 	assert.Equal(t, "First", p.Uploads()[0].Summary)
 	got := result[platform.Publish](t, callTool("release_status", map[string]any{"id": out.ID}))
@@ -573,6 +619,9 @@ func TestPublishTools(t *testing.T) {
 	assert.Equal(t, &platform.Release{Tier: "R2", AppType: "internal-tool@builtin", State: "waiting",
 		Reasons: []problem.Problem{{Code: "E-GATE-043", Pos: "aicoded.yaml:4", Message: "people outside the company may use it",
 			Docs: "https://aicoded.dev/docs/errors/E-GATE-043"}}}, got.Release, "the decision on releasing it")
+	p.Answers(platformtest.Publish{Status: "passed", Release: platformtest.Live("demo")})
+	got = result[platform.Publish](t, callTool("release_status", map[string]any{"id": out.ID}))
+	assert.Equal(t, "https://demo.acme.apps.aicoded.cloud/", got.Release.URL, "the address of the live release")
 	p.Answers(platformtest.Passed())
 
 	res := callTool("publish", map[string]any{"app": "demo", "summary": "Again"})

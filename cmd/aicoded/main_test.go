@@ -240,6 +240,7 @@ func TestRunCheck(t *testing.T) {
 }
 
 func TestRunDescribe(t *testing.T) {
+	testhome.Set(t)
 	var out, errOut bytes.Buffer
 	assert.Equal(t, 2, run([]string{"describe", "a", "b"}, &out, &errOut))
 	dir := testApp(t, "")
@@ -256,6 +257,26 @@ func TestRunDescribe(t *testing.T) {
 	out.Reset()
 	assert.Equal(t, 0, run([]string{"describe", dir}, &out, &errOut))
 	assert.True(t, strings.HasPrefix(out.String(), "app calc ("), out.String())
+}
+
+// aicoded describe tells which local values are set, and never a value of dev.yaml.
+func TestRunDescribeLocalSetup(t *testing.T) {
+	home := testhome.Set(t)
+	dir := testApp(t, "")
+	testhome.DevYAML(t, home, "workspaces:\n  "+dir+`:
+    mysql: root:pw-SHOULD-NOT-LEAK@unix(/var/run/mysqld/mysqld.sock)/
+    personas: [{name: alice, roles: [editor]}]
+    apps:
+      calc:
+        settings: {greeting: set-SHOULD-NOT-LEAK}
+        secrets: {token: sec-SHOULD-NOT-LEAK}
+`)
+	var out, errOut bytes.Buffer
+	assert.Equal(t, 0, run([]string{"describe", dir}, &out, &errOut), errOut.String())
+	assert.Contains(t, out.String(), "  local workspace "+dir+"\n  local persona alice  roles editor\n")
+	assert.Equal(t, 0, run([]string{"describe", "--json", dir}, &out, &errOut), errOut.String())
+	assert.Contains(t, out.String(), `"workspace": "`+dir+`"`)
+	assert.NotContains(t, out.String()+errOut.String(), "SHOULD-NOT-LEAK")
 }
 
 func TestRunInit(t *testing.T) {

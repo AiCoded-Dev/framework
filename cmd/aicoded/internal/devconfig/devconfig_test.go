@@ -41,6 +41,36 @@ func TestLoad(t *testing.T) {
 	assert.Equal(t, "s3cret", ws.Apps["rooms"].Secrets["api_key"])
 }
 
+func TestFind(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dev.yaml")
+	ws, found, above, err := devconfig.Find(path, "/src/apps")
+	require.NoError(t, err)
+	assert.False(t, found, "no dev.yaml")
+	assert.Empty(t, above)
+	assert.Equal(t, devconfig.DefaultPort, ws.Port)
+
+	require.NoError(t, os.WriteFile(path, []byte("workspaces:\n  /src/apps:\n    port: 9000\n  /src/apps/rooms/pages:\n    port: 9100\n"), 0o600))
+	ws, found, above, err = devconfig.Find(path, "/src/apps")
+	require.NoError(t, err)
+	assert.True(t, found)
+	assert.Empty(t, above)
+	assert.Equal(t, 9000, ws.Port)
+	ws, found, above, err = devconfig.Find(path, "/src/apps/rooms")
+	require.NoError(t, err)
+	assert.False(t, found, "only the folder itself")
+	assert.Equal(t, "/src/apps", above)
+	assert.Equal(t, devconfig.DefaultPort, ws.Port, "with the defaults, as aicoded dev runs there")
+	for _, dir := range []string{"/src", "/other"} {
+		_, found, above, err = devconfig.Find(path, dir)
+		require.NoError(t, err)
+		assert.False(t, found, dir)
+		assert.Empty(t, above, dir)
+	}
+	require.NoError(t, os.Chmod(path, 0o644))
+	_, _, _, err = devconfig.Find(path, "/src/apps")
+	assert.Equal(t, "E-DEV-001", errs.Code(err))
+}
+
 func TestLoadEnv(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "dev.yaml")
 	require.NoError(t, os.WriteFile(path, []byte("workspaces:\n  /src/apps:\n    env: preview\n  /src/other:\n    port: 9100\n"+

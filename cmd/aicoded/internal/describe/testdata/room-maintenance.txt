@@ -13,3 +13,5 @@ app room-maintenance (/apps/room-maintenance)
   ttl 180d
   writes INSERT rooms, INSERT tickets, UPDATE tickets
   surface 5 (5 entry points, 3 effects)
+  local note: dev.yaml names no workspace at or above this folder, so aicoded dev runs the apps here with its defaults: no local MySQL server, no local values, and the personas all-roles and no-roles; howto E-DEV-002 shows the format of dev.yaml
+  local mysql not set

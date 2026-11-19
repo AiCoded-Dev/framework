@@ -25,7 +25,7 @@ The MCP setup page of the dev UI shows the commands for Claude Code and Codex, a
 | `check` | runs lint's precheck of GOFLAGS and the `vendor` folder, `aicoded generate`, the check of the draft `.aicoded/migration.sql`, `go build`, `go vet`, the lint rules for app code and the tests for every app or one, and lists each problem with its code, `file:line` and fix, and each app's notes in the same shape, which do not fail the check; `frozen` writes nothing |
 | `preview` | builds and starts, or restarts, an app in `aicoded dev`, and returns its state and local address, or the problems that stop it |
 | `what_broke` | lists what went wrong: the problems of failed apps, the last error log lines and the last failed spans |
-| `describe` | summarises the apps, as `aicoded describe` does |
+| `describe` | summarises the apps, as `aicoded describe --json` does, with each app's `local` setup in `dev.yaml`: the `workspace`, whether `mysql` is set, the `personas` with their roles and groups, and each of its `settings` and `secrets` with whether it is `set`, never a value |
 | `howto` | shows a page of the docs, or lists them all with their summaries |
 | `logs` | the newest log lines of the apps, by app, lowest level, trace or text; with `env` `preview` or `production`, those of one app on the platform, as `aicoded logs` reads them |
 | `traces` | the newest traces, each request or call across the apps, by app or with an error only; with `env`, those of one app on the platform, from its newest 1000 spans |
@@ -34,7 +34,7 @@ The MCP setup page of the dev UI shows the commands for Claude Code and Codex, a
 | `mail_get` | one message from `mail_list` |
 | `mail_receive` | delivers a test message to an app's inbox, as if it had arrived by mail |
 | `publish` | does what `aicoded publish --no-wait` does for an app, with a summary of the change, and returns the publish's id, app and commit, whether it created the app, and what to do next |
-| `release_status` | shows a publish by its id, as `aicoded status --json` does: its status, steps, problems and notes, and the decision on releasing it |
+| `release_status` | shows a publish by its id, as `aicoded status --json` does: its status, steps, problems and notes, and the decision on releasing it, with the address of a live release in `release.url` |
 | `preview_publish` | runs a publish that passed as its app's preview on the platform, as `aicoded preview <id>` does, and returns its `app`, `host`, `url`, `publish`, `started`, `expires`, whether its data was `reset`, and what to do next |
 | `preview_end` | ends the preview of an app on the platform, as `aicoded preview end` does, which deletes its data |
 
@@ -74,12 +74,17 @@ The server tells the assistant to start with `howto guides/overview`, and to wor
 4. When something fails, `what_broke` lists the failed apps, error log lines and failed spans.
 5. Only when you ask it to publish an app, it commits everything, calls `publish` with the app
    and a summary of the change, then calls `release_status` with the id until the publish ends,
-   tells you the outcome, with whether it goes live, and fixes its problems as it fixes those of
+   tells you the outcome, with whether it goes live and, once it is live, its address from
+   `release.url`, and fixes its problems as it fixes those of
    `check`. When it is not signed in (E-CLI-004), it asks you to run `aicoded login`: there is no
    tool for signing in.
 6. Only when you ask for a preview on the platform, it calls `preview_publish` with a publish that
    passed and gives you the preview's address, and `preview_end` when you ask to end it. It
    invites no one: you pick who sees the preview, in the console.
+
+The server also tells it never to open, print or copy `dev.yaml`, `credentials.json` or any other
+file of `aicoded`'s config folder, as they hold passwords and keys: `describe` tells which local
+values and personas are set, and `aicoded whoami` the organisation and the sign-in.
 
 It writes `app`, `owner`, `data`, `email`, `settings` and `secrets` in the permission list by
 hand, and never edits what `aicoded generate` writes: the `access` and `services` sections, every

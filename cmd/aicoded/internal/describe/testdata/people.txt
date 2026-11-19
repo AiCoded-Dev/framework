@@ -12,3 +12,6 @@ app people (/apps/people)
   settings team_address
   writes INSERT users
   surface 5 (5 entry points, 2 effects)
+  local note: dev.yaml names no workspace at or above this folder, so aicoded dev runs the apps here with its defaults: no local MySQL server, no local values, and the personas all-roles and no-roles; howto E-DEV-002 shows the format of dev.yaml
+  local mysql not set
+  local setting team_address not set

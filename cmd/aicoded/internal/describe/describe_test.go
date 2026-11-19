@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,18 +17,21 @@ import (
 	"aicoded.dev/framework/cmd/aicoded/internal/generate"
 	"aicoded.dev/framework/cmd/aicoded/internal/problem"
 	"aicoded.dev/framework/cmd/aicoded/internal/surface"
+	"aicoded.dev/framework/cmd/aicoded/internal/testhome"
 	"aicoded.dev/framework/internal/errs"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files")
 
 // copyWorkspace copies the e2e rpc pair and the dev runner's hello app into a temp folder, with
-// their replace directives pointing at this checkout, generates them, and returns the folder. It
+// their replace directives pointing at this checkout, generates them, and returns the folder, in a
+// home of its own with no dev.yaml. It
 // skips the test without the go command, which Describe needs to lint the apps.
 func copyWorkspace(t *testing.T) string {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not in PATH")
 	}
+	testhome.Set(t)
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	framework, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
@@ -65,14 +69,15 @@ func TestDescribe(t *testing.T) {
 			{Name: "Missing", Callers: []string{"shop"}, Require: all},
 			{Name: "Ping", Callers: []string{"shop"}, Apps: true},
 			{Name: "Secret", Callers: []string{"shop"}, Require: []string{"admin"}},
-		}, Surface: surface.Surface{Size: 5, EntryPoints: 5}},
-		{Name: "hello", Dir: filepath.Join(root, "hello"), Audience: everyone, Settings: []string{"greeting"}, Secrets: []string{"token"}},
+		}, Surface: surface.Surface{Size: 5, EntryPoints: 5}, Local: Local{Note: noWorkspace}},
+		{Name: "hello", Dir: filepath.Join(root, "hello"), Audience: everyone, Settings: []string{"greeting"}, Secrets: []string{"token"},
+			Local: Local{Note: noWorkspace, Settings: []Value{{Name: "greeting"}}, Secrets: []Value{{Name: "token"}}}},
 		{Name: "shop", Dir: filepath.Join(root, "shop"), Audience: everyone, Pages: []Page{
 			{Path: "/checks", Require: all},
 			{Path: "/invoices/{id}", Require: all, Shared: true},
 			{Path: "/status", Require: all},
 		}, Calls: map[string][]string{"billing": {"Fail", "GetInvoice", "Missing", "Ping", "Secret"}},
-			Surface: surface.Surface{Size: 3, EntryPoints: 3},
+			Surface: surface.Surface{Size: 3, EntryPoints: 3}, Local: Local{Note: noWorkspace},
 			Routes: []generate.RouteInfo{
 				{Path: "/", Template: "pages/index.html", Layout: true, Params: noParams, Require: all, Calls: noCalls, Forms: noForms},
 				{Path: "/checks", Template: "pages/checks/index.html", Params: noParams, Require: all, Calls: noCalls, Forms: noForms},
@@ -88,7 +93,7 @@ func TestDescribe(t *testing.T) {
 	data, err := json.Marshal(s)
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"apps": [{"name": "hello", "dir": `+quote(filepath.Join(root, "hello"))+`, "audience": {"internal": ["everyone"]},
-		"settings": ["greeting"], "secrets": ["token"], "surface": {"size": 0, "entry_points": 0, "effects": 0}}]}`, string(data))
+		"settings": ["greeting"], "secrets": ["token"], "surface": {"size": 0, "entry_points": 0, "effects": 0}, "local": `+helloLocal+`}]}`, string(data))
 }
 
 // The room-maintenance and people examples, described in text and JSON, match their golden
@@ -97,6 +102,7 @@ func TestDescribeExample(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go toolchain not in PATH")
 	}
+	testhome.Set(t)
 	for _, app := range []string{"room-maintenance", "people"} {
 		s, err := Describe(t.Context(), filepath.Join("..", "..", "..", "..", "examples"), app)
 		require.NoError(t, err)
@@ -174,7 +180,7 @@ func TestDescribeModules(t *testing.T) {
 	data, err = json.Marshal(s)
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"apps": [{"name": "hello", "dir": `+quote(filepath.Join(root, "hello"))+`, "audience": {"internal": ["everyone"]},
-		"settings": ["greeting"], "secrets": ["token"], "modules": ["golang.org/x/text"], "surface": {"size": 0, "entry_points": 0, "effects": 0}}]}`, string(data))
+		"settings": ["greeting"], "secrets": ["token"], "modules": ["golang.org/x/text"], "surface": {"size": 0, "entry_points": 0, "effects": 0}, "local": `+helloLocal+`}]}`, string(data))
 }
 
 func TestDescribeReach(t *testing.T) {
@@ -201,12 +207,110 @@ schedule:
 		"connectors": ["crm"], "egress": ["api.partner.example", "hooks.partner.example"],
 		"bindings": [{"host": "api.partner.example", "secret": "token", "header": "Authorization", "prefix": "Bearer "}],
 		"schedule": [{"job": "daily-summary", "cron": "0 6 * * *"}], "settings": ["greeting"], "secrets": ["token"],
-		"surface": {"size": 3, "entry_points": 1, "effects": 3}}]}`, string(data))
+		"surface": {"size": 3, "entry_points": 1, "effects": 3}, "local": `+helloLocal+`}]}`, string(data))
 }
+
+// helloLocal is the local setup of the hello app in a home with no dev.yaml.
+var helloLocal = `{"workspace": "", "note": ` + quote(noWorkspace) + `,
+	"settings": [{"name": "greeting", "set": false}], "secrets": [{"name": "token", "set": false}]}`
 
 func quote(s string) string {
 	data, _ := json.Marshal(s)
 	return string(data)
+}
+
+// leaky is a dev.yaml for the workspace root whose values describe must never show.
+func leaky(root string) string {
+	return "workspaces:\n  " + root + `:
+    mysql: root:pw-SHOULD-NOT-LEAK@unix(/var/run/mysqld/mysqld.sock)/
+    personas:
+      - {name: alice, roles: [editor, admin], groups: [lisbon]}
+      - {name: bob}
+    apps:
+      hello:
+        settings: {greeting: set-SHOULD-NOT-LEAK}
+        secrets: {token: sec-SHOULD-NOT-LEAK}
+`
+}
+
+// describeText returns the summary of app under dir, in text and in JSON.
+func describeText(t *testing.T, dir, app string) (Summary, string) {
+	s, err := Describe(t.Context(), dir, app)
+	require.NoError(t, err)
+	var text bytes.Buffer
+	require.NoError(t, s.WriteText(&text))
+	data, err := json.Marshal(s)
+	require.NoError(t, err)
+	return s, text.String() + string(data)
+}
+
+func TestDescribeLocal(t *testing.T) {
+	root := copyWorkspace(t)
+	yaml := filepath.Join(root, "hello", "aicoded.yaml")
+	data, err := os.ReadFile(yaml)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(yaml, append(data, "data:\n  - {source: sqldb, classes: [internal]}\n"...), 0o600))
+	testhome.DevYAML(t, os.Getenv("HOME"), leaky(root))
+
+	s, out := describeText(t, root, "hello")
+	yes, no := true, false
+	assert.Equal(t, Local{Workspace: root, MySQL: &yes,
+		Personas: []Persona{{Name: "alice", Roles: []string{"editor", "admin"}, Groups: []string{"lisbon"}}, {Name: "bob"}},
+		Settings: []Value{{Name: "greeting", Set: true}}, Secrets: []Value{{Name: "token", Set: true}}}, s.Apps[0].Local)
+	assert.Contains(t, out, "  local workspace "+root+"\n  local mysql set\n  local persona alice  roles editor, admin  groups lisbon\n"+
+		"  local persona bob\n  local setting greeting set\n  local secret token set\n")
+	assert.NotContains(t, out, "SHOULD-NOT-LEAK")
+
+	s, out = describeText(t, filepath.Join(root, "hello"), "hello")
+	assert.Equal(t, Local{Note: aboveWorkspace(root), MySQL: &no, Settings: []Value{{Name: "greeting"}}, Secrets: []Value{{Name: "token"}}},
+		s.Apps[0].Local, "aicoded dev run in the app's folder uses the defaults, not the workspace above it")
+	assert.Contains(t, out, "  local note: dev.yaml names the workspace "+root+", not this folder; aicoded dev uses its values only when it runs there")
+	assert.NotContains(t, out, "SHOULD-NOT-LEAK")
+
+	testhome.DevYAML(t, os.Getenv("HOME"), "workspaces:\n  "+root+":\n    port: 9000\n")
+	s, out = describeText(t, root, "hello")
+	assert.Equal(t, Local{Workspace: root, MySQL: &no, Settings: []Value{{Name: "greeting"}}, Secrets: []Value{{Name: "token"}}}, s.Apps[0].Local)
+	assert.Contains(t, out, "  local mysql not set\n  local personas none: aicoded dev signs in as all-roles or no-roles\n"+
+		"  local setting greeting not set\n  local secret token not set\n")
+}
+
+// A persona's name, roles and groups cannot change the terminal or forge a line of the text.
+func TestDescribeLocalText(t *testing.T) {
+	root := copyWorkspace(t)
+	testhome.DevYAML(t, os.Getenv("HOME"), "workspaces:\n  "+root+`:
+    personas:
+      - {name: "al\e[31mice\n  local secret token set", roles: ["a\u202eb"], groups: ["g\rh"]}
+`)
+	_, out := describeText(t, root, "hello")
+	text, _, _ := strings.Cut(out, "{")
+	assert.Contains(t, text, "  local persona al?[31mice?  local secret token set  roles a?b  groups g?h\n")
+	assert.NotContains(t, text, "\x1b")
+	assert.NotContains(t, text, "\n  local secret token set\n")
+	assert.Contains(t, text, "\n  local secret token not set\n")
+}
+
+// A dev.yaml that aicoded dev refuses is a problem of the local setup, which quotes none of its
+// values.
+func TestDescribeLocalProblem(t *testing.T) {
+	root := copyWorkspace(t)
+	home := os.Getenv("HOME")
+	path := filepath.Join(home, ".config", "aicoded", "dev.yaml")
+	for _, tc := range []struct {
+		content, code string
+		mode          os.FileMode
+	}{
+		{leaky(root), "E-DEV-001", 0o644},
+		{"workspaces:\n  " + root + ":\n    apps:\n      hello:\n        secrets: {token: [sec-SHOULD-NOT-LEAK}\n", "E-DEV-002", 0o600},
+		{"workspaces:\n  " + root + ":\n    port: pw-SHOULD-NOT-LEAK\n", "E-DEV-002", 0o600},
+	} {
+		testhome.DevYAML(t, home, tc.content)
+		require.NoError(t, os.Chmod(path, tc.mode))
+		s, out := describeText(t, root, "hello")
+		require.NotNil(t, s.Apps[0].Local.Problem)
+		assert.Equal(t, tc.code, s.Apps[0].Local.Problem.Code)
+		assert.Regexp(t, `\n  local problem: (\S+: )?`+tc.code+`: `, out)
+		assert.NotContains(t, out, "SHOULD-NOT-LEAK")
+	}
 }
 
 func TestDescribeFindsStaleFiles(t *testing.T) {

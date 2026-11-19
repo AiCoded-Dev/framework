@@ -193,6 +193,9 @@ type Release struct {
 	Reason string `json:"reason,omitempty"`
 	// Live is whether the release went live.
 	Live bool `json:"live"`
+	// URL is the address viewers open, https://<host>/, present while the release is live. An
+	// older platform leaves it out.
+	URL string `json:"url,omitempty"`
 }
 
 // Parent is the publish before another.
@@ -363,11 +366,21 @@ func (c *Client) Publish(ctx context.Context, id string) (Publish, error) {
 	return p, nil
 }
 
-// valid reports whether the ids, commits and status of p are well formed.
+// valid reports whether the ids, commits, status and address of p are well formed, and whether
+// only a live release has an address.
 func (p *Publish) valid() bool {
 	_, known := statuses[p.Status]
 	return known && commitSHA.MatchString(p.SHA) &&
-		(p.Parent == nil || PublishID.MatchString(p.Parent.ID) && commitSHA.MatchString(p.Parent.SHA))
+		(p.Parent == nil || PublishID.MatchString(p.Parent.ID) && commitSHA.MatchString(p.Parent.SHA)) &&
+		(p.Release == nil || p.Release.URL == "" || p.Release.Live && address(p.Release.URL))
+}
+
+// address reports whether s is the address of an app: https://, a host name and /, with no port,
+// user info, path, query or fragment.
+func address(s string) bool {
+	host, https := strings.CutPrefix(s, "https://")
+	host, slash := strings.CutSuffix(host, "/")
+	return https && slash && len(host) <= 253 && hostName.MatchString(host)
 }
 
 // clean makes every text of p fit to print, and gives every problem and note the docs link of

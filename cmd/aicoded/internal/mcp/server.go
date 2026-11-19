@@ -37,8 +37,9 @@ Work in this loop:
    call publish with the app and a summary of the change. It sends the commit to the platform's
    delivery pipeline and returns a publish id at once. Call release_status with that id until
    the status is passed, failed, refused or error, tell the person the outcome, with the release
-   of a publish that passed (Pre-approved, Needs approval and why, or Not released), and fix its
-   problems as you fix check's. On E-CLI-004, ask the person to run aicoded login.
+   of a publish that passed (Pre-approved, Needs approval and why, or Not released) and, once it
+   is live, the address in release.url, and fix its problems as you fix check's. Never guess an
+   address. On E-CLI-004, ask the person to run aicoded login.
 6. Only when the person asks for a preview on the platform: call preview_publish with the id of
    a publish that passed, and tell the person its url. preview_end ends it. Invite no one: the
    person picks who sees the preview, in the console.
@@ -46,7 +47,10 @@ aicoded.yaml is the app's permission list: write app, owner, data, email, settin
 and modules by hand.
 aicoded generate writes its access and services sections, every *_gen.go and *_gen.ts file,
 pages/assets_gen/ and .aicoded/. Never edit them.
-describe summarises the apps, and howto with an error code such as E-DEV-001 explains it.
+describe summarises the apps, with the personas and which local values dev.yaml sets, and howto
+with an error code such as E-DEV-001 explains it. Never open, print or copy dev.yaml,
+credentials.json or any other file of aicoded's config folder: they hold passwords and keys.
+aicoded whoami tells the organisation and the sign-in.
 logs, traces, trace, mail_list and mail_get show what aicoded dev saw; mail_receive delivers a test mail.
 With env preview or production, logs, traces and trace read one app on the platform with the
 person's sign-in. Read them only when the person asks, such as to find why a published app fails:

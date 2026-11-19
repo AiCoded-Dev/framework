@@ -316,7 +316,18 @@
           "calls": [],
           "forms": []
         }
-      ]
+      ],
+      "local": {
+        "workspace": "",
+        "note": "dev.yaml names no workspace at or above this folder, so aicoded dev runs the apps here with its defaults: no local MySQL server, no local values, and the personas all-roles and no-roles; howto E-DEV-002 shows the format of dev.yaml",
+        "mysql": false,
+        "settings": [
+          {
+            "name": "team_address",
+            "set": false
+          }
+        ]
+      }
     }
   ]
 }

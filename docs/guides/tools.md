@@ -102,8 +102,10 @@ aicoded check: ok
 its app type, owner and audience, pages with their access rules, functions served and called,
 database, file stores, connectors, mail, outside services, scheduled jobs, settings, the names of
 its secrets, the modules it declares, its size, resources and review period, the tables its SQL
-writes, its surface, and generated files that are out of date. Each line shows only when the app
-has the item. It writes nothing. For the room-maintenance example it prints:
+writes, its surface, generated files that are out of date, and its local setup in `dev.yaml`,
+never a value of it: see [aicoded dev](dev.md). Each line shows only when the app has the
+item. It writes nothing. For the room-maintenance example, in a workspace whose `dev.yaml` names
+`mysql:` and one persona, it prints:
 
 ```text
 app room-maintenance (/home/me/apps/room-maintenance)
@@ -121,7 +123,19 @@ app room-maintenance (/home/me/apps/room-maintenance)
   ttl 180d
   writes INSERT rooms, INSERT tickets, UPDATE tickets
   surface 5 (5 entry points, 3 effects)
+  local workspace /home/me/apps
+  local mysql set
+  local persona alice  roles staff, hotel-ops  groups lisbon
 ```
+
+The `local` lines come from `dev.yaml`, as `aicoded dev` run in the described folder uses it: the
+workspace it holds for that folder; `local mysql set` or `not set`, for an app that declares
+`sqldb`; each persona with its roles and groups, or `local personas none` when `aicoded dev` uses
+`all-roles` and `no-roles`; and `local setting <name> set` or `not set`, and the same for each
+secret, by name. When `dev.yaml` holds no workspace for the folder itself, `local note:` says
+what `aicoded dev` does then, and names the nearest folder above it that has one, whose values
+`aicoded dev` uses only when it runs there; when `aicoded dev` cannot read `dev.yaml`,
+`local problem:` gives the code, such as E-DEV-001.
 
 An app with more in its permission list gets more lines, such as `connectors crm` after
 `files`, `egress api.partner.example` and `schedule daily-summary  cron 0 6 * * *` after the
@@ -270,8 +284,9 @@ record. [Publishing](publishing.md) tells the whole story.
 ## aicoded status
 
 `aicoded status [--json] <id>` prints a publish as the end of `aicoded publish` does, at once:
-its steps, its problems, its notes, the decision on releasing it and its status, `queued`,
-`running`, `passed`, `failed`, `refused` or `error`. `--json` prints the publish as JSON. It exits
+its steps, its problems, its notes, the decision on releasing it, with `Live at <address>` once
+the release is live, and its status, `queued`, `running`, `passed`, `failed`, `refused` or
+`error`. `--json` prints the publish as JSON, the address as `release.url`. It exits
 with 1 when the publish failed, was refused or ended in error. An id is `pub_` and 26 lowercase
 letters and digits; another shape exits with 2. An id the platform does not know in your organisation is E-PUB-013, a publish of
 another builder's app E-PUB-005, and one of an app of yours that was archived E-PUB-006.

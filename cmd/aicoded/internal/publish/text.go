@@ -81,8 +81,8 @@ func writeProblem(b *strings.Builder, prefix, app string, q problem.Problem) {
 }
 
 // writeRelease writes the decision r on releasing a publish, in the words people see: the tier
-// with its app type or its reasons, and what became of the release, which an approver must
-// approve unless it is declined.
+// with its app type or its reasons, what became of the release, which an approver must approve
+// unless it is declined, and the address of a live release.
 func writeRelease(b *strings.Builder, r platform.Release, declined bool) {
 	if r.Tier == "R3" {
 		b.WriteString("  Not allowed" + reason(r.Reason) + ".\n")
@@ -126,6 +126,9 @@ func writeRelease(b *strings.Builder, r platform.Release, declined bool) {
 		}
 	default:
 		fmt.Fprintf(b, "  release: %s, %s\n", r.Tier, r.State)
+	}
+	if r.Live && r.URL != "" {
+		fmt.Fprintf(b, "  Live at %s\n", r.URL)
 	}
 }
 

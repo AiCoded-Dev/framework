@@ -69,6 +69,14 @@ type Release struct {
 	State   string    `json:"state"`
 	Reason  string    `json:"reason,omitempty"`
 	Live    bool      `json:"live"`
+	URL     string    `json:"url,omitempty"`
+}
+
+// Live is the decision on releasing a publish of app that is Pre-approved and live, at the
+// address of app in production.
+func Live(app string) *Release {
+	return &Release{Tier: "R1", AppType: "internal-tool@builtin", Reasons: []Problem{}, State: "released", Live: true,
+		URL: "https://" + app + "." + Org + ".apps.aicoded.cloud/"}
 }
 
 // Parent is the publish before another.

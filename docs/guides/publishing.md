@@ -259,7 +259,8 @@ passed
 ```
 
 - `Pre-approved by app type <type>: going live.`: the platform releases it on its own, and the
-  line says `live` once the new version serves.
+  line says `live` once the new version serves, followed by `Live at <address>`, the address
+  people open, such as `https://room-maintenance.acme.apps.aicoded.cloud/`.
 - `Needs approval:`, then a line for each reason, then
   `An approver must approve it before it goes live.`: the permission list asks for more than the
   app type allows, or the release holds a change that always needs an approver, such as a
@@ -270,16 +271,21 @@ passed
   approval card. The declined publish's schema changes left the app's migrations, and the draft
   was cleared when it passed, so put the ones you still want back in `.aicoded/migration.sql`; a
   publish made on top of them meanwhile fails with E-MIG-004.
+- `Released: live.`, then `Live at <address>`: an approver approved it, and it serves.
 - `Released: replaced by a newer release.`: the release went live, and a newer release of the
   app has since taken its place.
 - `Release failed:` and why: the release did not go live where the app runs.
 - `Not released:` and why: a newer publish of the app came after it, or the platform refused the
   release, such as one with scheduled jobs (E-REL-017).
 
+Tell people the address that `Live at` or `url` gives: never work it out from the app's name.
+Only a live release has one, and a platform older than this `aicoded` gives none.
+
 `aicoded status --json` and the `release_status` tool give the same in `release`: its `tier`
 (`R1` for *Pre-approved*, `R2` for *Needs approval*), its `app_type`, its `reasons`, its `state`
 (`due`, `waiting`, `released`, `failed`, `replaced`, `refused` or `superseded`), the `reason` of
-a refusal or a failure, and whether it is `live`; a declined approval card is in `declined`, with
+a refusal or a failure, whether it is `live`, and, while it is, its `url`, the address people
+open; a declined approval card is in `declined`, with
 the approver's email as `by`, the `reason` and the time `at`. [App types](app-types.md) tells how
 the platform decides.
 

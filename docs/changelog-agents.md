@@ -4,6 +4,24 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- Never open, print or copy `dev.yaml`, `credentials.json` or any other file of `aicoded`'s
+  config folder: they hold passwords and keys. `AGENTS.md` and the MCP server's instructions say
+  so; `describe` tells what you need from them, and `aicoded whoami` the organisation and the
+  sign-in.
+
+- `aicoded describe` and the `describe` tool give each app's local setup in `dev.yaml`, as
+  `local` in JSON and `local` lines in text, as `aicoded dev` run in the described folder uses it:
+  whether `dev.yaml` holds a workspace for that folder (a `note` names a folder above it that has
+  one), whether `mysql:` is set for an app that declares `sqldb`, the personas with their roles and
+  groups, and each setting and secret of the permission list with whether it has a local value.
+  They never show a value, the MySQL DSN included; a `dev.yaml` that `aicoded dev` refuses shows as
+  `problem`, with its code.
+
+- Once a release is live, `aicoded publish` and `aicoded status` print `Live at <address>`, and
+  `release_status` and `aicoded status --json` give the address as `release.url`, such as
+  `https://room-maintenance.acme.apps.aicoded.cloud/`. Tell the person that address; never work
+  one out from the app's name. A platform older than this `aicoded` sends none.
+
 - E-ORG-001 to E-ORG-006: the deletion of an organisation by the platform's operator, with
   `admin orgs delete`. Apps and builders do not meet them: an organisation being deleted refuses
   every sign-in, publish and preview, and its apps stop.

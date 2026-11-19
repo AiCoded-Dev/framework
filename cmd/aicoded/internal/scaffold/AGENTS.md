@@ -106,10 +106,10 @@ not for changing the framework itself. Follow them in every change.
    generated file that is out of date: run it before you commit.
 5. `aicoded explain <topic>` prints a page of the docs, such as `guides/forms` or an error code.
 
-Local values live outside the repository, in the developer's `dev.yaml`: the values of settings
-and secrets, `mysql:` for an app with a database, and the test personas. Its format is on the
-page `aicoded explain E-DEV-002` prints. When an app lacks a value (E-DEV-003), ask the developer
-to add it, and never copy a value from `dev.yaml` into the app.
+Local values live outside the repository, in the developer's `dev.yaml`. Never open, print or
+copy it, `credentials.json` or any file of `aicoded`'s config folder: they hold passwords and keys.
+`aicoded describe` tells which values, `mysql:` and personas are set; `aicoded whoami` tells the
+organisation and sign-in. Ask the developer to add a missing value (E-DEV-003; format: E-DEV-002).
 
 With MCP, the same loop is a set of tools that take app names, never paths. Add the server with
 `claude mcp add aicoded -- aicoded mcp` in the workspace folder, or as the dev UI shows:
@@ -123,15 +123,15 @@ With MCP, the same loop is a set of tools that take app names, never paths. Add 
 
 ## Publishing
 
-Publish only when the developer asks, and commit everything first: a publish sends the commit
-`HEAD` names, never what is not committed. Run `aicoded publish` in the app's folder, or call the
-MCP tool `publish` with the app and a summary: it runs `aicoded check --frozen` without the tests,
-sends the commit to the platform's delivery pipeline and gives a publish id. `aicoded status <id>`,
-or `release_status`, shows the steps, the problems, the notes (which never stop a publish) and the
-outcome. Tell the developer the outcome, and fix its problems as those of `aicoded check`. On
-E-CLI-004, ask the developer to run `aicoded login`: signing in needs a person. Only when asked,
-`aicoded preview <id>` or `preview_publish` runs a publish that passed as the app's preview on the
-platform, and `preview_end` ends it. Invite no one: the developer picks who sees it, in the console.
+Publish only when the developer asks, and commit everything first: a publish sends the commit `HEAD`
+names, never what is not committed. Run `aicoded publish` in the app's folder, or call the MCP tool
+`publish` with the app and a summary: it runs `aicoded check --frozen` without the tests, sends the
+commit to the platform's delivery pipeline and gives a publish id. `aicoded status <id>`, or
+`release_status`, shows the steps, the problems, the notes (which never stop a publish) and the
+outcome. Tell the developer the outcome and, once live, the address `Live at` or `release.url`
+gives; never guess one. Fix problems as with `aicoded check`. On E-CLI-004, ask the developer to run
+`aicoded login`. Only when asked, `aicoded preview <id>` or `preview_publish` previews a publish
+that passed, and `preview_end` ends it. Invite no one: the developer picks who sees it.
 
 ## Where to read
 

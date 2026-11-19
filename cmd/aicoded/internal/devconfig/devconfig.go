@@ -92,55 +92,40 @@ func DefaultPath() (string, error) {
 // Load returns the settings for the workspace rooted at root. A missing file gives defaults.
 // Personas stay empty when the workspace names none; the caller picks the defaults.
 func Load(path, root string) (Workspace, error) {
-	f, err := os.Open(path)
-	if errors.Is(err, fs.ErrNotExist) {
-		return withDefaults(Workspace{}), nil
-	}
+	c, err := read(path)
 	if err != nil {
 		return Workspace{}, err
-	}
-	defer f.Close()
-	st, err := f.Stat()
-	if err != nil {
-		return Workspace{}, err
-	}
-	if perm := st.Mode().Perm(); perm&0o077 != 0 {
-		return Workspace{}, errs.New("E-DEV-001", fmt.Sprintf("%s can be read by other users (mode %04o)", path, perm),
-			"run: chmod 600 "+path)
-	}
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return Workspace{}, err
-	}
-	var c config
-	dec := yaml.NewDecoder(bytes.NewReader(data))
-	dec.KnownFields(true)
-	if err := dec.Decode(&c); err != nil && !errors.Is(err, io.EOF) {
-		var env envError
-		if errors.As(err, &env) {
-			return Workspace{}, errs.At(fmt.Sprintf("%s:%d", path, env.line), "E-DEV-020", "env in dev.yaml must be dev or preview",
-				"set env: to dev or preview, or remove the line to run the apps as dev")
-		}
-		return Workspace{}, invalid(path, err)
-	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return Workspace{}, invalid(path, err)
-	}
-	if line := badPersona(&doc); line > 0 {
-		return Workspace{}, errs.At(fmt.Sprintf("%s:%d", path, line), "E-DEV-021", "a persona's name in dev.yaml must be 1 to 512 bytes",
-			"give the persona a name of 1 to 512 bytes")
 	}
 	return withDefaults(c.Workspaces[root]), nil
+}
+
+// Find returns what Load does, whether the dev.yaml at path names the workspace root, and, when
+// it does not, the nearest folder above root, an absolute path, that it names, or "".
+func Find(path, root string) (ws Workspace, found bool, above string, err error) {
+	c, err := read(path)
+	if err != nil {
+		return Workspace{}, false, "", err
+	}
+	ws, found = c.Workspaces[root]
+	for dir := root; !found && filepath.Dir(dir) != dir; {
+		dir = filepath.Dir(dir)
+		if _, ok := c.Workspaces[dir]; ok {
+			return withDefaults(ws), false, dir, nil
+		}
+	}
+	return withDefaults(ws), found, "", nil
 }
 
 // MySQL returns the MySQL admin DSN for the folder dir, an absolute path: that of the workspace of
 // the nearest folder at or above dir that names one in the dev.yaml at path, or "".
 func MySQL(path, dir string) (string, error) {
+	c, err := read(path)
+	if err != nil {
+		return "", err
+	}
 	for {
-		ws, err := Load(path, dir)
-		if err != nil || ws.MySQL != "" {
-			return ws.MySQL, err
+		if dsn := c.Workspaces[dir].MySQL; dsn != "" {
+			return dsn, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -148,6 +133,50 @@ func MySQL(path, dir string) (string, error) {
 		}
 		dir = parent
 	}
+}
+
+// read returns the dev.yaml at path, or an empty one when there is none.
+func read(path string) (config, error) {
+	f, err := os.Open(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return config{}, nil
+	}
+	if err != nil {
+		return config{}, err
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		return config{}, err
+	}
+	if perm := st.Mode().Perm(); perm&0o077 != 0 {
+		return config{}, errs.New("E-DEV-001", fmt.Sprintf("%s can be read by other users (mode %04o)", path, perm),
+			"run: chmod 600 "+path)
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return config{}, err
+	}
+	var c config
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&c); err != nil && !errors.Is(err, io.EOF) {
+		var env envError
+		if errors.As(err, &env) {
+			return config{}, errs.At(fmt.Sprintf("%s:%d", path, env.line), "E-DEV-020", "env in dev.yaml must be dev or preview",
+				"set env: to dev or preview, or remove the line to run the apps as dev")
+		}
+		return config{}, invalid(path, err)
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return config{}, invalid(path, err)
+	}
+	if line := badPersona(&doc); line > 0 {
+		return config{}, errs.At(fmt.Sprintf("%s:%d", path, line), "E-DEV-021", "a persona's name in dev.yaml must be 1 to 512 bytes",
+			"give the persona a name of 1 to 512 bytes")
+	}
+	return c, nil
 }
 
 // badPersona returns the line of the first persona in doc, in any workspace, whose name is empty

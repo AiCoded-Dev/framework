@@ -244,7 +244,7 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 			return withDev(ctx, s, func(b devapi.Backend) (devapi.Broken, error) { return b.WhatBroke(ctx, in.App) })
 		})
 	tool(srv, &mcpsdk.Tool{Name: "describe", Annotations: readOnly,
-		Description: "Summarise the apps: app type, owner and audience, pages and their access rules, every page and layout with its URL parameters and forms, functions served and called, data, mail, outside services, scheduled jobs, settings, secret names, third-party modules, size and resource limits, the tables their SQL writes, their surface, and generated files that are out of date."},
+		Description: "Summarise the apps: app type, owner and audience, pages and their access rules, every page and layout with its URL parameters and forms, functions served and called, data, mail, outside services, scheduled jobs, settings, secret names, third-party modules, size and resource limits, the tables their SQL writes, their surface, generated files that are out of date, and local, their setup in dev.yaml for aicoded dev: the workspace, whether a local MySQL server is set, the personas with their roles and groups, and whether each setting and secret has a local value, never a value."},
 		func(ctx context.Context, in anyAppIn) (describe.Summary, error) {
 			if err := validApp(in.App, true); err != nil {
 				return describe.Summary{}, err
@@ -333,7 +333,7 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 		s.publish)
 	tool(srv, &mcpsdk.Tool{Name: "release_status", Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &yes},
 		InputSchema: releaseStatusSchema,
-		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, the problems with their code, file:line and fix, and the notes, in the same shape, which do not stop the publish; release, the decision on releasing a publish that passed: its tier (R1 Pre-approved, R2 Needs approval, R3 Not allowed), the app type, the reasons it needs approval, its state (due, waiting, released, failed, replaced, refused or superseded) and whether it is live; and draft, what became of the app's schema-change draft, .aicoded/migration.sql: sent with a publish that has not ended, settled (deleted once that publish passed, or kept, as draft_note says), or none."},
+		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, the problems with their code, file:line and fix, and the notes, in the same shape, which do not stop the publish; release, the decision on releasing a publish that passed: its tier (R1 Pre-approved, R2 Needs approval, R3 Not allowed), the app type, the reasons it needs approval, its state (due, waiting, released, failed, replaced, refused or superseded), whether it is live and, while it is, url, the address its viewers open; and draft, what became of the app's schema-change draft, .aicoded/migration.sql: sent with a publish that has not ended, settled (deleted once that publish passed, or kept, as draft_note says), or none."},
 		s.releaseStatus)
 	changesPreview := &mcpsdk.ToolAnnotations{DestructiveHint: &yes, OpenWorldHint: &yes}
 	tool(srv, &mcpsdk.Tool{Name: "preview_publish", Annotations: changesPreview, InputSchema: previewPublishSchema,
@@ -423,7 +423,7 @@ func (s *server) publish(ctx context.Context, in publishIn) (publishOut, error) 
 		state.DraftNote = err.Error()
 	}
 	return publishOut{ID: sent.ID, App: sent.App, SHA: sent.SHA, CreatedApp: sent.CreatedApp, draftState: state,
-		Next: fmt.Sprintf("call release_status with id %q about every 30 seconds until its status is passed, failed, refused or error, then tell the person the outcome; the delivery pipeline takes a few minutes", sent.ID)}, nil
+		Next: fmt.Sprintf("call release_status with id %q about every 30 seconds until its status is passed, failed, refused or error, then tell the person the outcome and, once the release is live, its address, release.url; the delivery pipeline takes a few minutes", sent.ID)}, nil
 }
 
 // checkFailed is the tool error of a publish that aicoded check refused: each problem, then

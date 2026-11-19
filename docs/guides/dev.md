@@ -67,6 +67,15 @@ workspaces:
   [settings and secrets](settings-and-secrets.md).
 - `dev.yaml` is read again at every start of an app, so after adding a value, change a file of the
   app, press Restart on the dev UI or call the `preview` tool.
+- Your AI assistant never opens `dev.yaml`, nor `credentials.json` or any other file of
+  `aicoded`'s config folder, as they hold passwords and keys. `aicoded describe` and the
+  `describe` tool tell it what it needs, never a value: whether `dev.yaml` holds a workspace for
+  the folder they describe; for an app that declares `sqldb`, whether `mysql:` is set; the
+  personas with their roles and groups; and each setting and secret of the app's permission list
+  with whether it has a local value. They report what `aicoded dev` run in that folder uses, so a
+  workspace for a folder above it does not count: a note names that folder, whose values
+  `aicoded dev` uses only when it runs there. A `dev.yaml` that `aicoded dev` refuses shows as the
+  problem, with its code. `aicoded whoami` tells the organisation and the sign-in.
 
 ## Personas
 
