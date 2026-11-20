@@ -62,7 +62,22 @@ func TestWriteTextDecision(t *testing.T) {
 		"failed":       {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "failed", Reason: "the app did not start"}, "  Release failed: the app did not start.\n"},
 		"failed bare":  {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons, State: "failed"}, "  Release failed.\n"},
 		"R3":           {&platform.Release{Tier: "R3", AppType: "internal-tool@builtin", State: "refused", Reason: "E-REL-021: the source sqldb holds hr data"}, "  Not allowed: E-REL-021: the source sqldb holds hr data.\n"},
-		"superseded":   {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons, State: "superseded"}, "  Not released: a newer publish of the app came after it.\n"},
+		"R1 held": {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "held"}, "  Pre-approved by app type internal-tool.\n" +
+			"  Held for preview, not live: its owner asks for its release with aicoded release pub_x.\n"},
+		"R2 held": {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons[:1], State: "held"}, "  Needs approval:\n" +
+			"    E-GATE-041: mail to partner.example, which the app type internal-tool does not allow\n" +
+			"  It will need approval once you ask for its release.\n" +
+			"  Held for preview, not live: its owner asks for its release with aicoded release pub_x.\n"},
+		"held over waiting": {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "held", Replaced: "pub_old",
+			ReplacedState: "waiting"}, "  Pre-approved by app type internal-tool.\n  Held for preview, not live: its owner asks for its release with aicoded release pub_x.\n" +
+			"  This publish replaced pub_old, which was waiting for approval; its approval card is gone. Ask for this one's release to get a new card.\n"},
+		"held over due": {&platform.Release{Tier: "R1", AppType: "internal-tool@builtin", State: "held", Replaced: "pub_old",
+			ReplacedState: "due"}, "  Pre-approved by app type internal-tool.\n  Held for preview, not live: its owner asks for its release with aicoded release pub_x.\n" +
+			"  This publish replaced pub_old, which was going live; it will not go live. Ask for this one's release instead.\n"},
+		"waits over due": {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons[:1], State: "waiting", Replaced: "pub_old",
+			ReplacedState: "due"}, "  Needs approval:\n    E-GATE-041: mail to partner.example, which the app type internal-tool does not allow\n" +
+			"  An approver must approve it before it goes live.\n  This publish replaced pub_old, which was going live; it will not go live.\n"},
+		"superseded": {&platform.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: reasons, State: "superseded"}, "  Not released: a newer publish of the app came after it.\n"},
 	} {
 		var b strings.Builder
 		require.NoError(t, WriteText(&b, platform.Publish{ID: "pub_x", App: "demo", SHA: "1a2b3c4d", Status: "passed", Record: 7, Release: tc.release}))

@@ -41,12 +41,18 @@ func runPreview(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stderr, err)
 	}
+	printPreview(stdout, pv)
+	return exitOK
+}
+
+// printPreview prints the preview pv: its address, when it expires, whether its data was reset,
+// and who invites people to it.
+func printPreview(stdout io.Writer, pv platform.Preview) {
 	fmt.Fprintf(stdout, "Preview of %s at %s until %s.\n", pv.App, pv.URL, pv.Expires.Format(time.RFC3339))
 	if pv.Reset {
 		fmt.Fprintln(stdout, "Its data was reset: the preview had run schema changes that this publish does not continue.")
 	}
 	fmt.Fprintln(stdout, "Invite up to five people in the console.")
-	return exitOK
 }
 
 // runPreviewEnd runs aicoded preview end with the arguments after it.

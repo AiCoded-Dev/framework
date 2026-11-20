@@ -62,6 +62,8 @@ Signing in to the platform uses these codes:
 - E-CLI-007: a credentials file or folder that others can read.
 - E-CLI-008: a sign-in that was not finished in time.
 - E-CLI-009: a sign-in that the platform could not refresh right now.
+- E-CLI-010: a platform older than this `aicoded`, which does not hold publishes for their
+  owner's preview.
 
 Publishing uses these codes:
 
@@ -181,6 +183,19 @@ start that the platform refuses, so that a preview that runs keeps its version:
 - E-REL-029: a publish that has not passed its checks, or whose approval card was declined.
 - E-REL-030: a setting or a secret that the permission list declares and that has no value set
   for the preview in the console.
+
+Asking for the release of a publish held for its owner's preview, with `aicoded release`, the
+`release` tool or the console, uses these codes, each a request that the platform refuses, so
+that nothing is released:
+
+- E-REL-037: a publish that is not held for its owner's preview, as one published with
+  `--release` or one that has not passed its checks, or a request by the platform's operator, for
+  a held publish or one that was held and whose release was never asked for.
+  Anyone else but the app's owner is refused with E-PUB-005, or in the console with 403.
+- E-REL-038: a publish superseded by a newer publish of the app.
+
+E-REL-039 is a note on a held publish, for an `aicoded` older than v0.13.0, which does not know
+the held state.
 
 E-REL-031 refuses the app's owner a sixth person to see the app's preview, in the console.
 

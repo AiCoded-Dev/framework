@@ -35,6 +35,9 @@ type Options struct {
 	App string
 	// Summary says what changed, for the change record; "" takes the subject of the commit.
 	Summary string
+	// Release asks for the release at once, once the publish passed, skipping its owner's
+	// preview, for which the platform otherwise holds it.
+	Release bool
 }
 
 // Commit is a commit of an app that Prepare checked.
@@ -46,6 +49,8 @@ type Commit struct {
 	Summary string
 	// Migration is the app's draft, .aicoded/migration.sql, which the publish carries, or "".
 	Migration string
+	// Release is Options.Release.
+	Release bool
 }
 
 // CheckError is E-PUB-004, with the report of aicoded check, which found problems.
@@ -111,7 +116,7 @@ func Prepare(ctx context.Context, dir string, opts Options) (Commit, error) {
 		}
 		summary = summarize(s)
 	}
-	return Commit{Dir: dir, App: m.App, SHA: sha, Summary: summary, Migration: string(migration)}, nil
+	return Commit{Dir: dir, App: m.App, SHA: sha, Summary: summary, Migration: string(migration), Release: opts.Release}, nil
 }
 
 // summarize returns s without control or format characters, with a space for each line break or
@@ -160,7 +165,8 @@ type Sent struct {
 
 // Send sends the commit to the platform's delivery pipeline: the history since the app's base,
 // which it asks the platform for, or all of it, and the draft. An archived app is E-PUB-006, and
-// a commit the app has published already E-PUB-007. When another publish changes the base
+// a commit the app has published already E-PUB-007, whose fix, when that publish is held for its
+// owner's preview, is to release it. When another publish changes the base
 // meanwhile, it asks again and sends once more. The cache of the published migrations then keeps
 // the publish that carried the draft, so that Settle can clear the draft once it passed.
 func Send(ctx context.Context, c *platform.Client, cm Commit) (Sent, error) {
@@ -172,6 +178,10 @@ func Send(ctx context.Context, c *platform.Client, cm Commit) (Sent, error) {
 		switch {
 		case app.Archived:
 			return Sent{}, errs.New("E-PUB-006", "the app "+cm.App+" is archived on the platform", platform.Fix("E-PUB-006"))
+		case app.Last != nil && cm.SHA == app.Last.SHA && held(ctx, c, app.Last.ID):
+			return Sent{}, errs.New("E-PUB-007", "this commit is already published to the app as publish "+app.Last.ID+
+				", which is held for its owner's preview", "preview it with aicoded preview "+app.Last.ID+
+				", and release it only when the owner asks: aicoded release "+app.Last.ID)
 		case cm.SHA == app.Base || app.Last != nil && cm.SHA == app.Last.SHA:
 			return Sent{}, errs.New("E-PUB-007", fmt.Sprintf("%s already published the commit %s", cm.App, short(cm.SHA)),
 				platform.Fix("E-PUB-007"))
@@ -180,7 +190,8 @@ func Send(ctx context.Context, c *platform.Client, cm Commit) (Sent, error) {
 		if err != nil {
 			return Sent{}, err
 		}
-		created, err := c.CreatePublish(ctx, platform.Upload{App: cm.App, SHA: cm.SHA, Summary: cm.Summary, Migration: cm.Migration, Bundle: b})
+		created, err := c.CreatePublish(ctx, platform.Upload{App: cm.App, SHA: cm.SHA, Summary: cm.Summary, Migration: cm.Migration,
+			Release: cm.Release, Bundle: b})
 		switch {
 		case errors.Is(err, platform.ErrBaseChanged) && !retried:
 			continue
@@ -193,6 +204,13 @@ func Send(ctx context.Context, c *platform.Client, cm Commit) (Sent, error) {
 		}
 		return sent, nil
 	}
+}
+
+// held reports whether the publish id is held for its owner's preview, as far as the platform
+// says.
+func held(ctx context.Context, c *platform.Client, id string) bool {
+	p, err := c.Publish(ctx, id)
+	return err == nil && p.Release != nil && p.Release.State == "held"
 }
 
 // Settle clears the draft of the app in dir once p, a publish that carried it, has passed, as
@@ -238,18 +256,43 @@ var ErrTimeout = errors.New("the publish has not ended in time")
 // the last answer. A request that fails in a way that may pass, such as one with no answer, is
 // made again at the next turn, and the fifth such failure in a row ends the wait.
 func Wait(ctx context.Context, c *platform.Client, id string, every, limit time.Duration, progress io.Writer) (platform.Publish, error) {
+	return poll(ctx, c, id, every, limit, progress, platform.Publish.Done, func(p platform.Publish) string { return p.Status })
+}
+
+// WaitRelease waits, as Wait does, until the release of the publish id, whose release was asked
+// for, has gone live, waits for an approver, or ended otherwise. It writes each state of the
+// release before then to w, such as going live.
+func WaitRelease(ctx context.Context, c *platform.Client, id string, every, limit time.Duration, w io.Writer) (platform.Publish, error) {
+	return poll(ctx, c, id, every, limit, w, func(p platform.Publish) bool { return !Releasing(p) }, func(p platform.Publish) string {
+		return progress(*p.Release)
+	})
+}
+
+// Releasing reports whether the release of p is on its way to production: due, or released and
+// not live yet.
+func Releasing(p platform.Publish) bool {
+	r := p.Release
+	return r != nil && (r.State == "due" || r.State == "released" && !r.Live)
+}
+
+// poll asks the platform for the publish id until done, as Wait describes, and writes each
+// label of an answer before then that differs from the one before to progress.
+func poll(ctx context.Context, c *platform.Client, id string, every, limit time.Duration, progress io.Writer,
+	done func(platform.Publish) bool, label func(platform.Publish) string) (platform.Publish, error) {
 	deadline := time.Now().Add(limit)
 	var last platform.Publish
+	shown := ""
 	for failed := 0; ; {
 		p, err := c.Publish(ctx, id)
 		switch code := errs.Code(err); {
 		case err == nil:
 			failed = 0
-			if p.Done() {
+			if done(p) {
 				return p, nil
 			}
-			if p.Status != last.Status {
-				_, _ = fmt.Fprintf(progress, "%s ...\n", p.Status)
+			if l := label(p); l != shown {
+				_, _ = fmt.Fprintf(progress, "%s ...\n", l)
+				shown = l
 			}
 			last = p
 		case ctx.Err() != nil:

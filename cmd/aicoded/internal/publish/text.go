@@ -52,10 +52,10 @@ func WriteText(w io.Writer, p platform.Publish) error {
 		fmt.Fprintf(&b, "  change record %d\n", p.Record)
 	}
 	if p.Release != nil {
-		writeRelease(&b, *p.Release, p.Declined != nil)
+		writeRelease(&b, p.ID, *p.Release, p.Declined != nil)
 	}
 	if d := p.Declined; d != nil {
-		fmt.Fprintf(&b, "  Declined by %s%s.\n  Publish again to ask for a new approval.\n"+
+		fmt.Fprintf(&b, "  Declined by %s%s.\n  Publish again and ask for its release to get a new approval card.\n"+
 			"  If it changed the schema, put the changes you still want back in .aicoded/migration.sql: they left the app's migrations.\n", d.By, reason(strings.ReplaceAll(d.Reason, "\n", " ")))
 	}
 	b.WriteString(p.Status)
@@ -80,10 +80,11 @@ func writeProblem(b *strings.Builder, prefix, app string, q problem.Problem) {
 	fmt.Fprintf(b, "  %s%s\n", prefix, strings.ReplaceAll(q.String(), "\n", "\n  "))
 }
 
-// writeRelease writes the decision r on releasing a publish, in the words people see: the tier
-// with its app type or its reasons, what became of the release, which an approver must approve
-// unless it is declined, and the address of a live release.
-func writeRelease(b *strings.Builder, r platform.Release, declined bool) {
+// writeRelease writes the decision r on releasing the publish id, in the words people see: the
+// tier with its app type or its reasons, what became of the release, which an approver must
+// approve unless it is declined, how to release a publish held for preview, the older publish it
+// replaced, and the address of a live release.
+func writeRelease(b *strings.Builder, id string, r platform.Release, declined bool) {
 	if r.Tier == "R3" {
 		b.WriteString("  Not allowed" + reason(r.Reason) + ".\n")
 		return
@@ -105,9 +106,12 @@ func writeRelease(b *strings.Builder, r platform.Release, declined bool) {
 		if appType, _, _ := strings.Cut(r.AppType, "@"); appType != "" {
 			by = " by app type " + appType
 		}
-		if r.State == "replaced" {
+		switch r.State {
+		case "held":
+			fmt.Fprintf(b, "  Pre-approved%s.\n", by)
+		case "replaced":
 			fmt.Fprintf(b, "  Pre-approved%s.\n  Released: %s.\n", by, progress(r))
-		} else {
+		default:
 			fmt.Fprintf(b, "  Pre-approved%s: %s.\n", by, progress(r))
 		}
 	case "R2":
@@ -119,17 +123,46 @@ func writeRelease(b *strings.Builder, r platform.Release, declined bool) {
 			}
 			fmt.Fprintf(b, "    %s\n", line)
 		}
-		if r.Live || r.State == "released" || r.State == "replaced" {
+		switch {
+		case r.Live || r.State == "released" || r.State == "replaced":
 			fmt.Fprintf(b, "  Released: %s.\n", progress(r))
-		} else if !declined {
+		case r.State == "held":
+			b.WriteString("  It will need approval once you ask for its release.\n")
+		case !declined:
 			b.WriteString("  An approver must approve it before it goes live.\n")
 		}
 	default:
 		fmt.Fprintf(b, "  release: %s, %s\n", r.Tier, r.State)
 	}
+	if r.State == "held" {
+		fmt.Fprintf(b, "  Held for preview, not live: its owner asks for its release with aicoded release %s.\n", id)
+	}
+	if r.Replaced != "" {
+		fmt.Fprintf(b, "  %s\n", Replaced(r))
+	}
 	if r.Live && r.URL != "" {
 		fmt.Fprintf(b, "  Live at %s\n", r.URL)
 	}
+}
+
+// Replaced says which older publish the release r replaced, and what became of it, or "" when it
+// replaced none. While r is held, it says how to get a new approval card or go live.
+func Replaced(r platform.Release) string {
+	if r.Replaced == "" {
+		return ""
+	}
+	if r.ReplacedState == "waiting" {
+		s := "This publish replaced " + r.Replaced + ", which was waiting for approval; its approval card is gone."
+		if r.State == "held" {
+			s += " Ask for this one's release to get a new card."
+		}
+		return s
+	}
+	s := "This publish replaced " + r.Replaced + ", which was going live; it will not go live."
+	if r.State == "held" {
+		s += " Ask for this one's release instead."
+	}
+	return s
 }
 
 // progress says how far the release of r got.

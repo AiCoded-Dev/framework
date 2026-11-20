@@ -77,6 +77,8 @@ func TestPreviewStartChecksTheAnswer(t *testing.T) {
 		"http":            func(a map[string]any) { a["url"] = "http://demo.acme.preview.aicoded.cloud/" },
 		"another host":    func(a map[string]any) { a["url"] = "https://evil.example/" },
 		"a user":          func(a map[string]any) { a["url"] = "https://x@demo.acme.preview.aicoded.cloud/" },
+		"a path":          func(a map[string]any) { a["url"] = "https://demo.acme.preview.aicoded.cloud/admin" },
+		"a port":          func(a map[string]any) { a["url"] = "https://demo.acme.preview.aicoded.cloud:8443/" },
 		"no expiry":       func(a map[string]any) { delete(a, "expires") },
 	} {
 		answer := map[string]any{}
@@ -146,4 +148,34 @@ func answering(t *testing.T, status int, body any) *platform.Client {
 	t.Cleanup(srv.Close)
 	require.NoError(t, platform.Save(srv.URL, platform.Credentials{Org: "acme", AccessToken: "a", RefreshToken: "r", Expires: time.Now().Add(time.Hour)}))
 	return platform.New(srv.URL, nil)
+}
+
+func TestRunningPreview(t *testing.T) {
+	p, c := signedIn(t)
+	p.AddApp("demo", platformtest.Email)
+	p.AddApp("payroll", "bo@acme.example")
+	_, ok, err := c.RunningPreview(t.Context(), "demo")
+	require.NoError(t, err)
+	assert.False(t, ok, "none ever ran")
+
+	id := p.AddPublish("demo")
+	started, err := c.PreviewStart(t.Context(), id)
+	require.NoError(t, err)
+	pv, ok, err := c.RunningPreview(t.Context(), "demo")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, started, pv)
+
+	require.NoError(t, c.PreviewEnd(t.Context(), "demo"))
+	_, ok, err = c.RunningPreview(t.Context(), "demo")
+	require.NoError(t, err)
+	assert.False(t, ok, "ended")
+
+	_, _, err = c.RunningPreview(t.Context(), "payroll")
+	assert.Equal(t, "E-PUB-005", errs.Code(err))
+	_, _, err = c.RunningPreview(t.Context(), "nope")
+	assert.Equal(t, "E-PUB-019", errs.Code(err))
+	_, _, err = answering(t, http.StatusOK, map[string]any{"state": "running", "publish": id, "host": "demo.acme.preview.aicoded.cloud",
+		"url": "https://evil.example/", "started": "2026-10-30T10:00:00Z", "expires": "2026-11-13T10:00:00Z"}).RunningPreview(t.Context(), "demo")
+	require.EqualError(t, err, "the platform's answer about the preview of demo is not valid")
 }

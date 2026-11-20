@@ -4,6 +4,32 @@ Changes to the API that AI assistants build apps with. Newest first.
 
 ## Unreleased
 
+- Every publish that passes is held for its owner's preview: it does not go live, and has no
+  approval card, until its owner asks for its release (`release.state` `held`, the text
+  `Held for preview, not live: its owner asks for its release with aicoded release <id>.`, and the
+  note E-REL-039 for older `aicoded`, which this one leaves out). `aicoded publish` starts the
+  preview itself, prints its address and a line on its limits, and exits with 0 even when the
+  preview does not start; over MCP, `release_status` of a held publish says in `next` to call
+  `preview_publish` unless its preview runs or the person ended it, then to give the person the
+  preview's address. Its output never tells the reader to release:
+  `It is not live. When the app's owner asks for its release: aicoded release <id>.`
+  `aicoded release <id>`, or the new tool `release` with `publish`, asks for the release: the
+  platform decides again, and the publish goes live, waits for an approver or is refused; calling it
+  again shows the publish as it is. Call `release` only when the person asks.
+  `aicoded publish --release`, or the `publish` tool with `release: true`, skips the preview and
+  asks for the release at once: pass it only when the person asks to publish straight to production.
+  `--preview` is gone. A held publish that *Needs approval* says
+  `It will need approval once you ask for its release.` A new publish replaces one waiting for
+  approval or going live, and says so: `This publish replaced <id>, ...`, `release.replaced`.
+  E-REL-037 refuses the release of a publish that is not held, or one asked for by the platform's
+  operator; E-REL-038 one that a newer publish superseded; and E-PUB-007 of a held publish's commit
+  has the fix to preview it with `aicoded preview <id>`, and to release it only when the owner
+  asks: `aicoded release <id>`.
+  The preview reaches no outside service that production does not reach yet, keeps its mail in the
+  console and keeps its first end. A declined card says
+  `Publish again and ask for its release to get a new approval card.` The `release` tool is marked
+  destructive. `aicoded` always sends `release`; an older platform refuses it, which is E-CLI-010.
+
 - Never open, print or copy `dev.yaml`, `credentials.json` or any other file of `aicoded`'s
   config folder: they hold passwords and keys. `AGENTS.md` and the MCP server's instructions say
   so; `describe` tells what you need from them, and `aicoded whoami` the organisation and the

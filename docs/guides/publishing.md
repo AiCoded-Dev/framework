@@ -3,7 +3,8 @@
 `aicoded publish` sends a commit of an app to the platform's delivery pipeline, which checks it
 and writes a change record for it, and `aicoded status` shows the outcome. This guide covers
 signing in, the clean commit, what is sent, the waiting, reading the outcome, what the delivery
-pipeline checks, previews on the platform and the codes.
+pipeline checks, the preview every publish is held for until you ask for its release, publishing
+straight to production, and the codes.
 
 ## Signing in
 
@@ -249,26 +250,37 @@ of every publish.
 
 ## Going live
 
-A publish that passes is decided on at once, against its app type, and the end of
-`aicoded publish` and `aicoded status` says what happens next, before the status line:
+A publish that passes is decided on at once, against its app type, and held for your preview
+until you ask for its release, as [preview before release](#preview-before-release) tells. The
+end of `aicoded publish` and `aicoded status` says what happens next, before the status line:
 
 ```text
   change record 8
-  Pre-approved by app type internal-tool: going live.
+  Pre-approved by app type internal-tool.
+  Held for preview, not live: its owner asks for its release with aicoded release pub_7kq2m4x5c3v6b5n6d2f7hjrt2a.
 passed
 ```
 
-- `Pre-approved by app type <type>: going live.`: the platform releases it on its own, and the
-  line says `live` once the new version serves, followed by `Live at <address>`, the address
-  people open, such as `https://room-maintenance.acme.apps.aicoded.cloud/`.
+- `Held for preview, not live: its owner asks for its release with aicoded release <id>.`: the
+  publish waits for you to ask for its release. Before it, `Pre-approved by app type <type>.` says
+  that it needs no approver, or `Needs approval:` with its reasons and
+  `It will need approval once you ask for its release.` says that it will.
+- `Pre-approved by app type <type>: going live.`: its release was asked for, with
+  `aicoded release` or `--release`, and the platform releases it on its own; the line says `live`
+  once the new version serves, followed by `Live at <address>`, the address people open, such as
+  `https://room-maintenance.acme.apps.aicoded.cloud/`.
 - `Needs approval:`, then a line for each reason, then
-  `An approver must approve it before it goes live.`: the permission list asks for more than the
-  app type allows, or the release holds a change that always needs an approver, such as a
-  destructive schema change.
-- `Declined by <email>: <reason>.`, then `Publish again to ask for a new approval.` and a line
+  `An approver must approve it before it goes live.`: its release was asked for, and the
+  permission list asks for more than the app type allows, or the release holds a change that
+  always needs an approver, such as a destructive schema change.
+- `This publish replaced <id>, which was waiting for approval; its approval card is gone.`, or
+  `which was going live`: the publish superseded an older one of the app, which now never goes
+  live. While this one is held, the line adds how to get a new card: ask for its release.
+- `Declined by <email>: <reason>.`, then
+  `Publish again and ask for its release to get a new approval card.` and a line
   about schema changes: an approver declined the approval card, which is final, and the command
-  exits 1. Change what the reason asks for, commit, and publish again: a new publish makes a new
-  approval card. The declined publish's schema changes left the app's migrations, and the draft
+  exits 1. Change what the reason asks for, commit, publish again and ask for its release: that
+  makes a new approval card. The declined publish's schema changes left the app's migrations, and the draft
   was cleared when it passed, so put the ones you still want back in `.aicoded/migration.sql`; a
   publish made on top of them meanwhile fails with E-MIG-004.
 - `Released: live.`, then `Live at <address>`: an approver approved it, and it serves.
@@ -283,9 +295,9 @@ Only a live release has one, and a platform older than this `aicoded` gives none
 
 `aicoded status --json` and the `release_status` tool give the same in `release`: its `tier`
 (`R1` for *Pre-approved*, `R2` for *Needs approval*), its `app_type`, its `reasons`, its `state`
-(`due`, `waiting`, `released`, `failed`, `replaced`, `refused` or `superseded`), the `reason` of
+(`held`, `due`, `waiting`, `released`, `failed`, `replaced`, `refused` or `superseded`), the `reason` of
 a refusal or a failure, whether it is `live`, and, while it is, its `url`, the address people
-open; a declined approval card is in `declined`, with
+open, and the publish it `replaced` with that one's state then, `replaced_state`; a declined approval card is in `declined`, with
 the approver's email as `by`, the `reason` and the time `at`. [App types](app-types.md) tells how
 the platform decides.
 
@@ -316,8 +328,9 @@ data.
 ## Preview
 
 A publish that passed can run on the platform as the app's preview, so that you and a few people
-you pick try it before it goes live. Starting one is a step of its own, never part of publishing,
-and only the app's owner takes it, with the id of the publish:
+you pick try it before it goes live. Only the app's owner starts one: `aicoded publish` starts it
+with the publish it holds, as [preview before release](#preview-before-release) tells, and
+`aicoded preview` with the id of any publish that passed:
 
 ```sh
 aicoded preview pub_7kq2m4x5c3v6b5n6d2f7hjrt2a
@@ -365,8 +378,89 @@ Invite up to five people in the console.
 - **Records.** Each start, new version, reset of the data, person added or removed, and end is in
   a change record of the app.
 
-With `aicoded mcp`, the tools `preview_publish` and `preview_end` do the same, and your AI
-assistant calls them only when you ask.
+With `aicoded mcp`, the tools `preview_publish` and `preview_end` do the same. Your AI assistant
+calls `preview_publish` for a held publish when `release_status`'s `next` says so, otherwise only
+when you ask, and `preview_end` only when you ask.
+
+## Preview before release
+
+Every publish that passes is held for its owner's preview: it does not go live, and has no
+approval card, until you ask for its release. `aicoded publish` waits for the outcome, then starts
+the app's preview with the publish:
+
+```text
+  change record 9
+  Pre-approved by app type internal-tool.
+  Held for preview, not live: its owner asks for its release with aicoded release pub_7kq2m4x5c3v6b5n6d2f7hjrt2a.
+passed
+Preview of demo at https://demo.acme.preview.aicoded.cloud/ until 2026-11-13T10:00:00Z.
+Invite up to five people in the console.
+The preview keeps its first end, reaches no outside service that production does not reach yet, and keeps its mail in the console.
+It is not live. When the app's owner asks for its release: aicoded release pub_7kq2m4x5c3v6b5n6d2f7hjrt2a.
+```
+
+- **Held.** The publish runs every check and gets its tier as any other, then waits: its release
+  `state` is `held`, nothing is released and no approval card is made. A publish that is *Not
+  allowed* is refused as usual. A held publish has no deadline. A held publish that *Needs
+  approval* lists its reasons, then `It will need approval once you ask for its release.` The tier
+  shown is the one decided when the publish passed; the platform decides it again when you ask for
+  the release. A held publish also carries the note E-REL-039, for an `aicoded` older than
+  v0.13.0, which does not know the held state; this `aicoded` leaves it out, since its held lines
+  say the same.
+- **Its preview.** When the preview does not start, as when a value is missing for it
+  (E-REL-030), `aicoded publish` prints the problem, then
+  `The publish passed and is held; it is not live. Fix that and run aicoded preview <id>. Its owner may also release it without a preview, only at their word: aicoded release <id>.`,
+  and exits with 0, since the publish passed. With `--no-wait` it returns at once, and says how to
+  start the preview and release the publish later.
+- **What the preview is.** It is the app's one preview, as [Preview](#preview) tells: starting it
+  with the held publish replaces the version a running preview runs, keeps that preview's end, 14
+  days from its first start, and may reset its data. Outside services that production does not
+  reach yet are closed in the preview, so calls to a new one work only once the change is
+  released, and the preview's mail is kept for you in the console, never sent.
+- **What it costs.** Every publish runs in the app's preview, replacing the version the people
+  you invited see, and maybe resetting its data. End the preview with `aicoded preview end` when
+  you do not need it.
+- **The release.** `aicoded release <id>` asks for the release of a held publish, and only the
+  app's owner may. The platform decides again, against the app type and the release that is live
+  now: within the app type the publish goes live by itself, as a *Pre-approved* one does; beyond
+  it, an approval card is made then, never before, and an approver must approve it; a publish
+  that is *Not allowed* is not released, with the reason. `aicoded release` then waits, as
+  `aicoded publish` does, until the release is live, waits for an approver or ends otherwise, and
+  prints the publish as `aicoded status` does; `--no-wait` prints it at once. It exits with 1 when
+  the release was refused or failed. The app's owner may also press **Release** on the app's
+  Production page in the console. A release needs no preview: a held publish whose preview never
+  started can be released too.
+- **A newer publish** supersedes a held one, as it supersedes one going live or waiting for an
+  approver, whose approval card then disappears: `This publish replaced <id>, ...` says so. A
+  release of a publish that is not held, as one published with `--release` or one that has not
+  passed its checks, is E-REL-037, and of one a newer publish superseded E-REL-038. Asking
+  again for the release of a publish whose release was asked for already shows the publish as it
+  is. Publishing the same commit again while its publish is held is E-PUB-007, whose fix is to
+  preview that publish, and to release it only when its owner asks.
+- **Schema changes.** A held publish that is never released still counts for the app's schema
+  changes: they stay in the app's migrations, and the next publish carries them, as it carries
+  those of any publish that passed.
+- **After the release** the preview keeps running, with its data, for the rest of its 14 days.
+- **Records.** The publish's change record says it was held for preview, and each request of a
+  release is a change record of its own: who asked, through `aicoded` or the console, and the tier
+  and state it led to.
+
+With `aicoded mcp`, `release_status` of a held publish says in `next` to start its preview with
+`preview_publish` and give you its address, and the `release` tool asks for the release. Your AI
+assistant calls `release` only when you ask.
+
+## Straight to production
+
+`aicoded publish --release` skips the preview: once the publish passed, it goes live by itself
+when it is *Pre-approved*, and its approval card is made at once when it *Needs approval*, as if
+you had asked for its release the moment it passed. It prints
+`It skips the preview: once it passed, it goes live by itself or waits for an approver.` after the
+id, starts no preview, and its change record says the release was asked with the publish. When you
+no longer own the app by the time it passed, or it was archived, it is held instead.
+`aicoded publish --release --no-wait` returns at once, as `--no-wait` does. With `aicoded mcp`,
+the `publish` tool takes `release: true`, which your AI assistant sets only when you ask to
+publish straight to production. `--preview`, from older versions, is refused: holding is the
+default.
 
 ## What security sees
 
@@ -394,6 +488,8 @@ says which sections are enforced today, and which the platform only records for 
   E-PUB-006, E-PUB-007 and E-PUB-009 before sending when it can tell.
 - E-PUB-011 and E-PUB-014: a publish that ended in `error` or `refused`.
 - E-PUB-013: a publish id that the platform does not know in your organisation.
+- E-CLI-010: a platform older than this `aicoded`, which does not hold publishes and so takes
+  none from it.
 - E-GATE-001 to E-GATE-012 and E-GATE-026 to E-GATE-028: what the delivery pipeline finds in
   the commit, its modules, its permission list and its steps.
 - E-GATE-000 and E-GATE-013 to E-GATE-020: what the security checks find in the code, its
@@ -402,8 +498,10 @@ says which sections are enforced today, and which the platform only records for 
 - E-MIG-001 to E-MIG-007: the draft of schema changes, and the migrations a release applies.
 - E-REL-019 to E-REL-021: a publish that fails when the platform decides on its release.
 - E-REL-029 and E-REL-030: a preview that the platform does not start.
-- E-GATE-021 to E-GATE-025, E-GATE-038 to E-GATE-048, E-MIG-003, E-DATA-001 and E-DATA-002:
-  notes, which do not stop a publish.
+- E-REL-037 and E-REL-038: a release that the platform refuses, of a publish that is not held or
+  that a newer publish superseded.
+- E-GATE-021 to E-GATE-025, E-GATE-038 to E-GATE-048, E-MIG-003, E-DATA-001, E-DATA-002 and
+  E-REL-039: notes, which do not stop a publish.
 
 `aicoded explain <code>` prints the page of each, as does the `howto` tool of `aicoded mcp`.
 
@@ -422,11 +520,12 @@ running an app in production without the platform, `aicoded run`, comes later.
 
 ## See also
 
-- [Tools](tools.md): `aicoded publish`, `aicoded status`, `aicoded preview`, `aicoded check` and
-  `aicoded login`.
-- [MCP](mcp.md): the `publish`, `release_status`, `preview_publish` and `preview_end` tools.
+- [Tools](tools.md): `aicoded publish`, `aicoded status`, `aicoded release`, `aicoded preview`,
+  `aicoded check` and `aicoded login`.
+- [MCP](mcp.md): the `publish`, `release_status`, `release`, `preview_publish` and `preview_end`
+  tools.
 - [Simulated attacks](simulated-attacks.md): what the `attacks` and `personal-data` steps do.
-- [App types](app-types.md): what goes live on its own and what needs approval.
+- [App types](app-types.md): what needs approval and what does not.
 - [Schema changes](schema-changes.md): the draft that a publish carries.
 - [Project structure](project-structure.md): which files are yours and which are generated.
 - [The error catalogue](../errors/README.md): every code with its page.

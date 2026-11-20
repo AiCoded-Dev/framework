@@ -11,4 +11,4 @@ running the release it had.
 admin release <publish>            # refused: the publish needs approval
 ```
 
-**Fix:** an R2 release goes live through an approval card in the console; to roll back, publish the earlier commit again
+**Fix:** an R2 release goes live through an approval card in the console, made once its owner asks for its release; to roll back, the owner publishes the earlier commit again and asks for its release

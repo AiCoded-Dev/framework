@@ -1,4 +1,4 @@
-# App types: what goes live on its own and what needs approval
+# App types: what needs approval and what does not
 
 Security approves what a kind of app may do, not each app's code. It does that with app types:
 an app type says who its apps may serve, the data they may hold, where their mail may go and
@@ -33,7 +33,8 @@ When a publish passes, `aicoded publish` and `aicoded status` show one of these 
 line:
 
 - **Pre-approved.** The permission list stays within the app type, and nothing else needs an
-  approver. The platform releases it on its own, with no one to ask:
+  approver. Once its owner asks for its release, after the preview it is held for or at once with
+  `aicoded publish --release`, the platform releases it on its own, with no one to ask:
 
   ```text
     Pre-approved by app type internal-tool: going live.
@@ -50,9 +51,10 @@ line:
     An approver must approve it before it goes live.
   ```
 
-  An approver sees an approval card in the console that lists only what is new compared with the
-  app type, and approves or declines it: the app type's `approvers` group, or the security admins
-  when the type names none, and never the publish's builder. An approved release goes live; a
+  Once its owner asks for its release, an approver sees an approval card in the console that
+  lists only what is new compared with the app type, and approves or declines it: the app type's
+  `approvers` group, or the security admins when the type names none, and never the publish's
+  builder or the person who asked for its release. An approved release goes live; a
   declined one never does, and `aicoded status` shows who declined it and why. The reasons are
   notes of the step `decision` too, each with its fix.
 

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -129,7 +130,10 @@ type Upload struct {
 	// Migration is the app's schema-change draft, .aicoded/migration.sql, or "" when it has
 	// none.
 	Migration string
-	Bundle    []byte
+	// Release asks for the release at once, once the publish passed, skipping its owner's
+	// preview; without it the platform holds the publish for the preview until its owner asks.
+	Release bool
+	Bundle  []byte
 }
 
 // Created is the platform's answer to an upload.
@@ -186,8 +190,9 @@ type Release struct {
 	AppType string `json:"app_type"`
 	// Reasons say why the publish needs approval, empty for R1.
 	Reasons []problem.Problem `json:"reasons"`
-	// State is due, waiting, released, failed (its newest release failed where the app runs),
-	// replaced (its release went live and a newer release has since), refused or superseded.
+	// State is held (held for its owner's preview until the owner asks for its release), due,
+	// waiting, released, failed (its newest release failed where the app runs), replaced (its
+	// release went live and a newer release has since), refused or superseded.
 	State string `json:"state"`
 	// Reason says why the release was refused or failed.
 	Reason string `json:"reason,omitempty"`
@@ -196,6 +201,10 @@ type Release struct {
 	// URL is the address viewers open, https://<host>/, present while the release is live. An
 	// older platform leaves it out.
 	URL string `json:"url,omitempty"`
+	// Replaced is the older publish of the app that this one superseded while it was waiting for
+	// approval or going live, as ReplacedState says, or "".
+	Replaced      string `json:"replaced,omitempty"`
+	ReplacedState string `json:"replaced_state,omitempty"`
 }
 
 // Parent is the publish before another.
@@ -260,9 +269,11 @@ func (c *Client) App(ctx context.Context, name string) (app App, found bool, err
 // CreatePublish sends the upload to the delivery pipeline and returns the new publish. The first
 // publish of a name creates the app. A bundle whose prerequisite is no longer the app's base is
 // ErrBaseChanged; the other refusals have the code the platform gives, E-PUB-005 to E-PUB-010.
-// Its meta holds the key migration only with a draft.
+// Its meta holds the key migration only with a draft, and always the key release, so that a
+// platform that does not hold publishes refuses the upload rather than release it.
 func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
-	short, err := encodeMeta(map[string]string{"app": u.App, "sha": u.SHA, "summary": u.Summary})
+	fields := map[string]any{"app": u.App, "sha": u.SHA, "summary": u.Summary, "release": u.Release}
+	short, err := encodeMeta(fields)
 	if err != nil {
 		return Created{}, err
 	}
@@ -271,7 +282,8 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 	}
 	meta := short
 	if u.Migration != "" {
-		if meta, err = encodeMeta(map[string]string{"app": u.App, "sha": u.SHA, "summary": u.Summary, "migration": u.Migration}); err != nil {
+		fields["migration"] = u.Migration
+		if meta, err = encodeMeta(fields); err != nil {
 			return Created{}, err
 		}
 	}
@@ -306,6 +318,9 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 	case status == http.StatusCreated:
 	case status == http.StatusConflict && e.Error == "base_changed":
 		return Created{}, ErrBaseChanged
+	case status == http.StatusBadRequest && e.Error == "invalid_request" && e.Description == oldMeta:
+		return Created{}, errs.New("E-CLI-010", "the platform at "+c.address+" is older than this aicoded: it does not hold publishes for their owner's preview",
+			"use the aicoded version the platform's docs name, or wait for the platform update")
 	case known(e.Code):
 		return Created{}, refusal(e, e.Code, "the platform refused the publish")
 	case status == http.StatusForbidden:
@@ -325,8 +340,12 @@ func (c *Client) CreatePublish(ctx context.Context, u Upload) (Created, error) {
 	return Created{ID: a.ID, CreatedApp: a.CreatedApp}, nil
 }
 
+// oldMeta is how a platform from before publishes were held refuses the key release of an
+// upload's meta.
+const oldMeta = "meta is not a JSON object of app, sha, summary and migration"
+
 // encodeMeta returns the JSON of meta, with no escapes for HTML.
-func encodeMeta(meta map[string]string) ([]byte, error) {
+func encodeMeta(meta map[string]any) ([]byte, error) {
 	var b bytes.Buffer
 	enc := json.NewEncoder(&b)
 	enc.SetEscapeHTML(false)
@@ -338,11 +357,28 @@ func encodeMeta(meta map[string]string) ([]byte, error) {
 // since a publish may have many problems. An id the platform does not know is E-PUB-013, and a
 // publish of an app the builder does not own E-PUB-005, as the platform's answer says.
 func (c *Client) Publish(ctx context.Context, id string) (Publish, error) {
+	return c.publishCall(ctx, "/v1/publishes/get", id, "the platform refused to show the publish "+id)
+}
+
+// Release asks the platform to release the publish id, which is held for its preview, and
+// returns the publish after the request: the platform decides again against the app's type, and
+// the publish goes live by itself, waits for an approver, or is refused. A request made again
+// returns the publish as it is. A publish that is not held, as one published with release or one
+// that has not passed its checks, is E-REL-037, and one that a newer publish of the app
+// superseded E-REL-038; an id the platform does not know is E-PUB-013, and a publish of an
+// app the builder does not own E-PUB-005, as the platform's answer says.
+func (c *Client) Release(ctx context.Context, id string) (Publish, error) {
+	return c.publishCall(ctx, "/v1/publishes/release", id, "the platform refused to release the publish "+id)
+}
+
+// publishCall posts {id} to path, which answers the publish id, and returns the publish. A
+// refusal with a known code has that code, and refused when the platform gives no description.
+func (c *Client) publishCall(ctx context.Context, path, id, refused string) (Publish, error) {
 	body, err := json.Marshal(map[string]string{"id": id})
 	if err != nil {
 		return Publish{}, err
 	}
-	status, answer, err := c.call(ctx, c.HTTP, http.MethodPost, "/v1/publishes/get", "application/json", body, maxPublish)
+	status, answer, err := c.call(ctx, c.HTTP, http.MethodPost, path, "application/json", body, maxPublish)
 	if err != nil {
 		return Publish{}, err
 	}
@@ -350,8 +386,8 @@ func (c *Client) Publish(ctx context.Context, id string) (Publish, error) {
 	switch {
 	case status == http.StatusOK:
 	case known(e.Code):
-		return Publish{}, refusal(e, e.Code, "the platform refused to show the publish "+id)
-	case status == http.StatusNotFound:
+		return Publish{}, refusal(e, e.Code, refused)
+	case status == http.StatusNotFound && e.Error == "not_found":
 		return Publish{}, refusal(e, "E-PUB-013", "the platform knows no publish "+id)
 	case status == http.StatusForbidden:
 		return Publish{}, refusal(e, "E-PUB-005", "the publish "+id+" is of another builder's app")
@@ -366,13 +402,22 @@ func (c *Client) Publish(ctx context.Context, id string) (Publish, error) {
 	return p, nil
 }
 
-// valid reports whether the ids, commits, status and address of p are well formed, and whether
-// only a live release has an address.
+// valid reports whether the ids, commits, status and address of p are well formed, the publish a
+// release replaced included, and whether only a live release has an address.
 func (p *Publish) valid() bool {
 	_, known := statuses[p.Status]
 	return known && commitSHA.MatchString(p.SHA) &&
 		(p.Parent == nil || PublishID.MatchString(p.Parent.ID) && commitSHA.MatchString(p.Parent.SHA)) &&
-		(p.Release == nil || p.Release.URL == "" || p.Release.Live && address(p.Release.URL))
+		(p.Release == nil || (p.Release.URL == "" || p.Release.Live && address(p.Release.URL)) && p.Release.validReplaced())
+}
+
+// validReplaced reports whether r names no publish it replaced and no state of one, or a publish
+// id and the state it was in, waiting or due.
+func (r *Release) validReplaced() bool {
+	if r.Replaced == "" {
+		return r.ReplacedState == ""
+	}
+	return PublishID.MatchString(r.Replaced) && (r.ReplacedState == "waiting" || r.ReplacedState == "due")
 }
 
 // address reports whether s is the address of an app: https://, a host name and /, with no port,
@@ -383,8 +428,12 @@ func address(s string) bool {
 	return https && slash && len(host) <= 253 && hostName.MatchString(host)
 }
 
-// clean makes every text of p fit to print, and gives every problem and note the docs link of
-// its code.
+// heldNote is the code of the note on a publish held for its owner's preview, for clients that do
+// not know the held state.
+const heldNote = "E-REL-039"
+
+// clean makes every text of p fit to print, gives every problem and note the docs link of its
+// code, and drops the note E-REL-039 of a publish whose release state says it is held already.
 func (p *Publish) clean() {
 	p.App, p.Summary, p.Reason, p.Checks = clean(p.App, 63), clean(p.Summary, 1000), clean(p.Reason, 500), clean(p.Checks, 64)
 	steps := make([]Step, 0, len(p.Steps))
@@ -393,6 +442,9 @@ func (p *Publish) clean() {
 	}
 	p.Steps = steps
 	p.Problems, p.Notes = cleanProblems(p.Problems), cleanProblems(p.Notes)
+	if p.Release != nil && p.Release.State == "held" {
+		p.Notes = slices.DeleteFunc(p.Notes, func(q problem.Problem) bool { return q.Code == heldNote })
+	}
 	p.Record = max(p.Record, 0)
 	if r := p.Release; r != nil {
 		r.Tier, r.AppType, r.State, r.Reason = clean(r.Tier, 8), clean(r.AppType, 128), clean(r.State, 32), clean(r.Reason, 500)

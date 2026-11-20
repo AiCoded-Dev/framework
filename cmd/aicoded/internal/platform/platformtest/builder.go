@@ -70,6 +70,10 @@ type Release struct {
 	Reason  string    `json:"reason,omitempty"`
 	Live    bool      `json:"live"`
 	URL     string    `json:"url,omitempty"`
+	// Replaced is the older publish this one superseded while it was in ReplacedState, waiting or
+	// due.
+	Replaced      string `json:"replaced,omitempty"`
+	ReplacedState string `json:"replaced_state,omitempty"`
 }
 
 // Live is the decision on releasing a publish of app that is Pre-approved and live, at the
@@ -126,7 +130,9 @@ type Upload struct {
 	App, SHA, Summary, Migration string
 	// MigrationSent is whether the upload's meta held the key migration.
 	MigrationSent bool
-	Bundle        []byte
+	// Release is the upload's key release, or nil when its meta did not hold it.
+	Release *bool
+	Bundle  []byte
 }
 
 // builder is the state of the fake builder API.
@@ -151,6 +157,13 @@ type builder struct {
 	previews       map[string]*fakePreview
 	previewRefusal *refusal
 	resetNext      bool
+	// releases are the answers about a publish whose release was asked for, as answers are, and
+	// releaseRefusal refuses the next request of a release, when set.
+	releases       []*Release
+	releaseRefusal *refusal
+	// old makes the fake a platform from before publishes were held, which refuses the key
+	// release.
+	old bool
 }
 
 // fakePreview is an app's preview: the publish it runs, and since when and until when.
@@ -175,6 +188,10 @@ type fakePublish struct {
 	app              *fakeApp
 	created          time.Time
 	gets             int
+	// held is whether the publish is held for its owner's preview once it passed, until its
+	// release is asked for, and releaseGets counts the gets since.
+	held, requested bool
+	releaseGets     int
 }
 
 type refusal struct {
@@ -188,6 +205,7 @@ type uploadMeta struct {
 	SHA       string  `json:"sha"`
 	Summary   string  `json:"summary"`
 	Migration *string `json:"migration"`
+	Release   *bool   `json:"release"`
 }
 
 func newBuilder() builder {
@@ -289,8 +307,8 @@ func (p *Platform) SetMigrations(name string, steps ...migrate.Step) {
 	p.migrations[name] = steps
 }
 
-// AddPublish adds a publish of a new commit of the app name, as if it had been uploaded, and
-// returns its id.
+// AddPublish adds a publish of a new commit of the app name, as if it had been uploaded with
+// release, and returns its id. Hold holds it.
 func (p *Platform) AddPublish(name string) string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -299,6 +317,43 @@ func (p *Platform) AddPublish(name string) string {
 	pub := &fakePublish{id: publishID(), sha: fmt.Sprintf("%x", b), summary: "Change", app: p.app(name), created: time.Now()}
 	p.pubs = append(p.pubs, pub)
 	return pub.id
+}
+
+// Hold makes the publish id held for its owner's preview once it passed, as a publish sent
+// without release is.
+func (p *Platform) Hold(id string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, pub := range p.pubs {
+		if pub.id == id {
+			pub.held = true
+		}
+	}
+}
+
+// Old makes the fake a platform from before publishes were held: it refuses an upload whose meta
+// holds the key release, as an unknown key.
+func (p *Platform) Old() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.old = true
+}
+
+// ReleaseAnswers sets the decision on releasing a publish, held for its preview, whose release
+// was asked for: the first get after the request gets the first, and the last repeats. By default
+// the release is Live.
+func (p *Platform) ReleaseAnswers(releases ...*Release) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.releases = releases
+}
+
+// RefuseRelease refuses the next request of a release with status, the error errorCode, the
+// framework's code and the description.
+func (p *Platform) RefuseRelease(status int, errorCode, code, description string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.releaseRefusal = &refusal{status, errorCode, code, description}
 }
 
 // RefusePreview refuses the next start of a preview with status, the error errorCode, the
@@ -378,6 +433,14 @@ func (p *Platform) answer(pub *fakePublish, next bool) Publish {
 		pub.gets++
 	}
 	out.ID, out.App, out.SHA, out.Summary = pub.id, pub.app.name, pub.sha, pub.summary
+	if pub.held && out.Status == "passed" && out.Declined == nil {
+		out.Release = p.held(pub, out.Release, next)
+		if !pub.requested {
+			out.Notes = append(slices.Clone(out.Notes), Problem{Code: "E-REL-039",
+				Message: "held for its owner's preview: it does not go live and has no approval card until its owner asks for its release",
+				Fix:     "its owner asks for its release: aicoded release " + pub.id + " (aicoded v0.13.0 or newer) or the Release button on the app's Production page"})
+		}
+	}
 	out.Created = pub.created.UTC().Format(time.RFC3339)
 	if out.Steps == nil {
 		out.Steps = []Step{}
@@ -386,6 +449,28 @@ func (p *Platform) answer(pub *fakePublish, next bool) Publish {
 		out.Problems = []Problem{}
 	}
 	return out
+}
+
+// held returns the decision on releasing pub, a publish that passed and is held for its preview:
+// release, or an R1 one, held, until its release is asked for, then the answers of
+// ReleaseAnswers. next moves them on. The caller holds p.mu.
+func (p *Platform) held(pub *fakePublish, release *Release, next bool) *Release {
+	if pub.requested {
+		r := Live(pub.app.name)
+		if len(p.releases) > 0 {
+			r = p.releases[min(pub.releaseGets, len(p.releases)-1)]
+		}
+		if next {
+			pub.releaseGets++
+		}
+		return r
+	}
+	r := Release{Tier: "R1", AppType: "internal-tool@builtin", Reasons: []Problem{}}
+	if release != nil {
+		r = *release
+	}
+	r.State, r.Reason, r.Live, r.URL = "held", "", false, ""
+	return &r
 }
 
 // builderCall checks the access token of a request to the builder API, counts the request and
@@ -639,6 +724,49 @@ func (p *Platform) endPreview(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// release asks for the release of a publish held for its preview as the platform does: the
+// publish must be of an app that is not archived and that the token carries the release:request
+// scope of, be its app's newest (E-REL-038), and be held, not published with release, and have
+// passed (E-REL-037). It answers the publish after the request; a request made again answers the
+// publish as it is.
+func (p *Platform) release(w http.ResponseWriter, r *http.Request) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	var in struct {
+		ID string `json:"id"`
+	}
+	s, ok := p.builderCall(w, r, &in)
+	if !ok {
+		return
+	}
+	i := slices.IndexFunc(p.pubs, func(pub *fakePublish) bool { return pub.id == in.ID })
+	if i < 0 {
+		apiError(w, http.StatusNotFound, "not_found", "E-PUB-013", "no publish has that id")
+		return
+	}
+	pub := p.pubs[i]
+	newer := slices.ContainsFunc(p.pubs[i+1:], func(later *fakePublish) bool { return later.app == pub.app })
+	answer := p.answer(pub, false)
+	switch f := p.releaseRefusal; {
+	case pub.app.archived || !may(s, pub.app, "release:request"):
+		notYours(w, pub.app)
+	case f != nil:
+		p.releaseRefusal = nil
+		apiError(w, f.status, f.errorCode, f.code, f.description)
+	case newer:
+		apiError(w, http.StatusConflict, "conflict", "E-REL-038", "publish "+pub.id+" was superseded by a newer publish of the app, and only the app's newest publish is released")
+	case pub.requested:
+		writeJSON(w, http.StatusOK, answer)
+	case !pub.held:
+		apiError(w, http.StatusConflict, "conflict", "E-REL-037", "publish "+pub.id+" is not held for its owner's preview: it was published with --release, so its release was asked for at once")
+	case answer.Release == nil || answer.Release.State != "held":
+		apiError(w, http.StatusConflict, "conflict", "E-REL-037", "publish "+pub.id+" is not held for its owner's preview: it has not passed its checks")
+	default:
+		pub.requested = true
+		writeJSON(w, http.StatusOK, p.answer(pub, false))
+	}
+}
+
 // may reports whether the session may use the app with the scope app:<id>:<scope>: the person owns
 // it, and the token holds the scope.
 func may(s session, a *fakeApp, scope string) bool {
@@ -676,6 +804,9 @@ func (p *Platform) createPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	case err != nil:
 		apiError(w, http.StatusBadRequest, "invalid_request", "", err.Error())
+		return
+	case p.old && meta.Release != nil:
+		apiError(w, http.StatusBadRequest, "invalid_request", "", "meta is not a JSON object of app, sha, summary and migration")
 		return
 	case f != nil:
 		p.refused = nil
@@ -715,9 +846,10 @@ func (p *Platform) createPublish(w http.ResponseWriter, r *http.Request) {
 	if created {
 		p.apps = append(p.apps, a)
 	}
-	pub := &fakePublish{id: publishID(), sha: meta.SHA, summary: meta.Summary, app: a, created: time.Now()}
+	pub := &fakePublish{id: publishID(), sha: meta.SHA, summary: meta.Summary, app: a, created: time.Now(),
+		held: !p.old && (meta.Release == nil || !*meta.Release)}
 	p.pubs = append(p.pubs, pub)
-	u := Upload{App: meta.App, SHA: meta.SHA, Summary: meta.Summary, MigrationSent: meta.Migration != nil, Bundle: bundle}
+	u := Upload{App: meta.App, SHA: meta.SHA, Summary: meta.Summary, MigrationSent: meta.Migration != nil, Release: meta.Release, Bundle: bundle}
 	if meta.Migration != nil {
 		u.Migration = *meta.Migration
 	}

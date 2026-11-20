@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/url"
 	"regexp"
 	"time"
 
@@ -62,12 +61,11 @@ func (c *Client) PreviewStart(ctx context.Context, id string) (Preview, error) {
 	return p, nil
 }
 
-// valid reports whether p is a preview of the publish id whose names and address are well formed.
+// valid reports whether p is a preview of the publish id whose names are well formed and whose
+// address is https://<host>/.
 func (p *Preview) valid(id string) bool {
-	u, err := url.Parse(p.URL)
 	return p.Publish == id && manifest.ValidApp(p.App) && len(p.Host) <= 253 && hostName.MatchString(p.Host) &&
-		err == nil && u.Scheme == "https" && u.User == nil && u.Host == p.Host && visible(p.URL, 2048) &&
-		!p.Started.IsZero() && p.Expires.After(p.Started)
+		p.URL == "https://"+p.Host+"/" && !p.Started.IsZero() && p.Expires.After(p.Started)
 }
 
 // PreviewEnd ends the preview of the app on the platform, which then deletes its data. When no
@@ -94,4 +92,45 @@ func (c *Client) PreviewEnd(ctx context.Context, app string) error {
 		return refusal(e, "E-PUB-005", "the app "+app+" belongs to another builder")
 	}
 	return unexpected(status, answer)
+}
+
+// RunningPreview returns the preview of the app on the platform, and whether one runs. Its Reset
+// is false. An app the platform does not know is E-PUB-019, and one the builder does not own
+// E-PUB-005, as the platform's answer says.
+func (c *Client) RunningPreview(ctx context.Context, app string) (Preview, bool, error) {
+	body, err := json.Marshal(map[string]string{"app": app})
+	if err != nil {
+		return Preview{}, false, err
+	}
+	status, answer, err := c.call(ctx, c.HTTP, http.MethodPost, "/v1/previews/get", "application/json", body, maxAnswer)
+	if err != nil {
+		return Preview{}, false, err
+	}
+	e := parseError(answer)
+	switch {
+	case status == http.StatusOK:
+	case known(e.Code):
+		return Preview{}, false, refusal(e, e.Code, "the platform refused to show the preview of "+app)
+	case status == http.StatusForbidden:
+		return Preview{}, false, refusal(e, "E-PUB-005", "the app "+app+" belongs to another builder")
+	default:
+		return Preview{}, false, unexpected(status, answer)
+	}
+	var a struct {
+		State string `json:"state"`
+		Preview
+	}
+	if json.Unmarshal(answer, &a) != nil {
+		return Preview{}, false, errors.New("the platform's answer about the preview of " + app + " is not valid")
+	}
+	if a.State != "running" {
+		return Preview{}, false, nil
+	}
+	pv := a.Preview
+	pv.App, pv.Reset = app, false
+	if !PublishID.MatchString(pv.Publish) || !pv.valid(pv.Publish) {
+		return Preview{}, false, errors.New("the platform's answer about the preview of " + app + " is not valid")
+	}
+	pv.Started, pv.Expires = pv.Started.UTC(), pv.Expires.UTC()
+	return pv, true, nil
 }

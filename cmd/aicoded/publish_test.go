@@ -53,10 +53,13 @@ func TestRunPublishSendsTheHistorySinceTheBase(t *testing.T) {
 	require.Equal(t, 0, code, errOut)
 	id := publishID(t, out)
 	assert.Equal(t, "Created the app demo, which you own.\nPublished demo at "+first[:7]+" as "+id+".\n"+
-		"aicoded status "+id+" shows its outcome.\n", out)
+		"aicoded status "+id+" shows its outcome.\n"+
+		"Once it passed, aicoded preview "+id+" starts its preview. It is not live. When the app's owner asks for its release: aicoded release "+id+".\n", out)
 	uploads := p.Uploads()
 	require.Len(t, uploads, 1)
 	assert.Equal(t, platformtest.Upload{App: "demo", SHA: first, Summary: "Add demo"}, platformtest.Upload{App: uploads[0].App, SHA: uploads[0].SHA, Summary: uploads[0].Summary})
+	require.NotNil(t, uploads[0].Release, "the key release is always sent")
+	assert.False(t, *uploads[0].Release)
 	assert.True(t, bytes.HasPrefix(uploads[0].Bundle, []byte("# v2 git bundle\n"+first+" HEAD\n\nPACK")), "a full bundle")
 
 	gittest.Write(t, dir, map[string]string{"notes.txt": "notes\n"})
@@ -110,7 +113,7 @@ func TestRunPublishWaits(t *testing.T) {
 	sha := gittest.Head(t, dir)
 	p.Answers(platformtest.Publish{Status: "queued"}, platformtest.Publish{Status: "running"}, platformtest.Passed())
 
-	code, out, errOut := aicoded("publish", dir)
+	code, out, errOut := aicoded("publish", "--release", dir)
 	require.Equal(t, 0, code, errOut)
 	id := publishID(t, out)
 	assert.Contains(t, out, "\nqueued ...\nrunning ...\npublish "+id+" of demo at "+sha[:7]+": Add demo\n"+
@@ -164,7 +167,8 @@ func TestRunPublishStopsWaiting(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	var stdout, stderr bytes.Buffer
-	assert.Equal(t, 1, wait(ctx, platform.New(p.URL, &stdout), id, dir, &stdout, &stderr), "as after Ctrl-C")
+	_, code = wait(ctx, platform.New(p.URL, &stdout), id, dir, &stdout, &stderr)
+	assert.Equal(t, 1, code, "as after Ctrl-C")
 	assert.Equal(t, "the publish goes on: aicoded status "+id+"\n", stderr.String())
 
 	p.Close()
@@ -172,7 +176,8 @@ func TestRunPublishStopsWaiting(t *testing.T) {
 	code, _, errOut = aicoded("status", id)
 	assert.Equal(t, 1, code)
 	stderr.Reset()
-	assert.Equal(t, 1, wait(t.Context(), platform.New(p.URL, &stdout), id, dir, &stdout, &stderr))
+	_, code = wait(t.Context(), platform.New(p.URL, &stdout), id, dir, &stdout, &stderr)
+	assert.Equal(t, 1, code)
 	assert.Equal(t, strings.TrimSuffix(errOut, "\n")+"\nthe publish goes on: aicoded status "+id+"\n", stderr.String(),
 		"the fifth failure in a row ends the wait")
 }
@@ -283,11 +288,11 @@ func TestRunPublishRefusals(t *testing.T) {
 	assert.Equal(t, 1, p.TokenRequests(), "refused after one refresh")
 
 	dir = gittest.NewApp(t, "demo")
-	code, out, errOut := aicoded("publish", "--no-wait", dir)
+	code, out, errOut := aicoded("publish", "--release", "--no-wait", dir)
 	require.Equal(t, 0, code, errOut)
 	code, _, errOut = aicoded("publish", dir)
 	assert.Equal(t, 1, code)
-	assert.Contains(t, errOut, "E-PUB-007: demo already published the commit ")
+	assert.Contains(t, errOut, "E-PUB-007: demo already published the commit ", "not held, as it was published with --release")
 	id := publishID(t, out)
 	code, _, errOut = aicoded("status", id)
 	require.Equal(t, 0, code, errOut)
@@ -410,7 +415,7 @@ func TestStatusDeclined(t *testing.T) {
 	declined.Declined = &platformtest.Declined{By: "ann@acme.example", Reason: "the export goes to\na personal address.", At: "2026-10-29T10:00:00Z"}
 	p.Answers(declined)
 	const want = "  Needs approval:\n    E-GATE-041: mail to partner.example\n" +
-		"  Declined by ann@acme.example: the export goes to a personal address.\n  Publish again to ask for a new approval.\n" +
+		"  Declined by ann@acme.example: the export goes to a personal address.\n  Publish again and ask for its release to get a new approval card.\n" +
 		"  If it changed the schema, put the changes you still want back in .aicoded/migration.sql: they left the app's migrations.\npassed\n"
 
 	code, out, errOut := aicoded("publish", dir)
@@ -444,7 +449,7 @@ func TestStatusLive(t *testing.T) {
 	p.Answers(live)
 	const want = "  Pre-approved by app type internal-tool: live.\n  Live at https://demo.acme.apps.aicoded.cloud/\npassed\n"
 
-	code, out, errOut := aicoded("publish", dir)
+	code, out, errOut := aicoded("publish", "--release", dir)
 	assert.Equal(t, 0, code, errOut)
 	assert.True(t, strings.HasSuffix(out, want), out)
 

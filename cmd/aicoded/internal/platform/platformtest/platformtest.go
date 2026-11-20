@@ -1,6 +1,6 @@
 // Package platformtest fakes the platform on 127.0.0.1, for the tests of aicoded: its sign-in,
 // token, revocation and whoami endpoints, and the builder API that aicoded publish, status,
-// logs, traces and preview call.
+// logs, traces, preview and release call.
 package platformtest
 
 import (
@@ -78,6 +78,7 @@ func New(t testing.TB) *Platform {
 	mux.HandleFunc("POST /v1/apps/migrations", p.getMigrations)
 	mux.HandleFunc("POST /v1/publishes/create", p.createPublish)
 	mux.HandleFunc("POST /v1/publishes/get", p.getPublish)
+	mux.HandleFunc("POST /v1/publishes/release", p.release)
 	mux.HandleFunc("POST /v1/previews/start", p.startPreview)
 	mux.HandleFunc("POST /v1/previews/get", p.getPreview)
 	mux.HandleFunc("POST /v1/previews/end", p.endPreview)

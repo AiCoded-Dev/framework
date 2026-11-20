@@ -167,7 +167,7 @@ live values or page calls also opens one live connection. It runs the same acces
   commit holds, and reading the outcome.
 - [Simulated attacks](simulated-attacks.md): how the delivery pipeline attacks the running app,
   and how to let the attacks reach every page.
-- [App types](app-types.md): what goes live on its own, what needs approval, the group map and
+- [App types](app-types.md): what needs approval and what does not, the group map and
   the source registry.
 
 ## Tasks

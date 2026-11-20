@@ -19,8 +19,9 @@ aicoded mcp [dir]
 aicoded login [--org <organisation>] [--device]
 aicoded logout
 aicoded whoami [--json]
-aicoded publish [--app <name>] [-m <summary>] [--no-wait] [dir]
+aicoded publish [--app <name>] [-m <summary>] [--release] [--no-wait] [dir]
 aicoded status [--json] <id>
+aicoded release [--no-wait] <id>
 aicoded preview <id>
 aicoded preview end [dir]
 aicoded logs --env <env> [--app <name>] [--since <time>] [--until <time>] [--level <level>] [--trace <id>] [--limit <n>] [--json] [dir]
@@ -255,7 +256,7 @@ scopes: app:create
 
 ## aicoded publish
 
-`aicoded publish [--app <name>] [-m <summary>] [--no-wait] [dir]` sends the commit `HEAD` names,
+`aicoded publish [--app <name>] [-m <summary>] [--release] [--no-wait] [dir]` sends the commit `HEAD` names,
 of the app in `dir`, to the platform's delivery pipeline, which checks it and writes its change
 record. [Publishing](publishing.md) tells the whole story.
 
@@ -275,7 +276,18 @@ record. [Publishing](publishing.md) tells the whole story.
   seconds for up to 35 minutes, and prints the steps, the problems as `aicoded check` prints
   them, the notes, which do not stop a publish, the decision on releasing a publish that passed,
   and the status. It exits with 0 when the publish passed and 1 otherwise. Ctrl-C stops the
-  waiting, not the publish. `--no-wait` returns at once.
+  waiting, not the publish. `--no-wait` returns at once, and says how to start the preview and
+  release the publish once it passed.
+- The platform holds a publish that passed for your preview: the end of the waiting says
+  `Held for preview, not live: its owner asks for its release with aicoded release <id>.`, then
+  it starts the app's preview with the publish and prints it, as `aicoded preview <id>` does, with
+  a line on what the preview does not do as production does, and
+  `It is not live. When the app's owner asks for its release: aicoded release <id>.` A preview
+  that does not start is printed with its code, then what to do; the publish stays held, and the
+  command exits with 0. See [publishing](publishing.md).
+- `--release` skips the preview: once the publish passed, it goes live by itself or waits for an
+  approver, and the command says so after the id. `aicoded publish --release --no-wait` sends it
+  and returns at once. `--preview`, from older versions, exits with 2: holding is the default.
 - When the platform refuses the sign-in for want of an app's scopes, or does not accept its
   token, as when this computer's clock is off, it refreshes the sign-in once and asks again. That
   is how a sign-in gets the scopes of the app its first publish created. A token the platform
@@ -290,6 +302,19 @@ the release is live, and its status, `queued`, `running`, `passed`, `failed`, `r
 with 1 when the publish failed, was refused or ended in error. An id is `pub_` and 26 lowercase
 letters and digits; another shape exits with 2. An id the platform does not know in your organisation is E-PUB-013, a publish of
 another builder's app E-PUB-005, and one of an app of yours that was archived E-PUB-006.
+
+## aicoded release
+
+`aicoded release [--no-wait] <id>` asks for the release of the publish `<id>`, held for its
+owner's preview by `aicoded publish`; only the app's owner may. The platform decides again against the app
+type: the publish goes live by itself, waits for an approver, or is not released, with the
+reason. It then waits, as `aicoded publish` does, until the release is live, waits for an approver
+or ends otherwise, printing each state, such as `going live ...`, and prints the publish as
+`aicoded status` does; `--no-wait` prints it at once. It exits with 1 when the release was refused
+or failed. A publish that is not held, as one published with `--release`, is E-REL-037, and one
+that a newer publish of the app superseded E-REL-038; asking again for a release already asked for prints the
+publish as it is. An id is `pub_` and 26 lowercase letters
+and digits; another shape exits with 2.
 
 ## aicoded preview
 

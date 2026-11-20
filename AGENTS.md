@@ -41,16 +41,14 @@ not for changing the framework itself. Follow them in every change.
   a retry within 24 hours sends nothing again. Send it after the data it reports is committed.
 - Declare in `aicoded.yaml` who uses the app (`audience`) and every data source, mail address,
   setting, secret, outside service (`egress`) and third-party module it uses.
-- Open the database and file stores once, in `OnStart`. Use the context of the request or call
-  being served for everything else.
+- Open the database and file stores once, in `OnStart`; elsewhere use the request or call context.
 - Schema changes go in `.aicoded/migration.sql`; never commit it; `aicoded publish` sends it.
 - To end a request from a hook, return `web.NotFound()`, `web.Forbidden()`,
   `web.Error(status, message)` or `web.Redirect("/path")`; otherwise return nil, or the error.
   The viewer sees only these messages; any other error shows "Something went wrong.", logged.
 - Put page scripts in `index.ts` and styles in `index.css` next to the template, and pass data to
   scripts with `<ssr:json>`.
-- Run `aicoded check` after every change and fix every problem it lists. Commit the generated
-  files with the change.
+- Run `aicoded check` after every change, fix every problem it lists, and commit generated files.
 
 ## Never
 
@@ -124,14 +122,16 @@ With MCP, the same loop is a set of tools that take app names, never paths. Add 
 ## Publishing
 
 Publish only when the developer asks, and commit everything first: a publish sends the commit `HEAD`
-names, never what is not committed. Run `aicoded publish` in the app's folder, or call the MCP tool
-`publish` with the app and a summary: it runs `aicoded check --frozen` without the tests, sends the
-commit to the platform's delivery pipeline and gives a publish id. `aicoded status <id>`, or
-`release_status`, shows the steps, the problems, the notes (which never stop a publish) and the
-outcome. Tell the developer the outcome and, once live, the address `Live at` or `release.url`
-gives; never guess one. Fix problems as with `aicoded check`. On E-CLI-004, ask the developer to run
-`aicoded login`. Only when asked, `aicoded preview <id>` or `preview_publish` previews a publish
-that passed, and `preview_end` ends it. Invite no one: the developer picks who sees it.
+names, never what is not committed. Run `aicoded publish` in the app's folder, or MCP `publish` with
+the app and a summary: it runs `aicoded check --frozen` without the tests and gives a publish id.
+`aicoded status <id>`, or `release_status`, shows the steps, problems, notes (which never stop a
+publish) and outcome. Tell the developer the outcome and, once live, the address `Live at` or
+`release.url` gives; never guess one. Fix problems as with `aicoded check`. On E-CLI-004, ask the
+developer to run `aicoded login`. A publish is held for its owner's preview: once it passed, start
+the preview (`aicoded publish` does; with MCP do what `release_status`'s `next` says) and give its
+address. It is not live. Only when the developer asks: release it (`aicoded release <id>`,
+`release`), or publish straight to production (`--release`, MCP `release: true`); end a preview
+(`preview_end`). Invite no one. A new publish replaces one waiting for approval, whose card goes.
 
 ## Where to read
 

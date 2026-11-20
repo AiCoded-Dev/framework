@@ -192,7 +192,9 @@ func TestPublishIsCleaned(t *testing.T) {
 
 func TestPublishLiveAddress(t *testing.T) {
 	p, c := signedIn(t)
-	created, err := c.CreatePublish(t.Context(), upload(sha))
+	u := upload(sha)
+	u.Release = true
+	created, err := c.CreatePublish(t.Context(), u)
 	require.NoError(t, err)
 	live := platformtest.Passed()
 	live.Release = platformtest.Live("demo")
@@ -258,4 +260,128 @@ func TestPublishRefused(t *testing.T) {
 	p.Answers(platformtest.Publish{Status: "approved"})
 	_, err = c.Publish(t.Context(), created.ID)
 	require.EqualError(t, err, "the platform's answer about the publish "+created.ID+" is not valid")
+}
+
+func TestCreatePublishSendsRelease(t *testing.T) {
+	p, c := signedIn(t)
+	_, err := c.CreatePublish(t.Context(), upload(sha))
+	require.NoError(t, err)
+	straight := upload(strings.Repeat("cd", 20))
+	straight.Release = true
+	_, err = c.CreatePublish(t.Context(), straight)
+	require.NoError(t, err)
+
+	uploads := p.Uploads()
+	require.Len(t, uploads, 2)
+	require.NotNil(t, uploads[0].Release, "the key is always sent")
+	assert.False(t, *uploads[0].Release)
+	require.NotNil(t, uploads[1].Release)
+	assert.True(t, *uploads[1].Release)
+}
+
+func TestCreatePublishOnAnOldPlatform(t *testing.T) {
+	p, c := signedIn(t)
+	p.Old()
+	_, err := c.CreatePublish(t.Context(), upload(sha))
+	assert.Equal(t, "E-CLI-010: the platform at "+p.URL+" is older than this aicoded: it does not hold publishes for their owner's preview\n"+
+		"  fix: use the aicoded version the platform's docs name, or wait for the platform update\n"+
+		"  docs: https://aicoded.dev/docs/errors/E-CLI-010", err.Error())
+	assert.Empty(t, p.Uploads(), "nothing is published where it would not be held")
+}
+
+func TestPublishReplaced(t *testing.T) {
+	p, c := signedIn(t)
+	created, err := c.CreatePublish(t.Context(), upload(sha))
+	require.NoError(t, err)
+	older := p.AddPublish("demo")
+	p.Answers(platformtest.Publish{Status: "passed", Release: &platformtest.Release{Tier: "R2", State: "waiting", Replaced: older,
+		ReplacedState: "due"}})
+	got, err := c.Publish(t.Context(), created.ID)
+	require.NoError(t, err)
+	assert.Equal(t, []string{older, "held", "due"}, []string{got.Release.Replaced, got.Release.State, got.Release.ReplacedState})
+
+	for _, bad := range []platformtest.Release{
+		{Replaced: "pub_x\x1b[2J", ReplacedState: "waiting"},
+		{Replaced: older, ReplacedState: "waiting\x1b"},
+		{Replaced: older},
+		{ReplacedState: "due"},
+	} {
+		bad.Tier, bad.State = "R2", "waiting"
+		p.Answers(platformtest.Publish{Status: "passed", Release: &bad})
+		_, err = c.Publish(t.Context(), created.ID)
+		require.EqualError(t, err, "the platform's answer about the publish "+created.ID+" is not valid", "%+v", bad)
+	}
+}
+
+// The note E-REL-039 is for clients that do not know the held state: it is dropped only from a
+// publish whose state says held.
+func TestHeldNote(t *testing.T) {
+	const id = "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"
+	note := map[string]any{"code": "E-REL-039", "message": "held for its owner's preview", "fix": "aicoded release " + id}
+	for state, notes := range map[string]int{"held": 0, "due": 1} {
+		c := answering(t, http.StatusOK, map[string]any{"id": id, "sha": sha, "status": "passed", "notes": []any{note},
+			"release": map[string]any{"tier": "R1", "state": state}})
+		got, err := c.Publish(t.Context(), id)
+		require.NoError(t, err)
+		assert.Len(t, got.Notes, notes, state)
+	}
+}
+
+func TestRelease(t *testing.T) {
+	p, c := signedIn(t)
+	p.AddApp("demo", platformtest.Email)
+	id := p.AddPublish("demo")
+	p.Hold(id)
+
+	got, err := c.Publish(t.Context(), id)
+	require.NoError(t, err)
+	assert.Equal(t, &platform.Release{Tier: "R1", AppType: "internal-tool@builtin", Reasons: []problem.Problem{}, State: "held"}, got.Release)
+	assert.Empty(t, got.Notes, "the note E-REL-039 for older aicoded is dropped: the state says held")
+
+	got, err = c.Release(t.Context(), id)
+	require.NoError(t, err)
+	assert.Equal(t, id, got.ID)
+	assert.Equal(t, "https://demo.acme.apps.aicoded.cloud/", got.Release.URL)
+
+	again, err := c.Release(t.Context(), id)
+	require.NoError(t, err, "a request made again")
+	assert.Equal(t, got, again)
+
+	plain := p.AddPublish("demo")
+	_, err = c.Release(t.Context(), plain)
+	assert.Equal(t, "E-REL-037: publish "+plain+" is not held for its owner's preview: it was published with --release, so its release was asked for at once\n"+
+		"  fix: release only a held publish that passed its checks: aicoded status shows it as held\n"+
+		"  docs: https://aicoded.dev/docs/errors/E-REL-037", err.Error())
+}
+
+func TestReleaseRefused(t *testing.T) {
+	p, c := signedIn(t)
+	p.AddApp("demo", platformtest.Email)
+	p.AddApp("payroll", "bo@acme.example")
+	older, payroll := p.AddPublish("demo"), p.AddPublish("payroll")
+	p.Hold(older)
+	p.AddPublish("demo")
+
+	for id, code := range map[string]string{older: "E-REL-038", payroll: "E-PUB-005", "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa": "E-PUB-013"} {
+		_, err := c.Release(t.Context(), id)
+		assert.Equal(t, code, errs.Code(err), id)
+	}
+	_, err := c.Release(t.Context(), older)
+	assert.Contains(t, err.Error(), "fix: release the app's newest publish")
+
+	p.Archive("demo")
+	_, err = c.Release(t.Context(), older)
+	assert.Equal(t, "E-PUB-006", errs.Code(err))
+}
+
+func TestReleaseChecksTheAnswer(t *testing.T) {
+	const id = "pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"
+	_, err := answering(t, http.StatusOK, map[string]any{"id": "pub_bbbbbbbbbbbbbbbbbbbbbbbbbb", "sha": sha, "status": "passed"}).Release(t.Context(), id)
+	require.EqualError(t, err, "the platform's answer about the publish "+id+" is not valid")
+	_, err = answering(t, http.StatusAccepted, map[string]any{"id": id, "sha": sha, "status": "passed"}).Release(t.Context(), id)
+	require.EqualError(t, err, "the platform answered 202")
+	_, err = answering(t, http.StatusNotFound, map[string]any{"error": "no_route"}).Release(t.Context(), id)
+	require.EqualError(t, err, "the platform answered 404: no_route: ", "a 404 of no route is not an unknown publish")
+	_, err = answering(t, http.StatusNotFound, map[string]any{"error": "not_found"}).Release(t.Context(), id)
+	assert.Equal(t, "E-PUB-013", errs.Code(err))
 }

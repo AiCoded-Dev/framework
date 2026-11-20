@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -105,6 +106,7 @@ type idOut struct {
 type publishIn struct {
 	App     string `json:"app"`
 	Summary string `json:"summary"`
+	Release bool   `json:"release,omitempty"`
 }
 
 type publishOut struct {
@@ -112,7 +114,9 @@ type publishOut struct {
 	App        string `json:"app"`
 	SHA        string `json:"sha"`
 	CreatedApp bool   `json:"created_app"`
-	Next       string `json:"next"`
+	// Release is whether the publish skips its owner's preview.
+	Release bool   `json:"release"`
+	Next    string `json:"next"`
 	draftState
 }
 
@@ -123,14 +127,26 @@ type draftState struct {
 	DraftNote string `json:"draft_note,omitempty"`
 }
 
-// releaseStatusOut is a publish, and what became of the app's draft.
+// releaseStatusOut is a publish, what became of the app's draft, and, for a publish held for
+// preview, what to do next.
 type releaseStatusOut struct {
 	platform.Publish
 	draftState
+	Next string `json:"next,omitempty"`
 }
 
 type releaseStatusIn struct {
 	ID string `json:"id"`
+}
+
+type releaseIn struct {
+	Publish string `json:"publish"`
+}
+
+// releaseOut is a publish after the request of its release, and what to do next.
+type releaseOut struct {
+	platform.Publish
+	Next string `json:"next"`
 }
 
 type previewPublishIn struct {
@@ -191,7 +207,8 @@ var (
   "type": "object",
   "properties": {
     "app": {"type": "string", "description": "the app's name, from the app: line of its aicoded.yaml"},
-    "summary": {"type": "string", "minLength": 1, "description": "what changed and why, in a sentence of the person's words, for the change record; at most 1000 characters are kept, fewer of emoji"}
+    "summary": {"type": "string", "minLength": 1, "description": "what changed and why, in a sentence of the person's words, for the change record; at most 1000 characters are kept, fewer of emoji"},
+    "release": {"type": "boolean", "description": "true only when the person asks to publish straight to production, skipping the preview: once it passed, it goes live by itself or waits for an approver; without it the publish is held for the person's preview until the person asks for its release"}
   },
   "required": ["app", "summary"],
   "additionalProperties": false
@@ -202,6 +219,14 @@ var (
     "id": {"type": "string", "pattern": "^pub_[a-z2-7]{26}$", "description": "the id that publish returned"}
   },
   "required": ["id"],
+  "additionalProperties": false
+}`)
+	releaseSchema = json.RawMessage(`{
+  "type": "object",
+  "properties": {
+    "publish": {"type": "string", "pattern": "^pub_[a-z2-7]{26}$", "description": "the id of a publish held for preview, which publish returned"}
+  },
+  "required": ["publish"],
   "additionalProperties": false
 }`)
 	previewPublishSchema = json.RawMessage(`{
@@ -329,15 +354,19 @@ func (s *server) addTools(srv *mcpsdk.Server) {
 		})
 	tool(srv, &mcpsdk.Tool{Name: "publish", Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &yes},
 		InputSchema: publishSchema,
-		Description: "Send the committed app to the platform's delivery pipeline, only when the person asks: it refuses changes that are not committed, runs aicoded check --frozen without the tests, sends the commit and returns the publish's id at once. The first publish of a name creates the app."},
+		Description: "Send the committed app to the platform's delivery pipeline, only when the person asks: it refuses changes that are not committed, runs aicoded check --frozen without the tests, sends the commit and returns the publish's id at once. The first publish of a name creates the app. Once it passed, the publish is held for the person's preview and goes live only after the person asks for its release, unless release is set."},
 		s.publish)
 	tool(srv, &mcpsdk.Tool{Name: "release_status", Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: &no, OpenWorldHint: &yes},
 		InputSchema: releaseStatusSchema,
-		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, the problems with their code, file:line and fix, and the notes, in the same shape, which do not stop the publish; release, the decision on releasing a publish that passed: its tier (R1 Pre-approved, R2 Needs approval, R3 Not allowed), the app type, the reasons it needs approval, its state (due, waiting, released, failed, replaced, refused or superseded), whether it is live and, while it is, url, the address its viewers open; and draft, what became of the app's schema-change draft, .aicoded/migration.sql: sent with a publish that has not ended, settled (deleted once that publish passed, or kept, as draft_note says), or none."},
+		Description: "Show a publish: its status (queued, running, passed, failed, refused or error), each step with its outcome, the problems with their code, file:line and fix, and the notes, in the same shape, which do not stop the publish; release, the decision on releasing a publish that passed: its tier (R1 Pre-approved, R2 Needs approval, R3 Not allowed), the app type, the reasons it needs approval, its state (held for preview, due, waiting, released, failed, replaced, refused or superseded), whether it is live and, while it is, url, the address its viewers open, and replaced, an older publish whose approval card or release this one ended; draft, what became of the app's schema-change draft, .aicoded/migration.sql: sent with a publish that has not ended, settled (deleted once that publish passed, or kept, as draft_note says), or none; and next, what to do, for a publish held for preview or one that replaced another."},
 		s.releaseStatus)
+	tool(srv, &mcpsdk.Tool{Name: "release", Annotations: &mcpsdk.ToolAnnotations{DestructiveHint: &yes, OpenWorldHint: &yes},
+		InputSchema: releaseSchema,
+		Description: "Ask for the release of a publish held for preview, only when the person asks to release it: the platform decides again against the app type, and the publish goes live by itself (Pre-approved), waits for an approver (Needs approval), or is not released, with the reason. It returns the publish, as release_status does, and what to do next."},
+		s.release)
 	changesPreview := &mcpsdk.ToolAnnotations{DestructiveHint: &yes, OpenWorldHint: &yes}
 	tool(srv, &mcpsdk.Tool{Name: "preview_publish", Annotations: changesPreview, InputSchema: previewPublishSchema,
-		Description: "Run a publish that passed as its app's preview on the platform, only when the person asks: one preview per app, for 14 days from its first start; this publish replaces the version it runs. It returns the preview's address and when it expires, and reset, true when the preview's data was deleted because the version it ran had schema changes that this publish does not continue. Only the person invites viewers, in the console."},
+		Description: "Run a publish that passed as its app's preview on the platform, for a held publish when release_status's next says so, otherwise only when the person asks: one preview per app, for 14 days from its first start; this publish replaces the version it runs. It returns the preview's address and when it expires, and reset, true when the preview's data was deleted because the version it ran had schema changes that this publish does not continue. Only the person invites viewers, in the console."},
 		s.previewPublish)
 	tool(srv, &mcpsdk.Tool{Name: "preview_end", Annotations: changesPreview,
 		Description: "End the preview of an app on the platform, only when the person asks: its address stops answering and its data is deleted."},
@@ -404,7 +433,7 @@ func (s *server) publish(ctx context.Context, in publishIn) (publishOut, error) 
 	if err != nil {
 		return publishOut{}, err
 	}
-	cm, err := publish.Prepare(ctx, app[0].Dir, publish.Options{Summary: in.Summary})
+	cm, err := publish.Prepare(ctx, app[0].Dir, publish.Options{Summary: in.Summary, Release: in.Release})
 	if ce := (*publish.CheckError)(nil); errors.As(err, &ce) {
 		return publishOut{}, checkFailed(ce)
 	}
@@ -422,8 +451,11 @@ func (s *server) publish(ctx context.Context, in publishIn) (publishOut, error) 
 	if err != nil {
 		state.DraftNote = err.Error()
 	}
-	return publishOut{ID: sent.ID, App: sent.App, SHA: sent.SHA, CreatedApp: sent.CreatedApp, draftState: state,
-		Next: fmt.Sprintf("call release_status with id %q about every 30 seconds until its status is passed, failed, refused or error, then tell the person the outcome and, once the release is live, its address, release.url; the delivery pipeline takes a few minutes", sent.ID)}, nil
+	next := fmt.Sprintf("call release_status with id %q about every 30 seconds until its status is passed, failed, refused or error, then tell the person the outcome; once it passed and release.state is held, do what release_status's next says: start its preview and give the person its address; the delivery pipeline takes a few minutes", sent.ID)
+	if in.Release {
+		next = fmt.Sprintf("tell the person this publish skips the preview; call release_status with id %q about every 30 seconds until its status is passed, failed, refused or error, then tell the person the outcome and, once the release is live, its address, release.url; the delivery pipeline takes a few minutes", sent.ID)
+	}
+	return publishOut{ID: sent.ID, App: sent.App, SHA: sent.SHA, CreatedApp: sent.CreatedApp, Release: in.Release, draftState: state, Next: next}, nil
 }
 
 // checkFailed is the tool error of a publish that aicoded check refused: each problem, then
@@ -450,7 +482,49 @@ func (s *server) releaseStatus(ctx context.Context, in releaseStatusIn) (release
 	if err != nil {
 		return releaseStatusOut{}, err
 	}
-	return releaseStatusOut{Publish: p, draftState: s.settle(ctx, c, p)}, nil
+	out := releaseStatusOut{Publish: p, draftState: s.settle(ctx, c, p)}
+	if p.Release != nil && p.Release.State == "held" {
+		out.Next = heldNext(ctx, c, p)
+	}
+	if p.Release != nil && p.Release.Replaced != "" && p.Release.State != "superseded" {
+		out.Next = strings.TrimPrefix(out.Next+"; tell the person: "+publish.Replaced(*p.Release), "; ")
+	}
+	return out, nil
+}
+
+// heldNext says what to do with the publish p, held for preview: start its preview unless it
+// runs, give the person its address, and ask for the release only when the person asks.
+func heldNext(ctx context.Context, c *platform.Client, p platform.Publish) string {
+	release := fmt.Sprintf("call release with publish %q only when the person asks to release it; until then it does not go live", p.ID)
+	if pv, ok, err := c.RunningPreview(ctx, p.App); err == nil && ok && pv.Publish == p.ID {
+		return fmt.Sprintf("the publish is held for preview, and its preview runs at %s until %s: give the person that address, and %s",
+			pv.URL, pv.Expires.Format(time.RFC3339), release)
+	}
+	return fmt.Sprintf("the publish is held for preview: unless the person ended its preview, call preview_publish with publish %q and give the person the preview's url; %s", p.ID, release)
+}
+
+func (s *server) release(ctx context.Context, in releaseIn) (releaseOut, error) {
+	if !platform.PublishID.MatchString(in.Publish) {
+		return releaseOut{}, errors.New("the id of a publish is pub_ and 26 lowercase letters and digits")
+	}
+	c, err := s.platformClient()
+	if err != nil {
+		return releaseOut{}, err
+	}
+	p, err := c.Release(ctx, in.Publish)
+	if err != nil {
+		return releaseOut{}, err
+	}
+	next := fmt.Sprintf("call release_status with id %q about every 30 seconds until release.live is true or release.state is waiting, refused or failed, then tell the person the outcome and, once the release is live, its address, release.url", p.ID)
+	switch {
+	case p.Release != nil && p.Release.Live:
+		next = "tell the person the release is live, at its address, release.url"
+	case p.Release == nil || p.Release.State == "refused":
+		next = "tell the person the publish was not released, and why: release.reason"
+	case p.Release.State == "waiting":
+		next = "tell the person that an approver must approve the release before it goes live, and why: release.reasons; release_status shows when it is live"
+	}
+	return releaseOut{Publish: p, Next: next}, nil
 }
 
 // settle clears the draft of the app of the publish p, in the workspace, once p, which carried
@@ -491,7 +565,7 @@ func (s *server) previewPublish(ctx context.Context, in previewPublishIn) (previ
 	if err != nil {
 		return previewOut{}, err
 	}
-	next := "tell the person the preview's url and when it expires"
+	next := "tell the person the preview's url and when it expires, which a new version does not move; that the preview reaches no outside service that production does not reach yet, and keeps its mail in the console"
 	if pv.Reset {
 		next += ", and that its data was reset: the preview had run schema changes that this publish does not continue"
 	}

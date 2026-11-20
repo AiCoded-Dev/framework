@@ -40,9 +40,14 @@ Work in this loop:
    of a publish that passed (Pre-approved, Needs approval and why, or Not released) and, once it
    is live, the address in release.url, and fix its problems as you fix check's. Never guess an
    address. On E-CLI-004, ask the person to run aicoded login.
-6. Only when the person asks for a preview on the platform: call preview_publish with the id of
-   a publish that passed, and tell the person its url. preview_end ends it. Invite no one: the
-   person picks who sees the preview, in the console.
+   A publish is held for the person's preview: once it passed, release_status's next says to
+   start its preview with preview_publish; give the person the preview's url. It is not live.
+   Call release with the publish id only when the person asks to release it, and pass release
+   true to publish only when the person asks to publish straight to production, skipping the
+   preview. A new publish replaces one waiting for approval, whose approval card goes.
+6. Apart from the preview of a held publish, call preview_publish only when the person asks,
+   with the id of a publish that passed, and tell the person its url. preview_end ends it, only
+   when the person asks. Invite no one: the person picks who sees the preview, in the console.
 aicoded.yaml is the app's permission list: write app, owner, data, email, settings, secrets
 and modules by hand.
 aicoded generate writes its access and services sections, every *_gen.go and *_gen.ts file,

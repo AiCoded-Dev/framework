@@ -234,11 +234,12 @@ func TestToolsListed(t *testing.T) {
 	assert.Equal(t, map[string]bool{
 		"app_create": false, "check": false, "preview": false, "mail_receive": false, "publish": false,
 		"what_broke": true, "describe": true, "howto": true, "logs": true, "traces": true, "trace": true,
-		"mail_list": true, "mail_get": true, "release_status": false, "preview_publish": false, "preview_end": false,
+		"mail_list": true, "mail_get": true, "release_status": false, "preview_publish": false, "preview_end": false, "release": false,
 	}, readOnly)
-	assert.ElementsMatch(t, []string{"publish", "release_status", "logs", "traces", "trace", "preview_publish", "preview_end"}, openWorld,
+	assert.ElementsMatch(t, []string{"publish", "release_status", "release", "logs", "traces", "trace", "preview_publish", "preview_end"}, openWorld,
 		"only these reach the platform")
-	assert.ElementsMatch(t, []string{"preview_publish", "preview_end"}, destructive, "only these may delete a preview's data")
+	assert.ElementsMatch(t, []string{"preview_publish", "preview_end", "release"}, destructive,
+		"only these may delete a preview's data or replace what production runs")
 }
 
 func TestHowto(t *testing.T) {
@@ -318,6 +319,9 @@ func TestInstructionsNameTheOverview(t *testing.T) {
 	assert.Contains(t, cs.InitializeResult().Instructions, "the address in release.url")
 	assert.Contains(t, cs.InitializeResult().Instructions, "Never open, print or copy dev.yaml")
 	assert.Contains(t, cs.InitializeResult().Instructions, "Invite no one")
+	assert.Contains(t, cs.InitializeResult().Instructions, "A publish is held for the person's preview")
+	assert.Contains(t, cs.InitializeResult().Instructions, "pass release\n   true to publish only when the person asks to publish straight to production")
+	assert.Contains(t, cs.InitializeResult().Instructions, "release with the publish id only when the person asks to release it")
 }
 
 func TestAppNamesAreChecked(t *testing.T) {
@@ -369,6 +373,7 @@ func TestSchemasAreChecked(t *testing.T) {
 		"publish":         {"app": "hello", "summary": "First", "path": "/etc"},
 		"release_status":  {"id": "../pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"},
 		"preview_publish": {"publish": "../pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"},
+		"release":         {"publish": "../pub_aaaaaaaaaaaaaaaaaaaaaaaaaa"},
 		"preview_end":     {"app": "demo", "path": "/etc"},
 	} {
 		res := call(t, cs, tool, args)
@@ -593,14 +598,16 @@ func TestPublishTools(t *testing.T) {
 		return res
 	}
 
-	out := result[publishOut](t, callTool("publish", map[string]any{"app": "demo", "summary": "First"}))
+	out := result[publishOut](t, callTool("publish", map[string]any{"app": "demo", "summary": "First", "release": true}))
 	assert.Regexp(t, `^pub_[a-z2-7]{26}$`, out.ID)
-	assert.Equal(t, publishOut{ID: out.ID, App: "demo", SHA: gittest.Head(t, dir), CreatedApp: true, Next: out.Next,
+	assert.Equal(t, publishOut{ID: out.ID, App: "demo", SHA: gittest.Head(t, dir), CreatedApp: true, Release: true, Next: out.Next,
 		draftState: draftState{Draft: "none"}}, out)
+	assert.Contains(t, out.Next, "tell the person this publish skips the preview")
 	assert.Contains(t, out.Next, `call release_status with id "`+out.ID+`"`)
 	assert.Contains(t, out.Next, "release.url")
 	require.Len(t, p.Uploads(), 1)
 	assert.Equal(t, "First", p.Uploads()[0].Summary)
+	assert.True(t, *p.Uploads()[0].Release)
 	got := result[platform.Publish](t, callTool("release_status", map[string]any{"id": out.ID}))
 	assert.Equal(t, "passed", got.Status)
 	assert.Equal(t, out.ID, got.ID)
@@ -793,6 +800,7 @@ func TestMCPPreviewTools(t *testing.T) {
 	assert.Equal(t, "https://demo.acme.preview.aicoded.cloud/", out.URL)
 	assert.Equal(t, id, out.Publish)
 	assert.Contains(t, out.Next, "the person invites")
+	assert.Contains(t, out.Next, "reaches no outside service that production does not reach yet")
 	ended := result[previewEndOut](t, call(t, cs, "preview_end", map[string]any{"app": "demo"}))
 	assert.Equal(t, previewEndOut{App: "demo", Ended: true}, ended)
 	res := call(t, cs, "preview_end", map[string]any{"app": "demo"})
@@ -803,4 +811,112 @@ func TestMCPPreviewTools(t *testing.T) {
 	res = call(t, cs, "preview_publish", map[string]any{"publish": id})
 	assert.True(t, res.IsError)
 	assert.Contains(t, text(res), "E-REL-029: the publish "+id+" did not pass its checks\n  fix: preview a publish that passed its checks")
+}
+
+// A publish is held for its preview once it passed: release_status tells the assistant to start its
+// preview, then to give its address, and release asks for the release only when called.
+func TestPublishToolsHoldForPreview(t *testing.T) {
+	testhome.Set(t)
+	p := platformtest.New(t)
+	t.Setenv("AICODED_PLATFORM", p.URL)
+	p.SignIn(t)
+	dir := gittest.NewApp(t, "demo")
+	cs := connect(t, dir, io.Discard)
+
+	out := result[publishOut](t, call(t, cs, "publish", map[string]any{"app": "demo", "summary": "Search"}))
+	assert.False(t, out.Release)
+	assert.Contains(t, out.Next, "release.state is held, do what release_status's next says")
+	require.NotNil(t, p.Uploads()[0].Release)
+	assert.False(t, *p.Uploads()[0].Release)
+
+	p.RefusePreview(http.StatusConflict, "conflict", "E-REL-030", "the permission list declares the setting report_day with no value set for the preview")
+	got := result[releaseStatusOut](t, call(t, cs, "release_status", map[string]any{"id": out.ID}))
+	assert.Equal(t, "held", got.Release.State)
+	assert.Empty(t, got.Notes, "the note E-REL-039 for older clients is dropped: the state says held")
+	assert.Equal(t, `the publish is held for preview: unless the person ended its preview, call preview_publish with publish "`+out.ID+
+		`" and give the person the preview's url; call release with publish "`+out.ID+`" only when the person asks to release it; `+
+		`until then it does not go live`, got.Next)
+	res := call(t, cs, "preview_publish", map[string]any{"publish": out.ID})
+	assert.True(t, res.IsError)
+	assert.Contains(t, text(res), "E-REL-030: the permission list declares the setting report_day")
+	got = result[releaseStatusOut](t, call(t, cs, "release_status", map[string]any{"id": out.ID}))
+	assert.Contains(t, got.Next, "call preview_publish", "still held, with no preview")
+
+	result[previewOut](t, call(t, cs, "preview_publish", map[string]any{"publish": out.ID}))
+	got = result[releaseStatusOut](t, call(t, cs, "release_status", map[string]any{"id": out.ID}))
+	assert.Regexp(t, `^the publish is held for preview, and its preview runs at https://demo\.acme\.preview\.aicoded\.cloud/ until \S+Z: `+
+		`give the person that address, and call release with publish "`+out.ID+`" only when`, got.Next)
+
+	p.ReleaseAnswers(&platformtest.Release{Tier: "R1", AppType: "internal-tool@builtin", Reasons: []platformtest.Problem{}, State: "due"},
+		platformtest.Live("demo"))
+	released := result[releaseOut](t, call(t, cs, "release", map[string]any{"publish": out.ID}))
+	assert.Equal(t, "due", released.Release.State)
+	assert.Contains(t, released.Next, `call release_status with id "`+out.ID+`"`)
+	result[releaseStatusOut](t, call(t, cs, "release_status", map[string]any{"id": out.ID}))
+	got = result[releaseStatusOut](t, call(t, cs, "release_status", map[string]any{"id": out.ID}))
+	assert.Equal(t, "https://demo.acme.apps.aicoded.cloud/", got.Release.URL)
+	assert.Empty(t, got.Next)
+
+	again := result[releaseOut](t, call(t, cs, "release", map[string]any{"publish": out.ID}))
+	assert.True(t, again.Release.Live, "a request made again shows the publish as it is")
+	assert.Equal(t, "tell the person the release is live, at its address, release.url", again.Next)
+
+	plain := p.AddPublish("demo")
+	res = call(t, cs, "release", map[string]any{"publish": plain})
+	assert.True(t, res.IsError)
+	assert.Equal(t, "E-REL-037: publish "+plain+" is not held for its owner's preview: it was published with --release, so its release was asked for at once\n"+
+		"  fix: release only a held publish that passed its checks: aicoded status shows it as held\n"+
+		"  docs: https://aicoded.dev/docs/errors/E-REL-037", text(res))
+}
+
+func TestReleaseTool(t *testing.T) {
+	testhome.Set(t)
+	p := platformtest.New(t)
+	t.Setenv("AICODED_PLATFORM", p.URL)
+	p.SignIn(t)
+	p.AddApp("demo", platformtest.Email)
+	cs := connect(t, t.TempDir(), io.Discard)
+
+	for state, next := range map[string]string{
+		"waiting": "tell the person that an approver must approve the release before it goes live",
+		"refused": "tell the person the publish was not released, and why: release.reason",
+	} {
+		id := p.AddPublish("demo")
+		p.Hold(id)
+		p.ReleaseAnswers(&platformtest.Release{Tier: "R2", AppType: "internal-tool@builtin", Reasons: []platformtest.Problem{}, State: state})
+		out := result[releaseOut](t, call(t, cs, "release", map[string]any{"publish": id}))
+		assert.Equal(t, state, out.Release.State)
+		assert.Contains(t, out.Next, next)
+	}
+
+	older := p.AddPublish("demo")
+	p.Hold(older)
+	p.AddPublish("demo")
+	res := call(t, cs, "release", map[string]any{"publish": older})
+	assert.True(t, res.IsError)
+	assert.Contains(t, text(res), "E-REL-038: publish "+older+" was superseded by a newer publish of the app, and only the app's newest publish is released\n  fix: release the app's newest publish")
+}
+
+func TestReleaseStatusReplaced(t *testing.T) {
+	testhome.Set(t)
+	p := platformtest.New(t)
+	t.Setenv("AICODED_PLATFORM", p.URL)
+	p.SignIn(t)
+	p.AddApp("demo", platformtest.Email)
+	cs := connect(t, t.TempDir(), io.Discard)
+	older, id := p.AddPublish("demo"), p.AddPublish("demo")
+	p.Hold(id)
+	p.Answers(platformtest.Publish{Status: "passed", Release: &platformtest.Release{Tier: "R1", AppType: "internal-tool@builtin",
+		Reasons: []platformtest.Problem{}, Replaced: older, ReplacedState: "waiting"}})
+
+	got := result[releaseStatusOut](t, call(t, cs, "release_status", map[string]any{"id": id}))
+	assert.Equal(t, older, got.Release.Replaced)
+	assert.Contains(t, got.Next, `call preview_publish with publish "`+id+`"`)
+	assert.True(t, strings.HasSuffix(got.Next, "; tell the person: This publish replaced "+older+
+		", which was waiting for approval; its approval card is gone. Ask for this one's release to get a new card."), got.Next)
+
+	p.Answers(platformtest.Publish{Status: "passed", Release: &platformtest.Release{Tier: "R1", AppType: "internal-tool@builtin",
+		Reasons: []platformtest.Problem{}, State: "superseded", Replaced: older, ReplacedState: "waiting"}})
+	got = result[releaseStatusOut](t, call(t, cs, "release_status", map[string]any{"id": older}))
+	assert.Empty(t, got.Next, "a superseded publish says nothing of what it replaced")
 }

@@ -7,4 +7,4 @@ The runner tried to start the new version 3 times, 5 seconds apart, and reported
 failed. Until a version that runs on the changed schema goes live, the app's address answers this
 page with status 503, and the app serves no one. See [schema changes](../guides/schema-changes.md).
 
-**Fix:** publish a fixed version; the app stays stopped until it goes live
+**Fix:** publish a fixed version and ask for its release, or publish it with `aicoded publish --release`; the app stays stopped until it goes live

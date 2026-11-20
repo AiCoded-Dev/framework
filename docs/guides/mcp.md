@@ -2,7 +2,7 @@
 
 `aicoded mcp` gives your AI assistant the tools of `aicoded` over MCP: it creates apps, checks
 them, previews them in `aicoded dev`, reads what went wrong, publishes them, runs their previews
-on the platform, reads their logs and traces there, and reads these docs offline. No tool runs a shell command or takes a file
+on the platform, releases a publish held for preview, reads their logs and traces there, and reads these docs offline. No tool runs a shell command or takes a file
 path, and nothing a tool returns of `aicoded dev` holds a secret value.
 
 ## Setting it up
@@ -33,17 +33,19 @@ The MCP setup page of the dev UI shows the commands for Claude Code and Codex, a
 | `mail_list` | the mail an app sent, which `aicoded dev` caught, and its mailbox, newest first |
 | `mail_get` | one message from `mail_list` |
 | `mail_receive` | delivers a test message to an app's inbox, as if it had arrived by mail |
-| `publish` | does what `aicoded publish --no-wait` does for an app, with a summary of the change, and returns the publish's id, app and commit, whether it created the app, and what to do next |
-| `release_status` | shows a publish by its id, as `aicoded status --json` does: its status, steps, problems and notes, and the decision on releasing it, with the address of a live release in `release.url` |
-| `preview_publish` | runs a publish that passed as its app's preview on the platform, as `aicoded preview <id>` does, and returns its `app`, `host`, `url`, `publish`, `started`, `expires`, whether its data was `reset`, and what to do next |
+| `publish` | does what `aicoded publish --no-wait` does for an app, with a summary of the change and, with `release: true`, as `--release` does, and returns the publish's id, app and commit, whether it created the app, whether it skips the preview (`release`), and what to do next |
+| `release_status` | shows a publish by its id, as `aicoded status --json` does: its status, steps, problems and notes, and the decision on releasing it, with the address of a live release in `release.url`; for a publish held for preview, `next` says to start its preview with `preview_publish` unless it runs, to give you its address, and to call `release` only when you ask, and, for one that replaced an older publish waiting for approval or going live, to tell you so |
+| `release` | asks for the release of a publish held for preview, as `aicoded release --no-wait` does, and returns the publish, as `release_status` does, and what to do next |
+| `preview_publish` | runs a publish that passed as its app's preview on the platform, as `aicoded preview <id>` does, for a held publish when `release_status`'s `next` says so and otherwise only when you ask, and returns its `app`, `host`, `url`, `publish`, `started`, `expires`, whether its data was `reset`, and what to do next |
 | `preview_end` | ends the preview of an app on the platform, as `aicoded preview end` does, which deletes its data |
 
-All but `app_create`, `check`, `preview`, `mail_receive`, `publish`, `preview_publish` and
-`preview_end` only read; `preview_publish` and `preview_end` may delete a preview's data, so your
-AI assistant may ask you before it calls them. `publish`, `release_status`, `preview_publish`,
-`preview_end`, and `logs`, `traces` and `trace` with `env` set to `preview` or `production`,
-reach the platform, with your sign-in; the other tools stay on this computer. On the platform,
-`logs`, `traces` and `trace` also take `since` and `until`, as `aicoded logs` does, read one app,
+All but `app_create`, `check`, `preview`, `mail_receive`, `publish`, `release`, `preview_publish`
+and `preview_end` only read; `preview_publish` and `preview_end` may delete a preview's data, and
+`release` may replace what production runs, so your AI assistant may ask you before it calls
+them. `publish`, `release_status`, `release`,
+`preview_publish`, `preview_end`, and `logs`, `traces` and `trace` with `env` set to `preview` or
+`production`, reach the platform, with your sign-in; the other tools stay on this computer. On the
+platform, `logs`, `traces` and `trace` also take `since` and `until`, as `aicoded logs` does, read one app,
 which you must own, and refuse `contains`; their answers have the shape of those of
 `aicoded dev`. Production logs hold what the app logged while people used it, which can be
 personal data: the server tells the assistant to read them only when you ask.
@@ -77,9 +79,14 @@ The server tells the assistant to start with `howto guides/overview`, and to wor
    tells you the outcome, with whether it goes live and, once it is live, its address from
    `release.url`, and fixes its problems as it fixes those of
    `check`. When it is not signed in (E-CLI-004), it asks you to run `aicoded login`: there is no
-   tool for signing in.
-6. Only when you ask for a preview on the platform, it calls `preview_publish` with a publish that
-   passed and gives you the preview's address, and `preview_end` when you ask to end it. It
+   tool for signing in. A publish is held for your preview: once it passed, it starts the preview
+   with `preview_publish`, as `release_status` says, and gives you the address. It calls `release`
+   only when you ask to release it, and passes `release: true` to `publish` only when you ask to
+   publish straight to production. A new publish replaces one waiting for approval, whose card
+   goes.
+6. Apart from the preview of a held publish, it calls `preview_publish` only when you ask, with a
+   publish that passed, and gives you the preview's address, and `preview_end` when you ask to end
+   it. It
    invites no one: you pick who sees the preview, in the console.
 
 The server also tells it never to open, print or copy `dev.yaml`, `credentials.json` or any other
