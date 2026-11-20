@@ -5,7 +5,7 @@ go 1.26.0
 toolchain go1.26.11
 
 require (
-	aicoded.dev/framework v0.0.0-00010101000000-000000000000
+	aicoded.dev/framework v0.13.0
 	connectrpc.com/connect v1.21.0
 	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327
 	github.com/chromedp/chromedp v0.14.2
@@ -38,5 +38,3 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
 )
-
-replace aicoded.dev/framework => ../..
